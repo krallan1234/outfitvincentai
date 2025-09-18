@@ -21,6 +21,17 @@ const CATEGORIES = [
   'other'
 ];
 
+const STYLES = [
+  'casual',
+  'formal',
+  'sporty',
+  'business',
+  'elegant',
+  'vintage',
+  'streetwear',
+  'bohemian'
+];
+
 export const ClothesUpload = () => {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>('');
@@ -30,7 +41,7 @@ export const ClothesUpload = () => {
   const [brand, setBrand] = useState('');
   const [description, setDescription] = useState('');
   
-  const { uploadClothing, loading } = useClothes();
+  const { uploadClothing, loading, clothes } = useClothes();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -46,13 +57,19 @@ export const ClothesUpload = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !category) return;
+    if (!file || !category || !style) return;
+
+    // Check for 10 image limit
+    if (clothes.length >= 10) {
+      alert('Maximum 10 clothing items allowed for testing. Please delete some items to upload new ones.');
+      return;
+    }
 
     try {
       await uploadClothing(file, {
         category,
         color: color || undefined,
-        style: style || undefined,
+        style,
         brand: brand || undefined,
         description: description || undefined,
       });
@@ -75,7 +92,7 @@ export const ClothesUpload = () => {
       <CardHeader>
         <CardTitle>Upload Clothing Item</CardTitle>
         <CardDescription>
-          Upload a photo of your clothing item. Our AI will automatically detect category, color, and style.
+          Upload a photo of your clothing item ({clothes.length}/10 items used). Google Gemini AI will detect the color automatically, but you'll need to manually tag category and style.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -140,26 +157,32 @@ export const ClothesUpload = () => {
             </Select>
           </div>
 
-          {/* Optional Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="color">Color</Label>
-              <Input
-                id="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                placeholder="e.g., Blue, Red, Black"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="style">Style</Label>
-              <Input
-                id="style"
-                value={style}
-                onChange={(e) => setStyle(e.target.value)}
-                placeholder="e.g., Casual, Formal, Sporty"
-              />
-            </div>
+          {/* Style Selection - Required */}
+          <div className="space-y-2">
+            <Label htmlFor="style">Style *</Label>
+            <Select value={style} onValueChange={setStyle}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select style" />
+              </SelectTrigger>
+              <SelectContent>
+                {STYLES.map((styleOption) => (
+                  <SelectItem key={styleOption} value={styleOption}>
+                    {styleOption.charAt(0).toUpperCase() + styleOption.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Color - Auto-detected by AI */}
+          <div className="space-y-2">
+            <Label htmlFor="color">Color (AI will auto-detect)</Label>
+            <Input
+              id="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              placeholder="Leave empty for AI color detection"
+            />
           </div>
 
           <div className="space-y-2">
@@ -186,13 +209,15 @@ export const ClothesUpload = () => {
           <Button 
             type="submit" 
             className="w-full" 
-            disabled={!file || !category || loading}
+            disabled={!file || !category || !style || loading || clothes.length >= 10}
           >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading & Analyzing...
+                Uploading & Detecting Color...
               </>
+            ) : clothes.length >= 10 ? (
+              'Max 10 items reached'
             ) : (
               'Upload Clothing Item'
             )}

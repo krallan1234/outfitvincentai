@@ -66,18 +66,20 @@ export const useClothes = () => {
         reader.readAsDataURL(file);
       });
 
-      // Analyze image with AI
-      let aiAnalysis = null;
-      try {
-        const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-clothing', {
-          body: { imageBase64 },
-        });
-        
-        if (!analysisError && analysisData?.analysis) {
-          aiAnalysis = analysisData.analysis;
+      // Only use AI for color detection if color is not manually provided
+      let aiDetectedColor = null;
+      if (!metadata.color) {
+        try {
+          const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-clothing', {
+            body: { imageBase64 },
+          });
+          
+          if (!analysisError && analysisData?.analysis?.color) {
+            aiDetectedColor = analysisData.analysis.color;
+          }
+        } catch (aiError) {
+          console.warn('AI color detection failed, continuing without color:', aiError);
         }
-      } catch (aiError) {
-        console.warn('AI analysis failed, continuing with manual metadata:', aiError);
       }
 
       // Sanitize filename to prevent storage errors
@@ -103,16 +105,10 @@ export const useClothes = () => {
         .from('clothes')
         .getPublicUrl(fileName);
 
-      // Save to database with merged metadata
+      // Save to database with manual metadata and AI-detected color
       const finalMetadata = {
         ...metadata,
-        ...(aiAnalysis && {
-          category: aiAnalysis.category || metadata.category,
-          color: aiAnalysis.color || metadata.color,
-          style: aiAnalysis.style || metadata.style,
-          brand: aiAnalysis.brand || metadata.brand,
-          description: aiAnalysis.description || metadata.description,
-        })
+        color: metadata.color || aiDetectedColor || 'unknown',
       };
 
       const { data: clothingData, error: dbError } = await supabase
@@ -121,7 +117,7 @@ export const useClothes = () => {
           user_id: user.id,
           image_url: publicUrl,
           ...finalMetadata,
-          ai_detected_metadata: aiAnalysis,
+          ai_detected_metadata: aiDetectedColor ? { color: aiDetectedColor } : null,
         })
         .select()
         .single();

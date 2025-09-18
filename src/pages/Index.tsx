@@ -9,9 +9,14 @@ const Index = () => {
       <div className="text-center space-y-6">
         <h1 className="text-4xl font-bold">Outfit AI</h1>
         <p className="text-xl text-muted-foreground">Upload your clothes and get AI-powered outfit suggestions</p>
-        <Button onClick={() => navigate('/dashboard')} size="lg">
-          Get Started
-        </Button>
+        <div className="flex gap-4 justify-center">
+          <Button onClick={() => navigate('/dashboard')} size="lg">
+            Manage Wardrobe
+          </Button>
+          <Button onClick={() => navigate('/outfits')} variant="outline" size="lg">
+            Generate Outfits
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -56,6 +56,48 @@ export type Database = {
         }
         Relationships: []
       }
+      outfits: {
+        Row: {
+          ai_analysis: Json | null
+          created_at: string
+          description: string | null
+          generated_image_url: string | null
+          id: string
+          mood: string | null
+          prompt: string
+          recommended_clothes: Json | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          created_at?: string
+          description?: string | null
+          generated_image_url?: string | null
+          id?: string
+          mood?: string | null
+          prompt: string
+          recommended_clothes?: Json | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_analysis?: Json | null
+          created_at?: string
+          description?: string | null
+          generated_image_url?: string | null
+          id?: string
+          mood?: string | null
+          prompt?: string
+          recommended_clothes?: Json | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

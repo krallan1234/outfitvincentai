@@ -110,7 +110,7 @@ export const OutfitGenerator = () => {
                 <SelectValue placeholder="Select a mood for your outfit" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No specific mood</SelectItem>
+                <SelectItem value="none">No specific mood</SelectItem>
                 {MOODS.map((moodOption) => (
                   <SelectItem key={moodOption.value} value={moodOption.value}>
                     {moodOption.label}

@@ -4,9 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Loader2, Calendar } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { OutfitModal } from '@/components/OutfitModal';
+import { useState } from 'react';
 
 export const OutfitGallery = () => {
   const { outfits, loading, deleteOutfit } = useOutfits();
+  const [selectedOutfit, setSelectedOutfit] = useState<Outfit | null>(null);
 
   if (loading && outfits.length === 0) {
     return (
@@ -25,24 +28,34 @@ export const OutfitGallery = () => {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {outfits.map((outfit) => (
-        <OutfitCard 
-          key={outfit.id} 
-          outfit={outfit} 
-          onDelete={() => deleteOutfit(outfit.id)} 
-        />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {outfits.map((outfit) => (
+          <OutfitCard 
+            key={outfit.id} 
+            outfit={outfit} 
+            onDelete={() => deleteOutfit(outfit.id)}
+            onClick={() => setSelectedOutfit(outfit)}
+          />
+        ))}
+      </div>
+      
+      <OutfitModal
+        outfit={selectedOutfit}
+        isOpen={!!selectedOutfit}
+        onClose={() => setSelectedOutfit(null)}
+      />
+    </>
   );
 };
 
 interface OutfitCardProps {
   outfit: Outfit;
   onDelete: () => void;
+  onClick: () => void;
 }
 
-const OutfitCard = ({ outfit, onDelete }: OutfitCardProps) => {
+const OutfitCard = ({ outfit, onDelete, onClick }: OutfitCardProps) => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -52,7 +65,7 @@ const OutfitCard = ({ outfit, onDelete }: OutfitCardProps) => {
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={onClick}>
       {/* Generated Image */}
       {outfit.generated_image_url && (
         <div className="aspect-square relative">
@@ -64,7 +77,12 @@ const OutfitCard = ({ outfit, onDelete }: OutfitCardProps) => {
           <div className="absolute top-2 right-2">
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="icon" className="h-8 w-8">
+                <Button 
+                  variant="destructive" 
+                  size="icon" 
+                  className="h-8 w-8"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </AlertDialogTrigger>

@@ -6,15 +6,18 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCommunity, CommunityOutfit, RecommendedOutfit } from '@/hooks/useCommunity';
 import { CommunityStats } from '@/components/CommunityStats';
+import { OutfitModal } from '@/components/OutfitModal';
 import { cn } from '@/lib/utils';
 
 export const CommunityOutfitCard = ({ 
   outfit, 
   onLike, 
+  onClick,
   showRecommendationReason = false 
 }: { 
   outfit: CommunityOutfit | RecommendedOutfit; 
   onLike: (id: string) => void;
+  onClick: () => void;
   showRecommendationReason?: boolean;
 }) => {
   const formatDate = (dateString: string) => {
@@ -27,7 +30,7 @@ export const CommunityOutfitCard = ({
   const isRecommended = 'recommendation_score' in outfit;
 
   return (
-    <Card className="overflow-hidden group hover:shadow-lg transition-shadow">
+    <Card className="overflow-hidden group hover:shadow-lg transition-shadow cursor-pointer" onClick={onClick}>
       {/* Image */}
       {outfit.generated_image_url && (
         <div className="aspect-square relative">
@@ -86,7 +89,10 @@ export const CommunityOutfitCard = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onLike(outfit.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onLike(outfit.id);
+            }}
             className={cn(
               "flex items-center gap-2",
               outfit.is_liked && "text-red-500"
@@ -114,6 +120,7 @@ const CommunityPage = () => {
     toggleLike, 
     fetchRecommendations 
   } = useCommunity();
+  const [selectedOutfit, setSelectedOutfit] = useState<CommunityOutfit | RecommendedOutfit | null>(null);
 
   useEffect(() => {
     fetchRecommendations();
@@ -172,6 +179,7 @@ const CommunityPage = () => {
                         key={outfit.id}
                         outfit={outfit}
                         onLike={toggleLike}
+                        onClick={() => setSelectedOutfit(outfit)}
                         showRecommendationReason={true}
                       />
                     ))}
@@ -210,6 +218,7 @@ const CommunityPage = () => {
                         key={outfit.id}
                         outfit={outfit}
                         onLike={toggleLike}
+                        onClick={() => setSelectedOutfit(outfit)}
                       />
                     ))}
                   </div>
@@ -224,6 +233,14 @@ const CommunityPage = () => {
             </Card>
           </TabsContent>
         </Tabs>
+        
+        <OutfitModal
+          outfit={selectedOutfit}
+          isOpen={!!selectedOutfit}
+          onClose={() => setSelectedOutfit(null)}
+          onLike={toggleLike}
+          showLikeButton={true}
+        />
       </div>
     </div>
   );

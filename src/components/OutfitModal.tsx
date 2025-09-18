@@ -32,6 +32,11 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
     }
   }, [isOpen, outfit]);
 
+  // Early return if outfit is null
+  if (!outfit) {
+    return null;
+  }
+
   const fetchClothesImages = async () => {
     setLoading(true);
     try {
@@ -62,7 +67,7 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">{outfit?.title}</DialogTitle>
+          <DialogTitle className="text-xl">{outfit.title}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -71,9 +76,9 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                {formatDate(outfit?.created_at)}
+                {formatDate(outfit.created_at)}
               </div>
-              {outfit?.mood && (
+              {outfit.mood && (
                 <Badge variant="secondary" className="capitalize">
                   {outfit.mood}
                 </Badge>
@@ -94,16 +99,16 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                       outfit.is_liked && "fill-current"
                     )} 
                   />
-                  <span>{outfit.likes_count}</span>
+                  <span>{outfit.likes_count || 0}</span>
                 </Button>
               )}
             </div>
 
             <p className="text-sm font-medium text-muted-foreground">
-              "{outfit?.prompt}"
+              "{outfit.prompt}"
             </p>
 
-            {outfit?.description && (
+            {outfit.description && (
               <p className="text-sm">
                 {outfit.description}
               </p>
@@ -115,7 +120,7 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
             <h3 className="text-lg font-semibold">Outfit Visualization</h3>
             
             {/* Generated Image */}
-            {outfit?.generated_image_url && (
+            {outfit.generated_image_url && (
               <div className="aspect-video bg-muted rounded-lg overflow-hidden">
                 <img
                   src={outfit.generated_image_url}
@@ -155,7 +160,7 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                   ))}
                 </div>
               </div>
-            ) : outfit?.recommended_clothes?.length > 0 ? (
+            ) : outfit.recommended_clothes?.length > 0 ? (
               <div className="text-center p-8">
                 <p className="text-muted-foreground">
                   Unable to load wardrobe item images
@@ -165,7 +170,7 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
           </div>
 
           {/* AI Analysis */}
-          {outfit?.ai_analysis && (
+          {outfit.ai_analysis && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Style Analysis</h3>
               

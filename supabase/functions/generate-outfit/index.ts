@@ -181,7 +181,28 @@ serve(async (req) => {
 
     const geminiData = await geminiResponse.json();
     const content = geminiData.candidates[0].content.parts[0].text;
-    const outfitRecommendation = JSON.parse(content);
+    
+    // Log raw response for debugging
+    console.log('Raw Gemini response:', content);
+    
+    // Parse JSON from potentially markdown-wrapped response
+    let outfitRecommendation;
+    try {
+      // Try to extract JSON from markdown code blocks first
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        console.log('Found markdown-wrapped JSON, extracting...');
+        outfitRecommendation = JSON.parse(jsonMatch[1].trim());
+      } else {
+        // Fallback to direct parsing
+        console.log('No markdown wrapper found, parsing directly...');
+        outfitRecommendation = JSON.parse(content.trim());
+      }
+    } catch (parseError) {
+      console.error('Failed to parse JSON response:', parseError);
+      console.error('Content that failed to parse:', content);
+      throw new Error('Invalid JSON response from AI. Please try again with a different request.');
+    }
 
     // Generate outfit visualization description (no additional API calls)
     const selectedItems = validClothes.filter(item => 

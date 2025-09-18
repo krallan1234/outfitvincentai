@@ -80,13 +80,23 @@ export const useClothes = () => {
         console.warn('AI analysis failed, continuing with manual metadata:', aiError);
       }
 
-      // Upload image to storage
-      const fileName = `${user.id}/${Date.now()}_${file.name}`;
+      // Sanitize filename to prevent storage errors
+      const sanitizedFileName = file.name
+        .replace(/[åäöÅÄÖ]/g, (char) => ({
+          'å': 'a', 'ä': 'a', 'ö': 'o',
+          'Å': 'A', 'Ä': 'A', 'Ö': 'O'
+        }[char] || char))
+        .replace(/[^a-zA-Z0-9.-]/g, '_');
+      
+      const fileName = `${user.id}/${Date.now()}_${sanitizedFileName}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('clothes')
         .upload(fileName, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
@@ -127,9 +137,21 @@ export const useClothes = () => {
       return clothingData;
     } catch (error) {
       console.error('Error uploading clothing:', error);
+      
+      let errorMessage = 'Failed to upload clothing item';
+      if (error instanceof Error) {
+        if (error.message.includes('InvalidKey')) {
+          errorMessage = 'Invalid filename. Please try renaming your image file.';
+        } else if (error.message.includes('quota exceeded')) {
+          errorMessage = 'AI analysis quota exceeded. Upload will continue without AI analysis.';
+        } else if (error.message.includes('Upload failed')) {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: 'Error',
-        description: 'Failed to upload clothing item',
+        description: errorMessage,
         variant: 'destructive',
       });
       throw error;

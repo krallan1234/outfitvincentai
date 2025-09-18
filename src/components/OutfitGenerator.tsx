@@ -5,8 +5,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { useOutfits } from '@/hooks/useOutfits';
+import { useCommunity } from '@/hooks/useCommunity';
 
 const MOODS = [
   { value: 'casual', label: 'Casual' },
@@ -31,9 +33,11 @@ const QUICK_PROMPTS = [
 export const OutfitGenerator = () => {
   const [prompt, setPrompt] = useState('');
   const [mood, setMood] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
   
   const { generateOutfit, loading } = useOutfits();
+  const { updateOutfitPrivacy } = useCommunity();
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -41,6 +45,11 @@ export const OutfitGenerator = () => {
     try {
       const result = await generateOutfit(prompt, mood || undefined);
       setGeneratedOutfit(result);
+      
+      // Update outfit privacy after generation if needed
+      if (result.outfit && !isPublic) {
+        await updateOutfitPrivacy(result.outfit.id, false);
+      }
     } catch (error) {
       // Error is handled in the hook
     }
@@ -111,7 +120,22 @@ export const OutfitGenerator = () => {
             </Select>
           </div>
 
-          <Button 
+          {/* Privacy Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="public">Share publicly</Label>
+              <p className="text-xs text-muted-foreground">
+                Allow others to see and like this outfit
+              </p>
+            </div>
+            <Switch
+              id="public"
+              checked={isPublic}
+              onCheckedChange={setIsPublic}
+            />
+          </div>
+
+          <Button
             onClick={handleGenerate}
             className="w-full" 
             disabled={!prompt.trim() || loading}

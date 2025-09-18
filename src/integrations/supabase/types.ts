@@ -56,6 +56,35 @@ export type Database = {
         }
         Relationships: []
       }
+      outfit_likes: {
+        Row: {
+          created_at: string
+          id: string
+          outfit_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          outfit_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          outfit_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outfit_likes_outfit_id_fkey"
+            columns: ["outfit_id"]
+            isOneToOne: false
+            referencedRelation: "outfits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outfits: {
         Row: {
           ai_analysis: Json | null
@@ -63,6 +92,8 @@ export type Database = {
           description: string | null
           generated_image_url: string | null
           id: string
+          is_public: boolean
+          likes_count: number
           mood: string | null
           prompt: string
           recommended_clothes: Json | null
@@ -76,6 +107,8 @@ export type Database = {
           description?: string | null
           generated_image_url?: string | null
           id?: string
+          is_public?: boolean
+          likes_count?: number
           mood?: string | null
           prompt: string
           recommended_clothes?: Json | null
@@ -89,6 +122,8 @@ export type Database = {
           description?: string | null
           generated_image_url?: string | null
           id?: string
+          is_public?: boolean
+          likes_count?: number
           mood?: string | null
           prompt?: string
           recommended_clothes?: Json | null

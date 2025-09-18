@@ -12,6 +12,8 @@ export interface Outfit {
   description?: string;
   recommended_clothes?: any;
   ai_analysis?: any;
+  is_public?: boolean;
+  likes_count?: number;
   created_at: string;
   updated_at: string;
 }

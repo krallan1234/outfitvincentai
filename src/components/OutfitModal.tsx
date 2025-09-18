@@ -35,7 +35,14 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
   const fetchClothesImages = async () => {
     setLoading(true);
     try {
-      const clothesIds = outfit.recommended_clothes.map((item: any) => item.id);
+      // recommended_clothes contains direct UUID strings, not objects
+      const clothesIds = outfit.recommended_clothes.filter((id: string) => id && typeof id === 'string');
+      
+      if (clothesIds.length === 0) {
+        setClothesImages([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('clothes')
         .select('*')

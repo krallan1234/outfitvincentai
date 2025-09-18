@@ -46,70 +46,48 @@ serve(async (req) => {
 
     console.log(`Analyzing ${clothes.length} clothing items for outfit generation`);
 
-    // Analyze user's clothes with OpenAI Vision
-    const clothesAnalysis = await Promise.all(
-      clothes.slice(0, 10).map(async (item) => { // Limit to 10 items to avoid token limits
+    // Prepare clothes analysis with fallback to existing metadata
+    console.log('Preparing clothes analysis...');
+    const clothesAnalysis = clothes.slice(0, 10).map((item) => {
+      // Use existing metadata as fallback, enhanced with AI data if available
+      const fallbackAnalysis = {
+        category: item.category,
+        color: item.color || 'neutral',
+        style: item.style || 'casual',
+        formality: item.style === 'formal' ? 'formal' : item.style === 'business' ? 'semi-formal' : 'casual',
+        season: 'all',
+        versatility: 7
+      };
+
+      // Check if we have AI analysis from previous uploads
+      let analysis = fallbackAnalysis;
+      if (item.ai_detected_metadata) {
         try {
-          const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${openAIApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o-mini',
-              messages: [
-                {
-                  role: 'system',
-                  content: 'Analyze this clothing item and return a JSON object with: category, color, style, formality (casual/semi-formal/formal), season (spring/summer/fall/winter/all), and versatility (1-10 scale).'
-                },
-                {
-                  role: 'user',
-                  content: [
-                    {
-                      type: 'text',
-                      text: `Analyze this ${item.category} for outfit coordination:`
-                    },
-                    {
-                      type: 'image_url',
-                      image_url: { url: item.image_url }
-                    }
-                  ]
-                }
-              ],
-              max_tokens: 200,
-              temperature: 0.3
-            }),
-          });
-
-          if (!response.ok) {
-            console.error(`Failed to analyze item ${item.id}`);
-            return null;
-          }
-
-          const data = await response.json();
-          const analysis = JSON.parse(data.choices[0].message.content);
+          const aiData = typeof item.ai_detected_metadata === 'string' 
+            ? JSON.parse(item.ai_detected_metadata) 
+            : item.ai_detected_metadata;
           
-          return {
-            ...item,
-            analysis
-          };
+          if (aiData && typeof aiData === 'object') {
+            analysis = {
+              category: aiData.category || fallbackAnalysis.category,
+              color: aiData.color || fallbackAnalysis.color,
+              style: aiData.style || fallbackAnalysis.style,
+              formality: aiData.formality || fallbackAnalysis.formality,
+              season: aiData.season || fallbackAnalysis.season,
+              versatility: aiData.versatility || fallbackAnalysis.versatility
+            };
+          }
         } catch (error) {
-          console.error(`Error analyzing item ${item.id}:`, error);
-          return {
-            ...item,
-            analysis: {
-              category: item.category,
-              color: item.color || 'unknown',
-              style: item.style || 'casual',
-              formality: 'casual',
-              season: 'all',
-              versatility: 5
-            }
-          };
+          console.warn(`Failed to parse AI metadata for item ${item.id}:`, error);
+          analysis = fallbackAnalysis;
         }
-      })
-    );
+      }
+
+      return {
+        ...item,
+        analysis
+      };
+    });
 
     const validClothes = clothesAnalysis.filter(item => item !== null);
 
@@ -157,7 +135,16 @@ serve(async (req) => {
     });
 
     if (!outfitResponse.ok) {
-      throw new Error('Failed to generate outfit recommendation');
+      const errorData = await outfitResponse.text();
+      console.error('OpenAI API error:', outfitResponse.status, errorData);
+      
+      if (outfitResponse.status === 429) {
+        throw new Error('OpenAI quota exceeded. Please try again later or contact support.');
+      } else if (outfitResponse.status === 401) {
+        throw new Error('OpenAI API authentication failed. Please check your API key.');
+      } else {
+        throw new Error(`OpenAI API error (${outfitResponse.status}): Failed to generate outfit recommendation`);
+      }
     }
 
     const outfitData = await outfitResponse.json();

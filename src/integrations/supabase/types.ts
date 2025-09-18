@@ -14,7 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clothes: {
+        Row: {
+          ai_detected_metadata: Json | null
+          brand: string | null
+          category: string
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string
+          style: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_detected_metadata?: Json | null
+          brand?: string | null
+          category: string
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url: string
+          style?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_detected_metadata?: Json | null
+          brand?: string | null
+          category?: string
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string
+          style?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

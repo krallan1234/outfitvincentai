@@ -89,23 +89,23 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="my-outfits" className="w-full">
+        <Tabs defaultValue="all-outfits" className="w-full">
           <TabsList className="grid w-full grid-cols-3 max-w-lg">
-            <TabsTrigger value="my-outfits">My Outfits</TabsTrigger>
+            <TabsTrigger value="all-outfits">All My Outfits</TabsTrigger>
             <TabsTrigger value="liked">Liked</TabsTrigger>
             <TabsTrigger value="private">Private</TabsTrigger>
           </TabsList>
 
-          {/* My Public Outfits */}
-          <TabsContent value="my-outfits" className="mt-6">
+          {/* All My Outfits */}
+          <TabsContent value="all-outfits" className="mt-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5" />
-                  My Public Outfits
+                  All My Outfits
                 </CardTitle>
                 <CardDescription>
-                  Outfits you've shared with the community
+                  All outfits you've created (public and private)
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -113,9 +113,9 @@ const ProfilePage = () => {
                   <div className="flex items-center justify-center p-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
-                ) : publicOutfits.length > 0 ? (
+                ) : outfits.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {publicOutfits.map((outfit) => (
+                    {outfits.map((outfit) => (
                       <Card key={outfit.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                         {outfit.generated_image_url && (
                           <div className="aspect-square relative">
@@ -133,21 +133,28 @@ const ProfilePage = () => {
                               <Calendar className="h-3 w-3" />
                               {formatDate(outfit.created_at)}
                             </span>
-                            {outfit.mood && (
-                              <Badge variant="outline" className="capitalize text-xs">
-                                {outfit.mood}
+                            <div className="flex items-center gap-2">
+                              {outfit.mood && (
+                                <Badge variant="outline" className="capitalize text-xs">
+                                  {outfit.mood}
+                                </Badge>
+                              )}
+                              <Badge variant={outfit.is_public ? "default" : "secondary"} className="text-xs">
+                                {outfit.is_public ? "Public" : "Private"}
                               </Badge>
-                            )}
+                            </div>
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
                           <p className="text-sm text-muted-foreground line-clamp-2">
                             "{outfit.prompt}"
                           </p>
-                          <div className="flex items-center gap-2">
-                            <Heart className="h-4 w-4 text-red-500" />
-                            <span className="text-sm font-medium">{outfit.likes_count || 0} likes</span>
-                          </div>
+                          {outfit.is_public && (
+                            <div className="flex items-center gap-2">
+                              <Heart className="h-4 w-4 text-red-500" />
+                              <span className="text-sm font-medium">{outfit.likes_count || 0} likes</span>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     ))}
@@ -155,7 +162,7 @@ const ProfilePage = () => {
                 ) : (
                   <div className="text-center p-8">
                     <p className="text-muted-foreground">
-                      No public outfits yet. Generate some outfits and share them with the community!
+                      No outfits yet. Generate some outfits to get started!
                     </p>
                   </div>
                 )}

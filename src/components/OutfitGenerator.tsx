@@ -45,13 +45,8 @@ export const OutfitGenerator = () => {
     if (!prompt.trim()) return;
 
     try {
-      const result = await generateOutfit(prompt, mood || undefined);
+      const result = await generateOutfit(prompt, mood || undefined, isPublic);
       setGeneratedOutfit(result);
-      
-      // Update outfit privacy after generation if needed
-      if (result.outfit && !isPublic) {
-        await updateOutfitPrivacy(result.outfit.id, false);
-      }
     } catch (error) {
       // Error is handled in the hook
     }

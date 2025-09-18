@@ -26,9 +26,13 @@ export const useOutfits = () => {
   const fetchOutfits = async () => {
     try {
       setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('outfits')
         .select('*')
+        .eq('user_id', user.id) // Filter by current user's ID
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -45,7 +49,7 @@ export const useOutfits = () => {
     }
   };
 
-  const generateOutfit = async (prompt: string, mood?: string) => {
+  const generateOutfit = async (prompt: string, mood?: string, isPublic: boolean = true) => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -55,7 +59,8 @@ export const useOutfits = () => {
         body: {
           prompt,
           mood,
-          userId: user.id
+          userId: user.id,
+          isPublic
         },
       });
 

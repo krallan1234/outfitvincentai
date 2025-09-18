@@ -18,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, mood, userId } = await req.json();
+    const { prompt, mood, userId, isPublic = true } = await req.json();
 
     if (!prompt || !userId) {
       throw new Error('Prompt and userId are required');
@@ -230,6 +230,7 @@ serve(async (req) => {
         title: outfitRecommendation.title,
         prompt,
         mood,
+        is_public: isPublic,
         generated_image_url: null, // Will be generated on frontend with Canvas
         description: outfitRecommendation.description,
         recommended_clothes: outfitRecommendation.recommended_items,

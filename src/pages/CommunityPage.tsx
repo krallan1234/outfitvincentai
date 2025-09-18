@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCommunity, CommunityOutfit, RecommendedOutfit } from '@/hooks/useCommunity';
+import { CommunityStats } from '@/components/CommunityStats';
 import { cn } from '@/lib/utils';
 
 export const CommunityOutfitCard = ({ 
@@ -127,8 +128,13 @@ const CommunityPage = () => {
             Community Outfits
           </h1>
           <p className="text-muted-foreground">
-            Discover and like outfits from other fashion enthusiasts
+            Discover and like outfits from other fashion enthusiasts. Our AI recommendation system learns from your preferences and community trends.
           </p>
+        </div>
+
+        {/* Community Stats */}
+        <div className="mb-8">
+          <CommunityStats />
         </div>
 
         <Tabs defaultValue="recommended" className="w-full">

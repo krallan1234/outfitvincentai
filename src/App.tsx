@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import OutfitPage from "./pages/OutfitPage";
 import CommunityPage from "./pages/CommunityPage";
+import ProfilePage from "./pages/ProfilePage";
 import PolicyPage from "./pages/PolicyPage";
 import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
@@ -55,6 +56,11 @@ const App = () => (
           <Route path="/community" element={
             <ProtectedRoute>
               <CommunityPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           } />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

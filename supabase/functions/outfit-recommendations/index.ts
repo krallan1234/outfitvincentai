@@ -45,7 +45,7 @@ serve(async (req) => {
 
     console.log('User preferences:', { userColors, userCategories, userStyles });
 
-    // Get highly-liked public outfits (minimum 2 likes for recommendation)
+    // Get highly-liked public outfits (lower threshold for small user base)
     const { data: popularOutfits, error: outfitsError } = await supabase
       .from('outfits')
       .select(`
@@ -62,7 +62,7 @@ serve(async (req) => {
       `)
       .eq('is_public', true)
       .neq('user_id', userId) // Exclude user's own outfits
-      .gte('likes_count', 2)
+      .gte('likes_count', 1) // Lower threshold for testing with 1-10 users
       .order('likes_count', { ascending: false })
       .limit(50);
 

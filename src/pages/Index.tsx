@@ -43,6 +43,9 @@ const Index = () => {
           <Button onClick={() => navigate('/community')} variant="outline" size="lg">
             Community
           </Button>
+          <Button onClick={() => navigate('/profile')} variant="outline" size="lg">
+            Profile
+          </Button>
         </div>
       </div>
     </div>

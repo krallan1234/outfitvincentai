@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, Loader2 } from 'lucide-react';
 import { useClothes } from '@/hooks/useClothes';
+import { useToast } from '@/hooks/use-toast';
 
 const CATEGORIES = [
   'shirt',
@@ -42,6 +43,7 @@ export const ClothesUpload = () => {
   const [description, setDescription] = useState('');
   
   const { uploadClothing, loading, clothes } = useClothes();
+  const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -59,9 +61,13 @@ export const ClothesUpload = () => {
     e.preventDefault();
     if (!file || !category || !style) return;
 
-    // Check for 10 image limit
-    if (clothes.length >= 10) {
-      alert('Maximum 10 clothing items allowed for testing. Please delete some items to upload new ones.');
+    // Check for 20 image limit
+    if (clothes.length >= 20) {
+      toast({
+        title: 'Upload Limit Reached',
+        description: "You've reached the maximum of 20 clothes items. Delete one to add more.",
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -92,7 +98,7 @@ export const ClothesUpload = () => {
       <CardHeader>
         <CardTitle>Upload Clothing Item</CardTitle>
         <CardDescription>
-          Upload a photo of your clothing item ({clothes.length}/10 items used). Google Gemini AI will detect the color automatically, but you'll need to manually tag category and style.
+          Upload a photo of your clothing item ({clothes.length}/20 items used). Google Gemini AI will detect the color automatically, but you'll need to manually tag category and style.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -209,15 +215,15 @@ export const ClothesUpload = () => {
           <Button 
             type="submit" 
             className="w-full" 
-            disabled={!file || !category || !style || loading || clothes.length >= 10}
+            disabled={!file || !category || !style || loading || clothes.length >= 20}
           >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Uploading & Detecting Color...
               </>
-            ) : clothes.length >= 10 ? (
-              'Max 10 items reached'
+            ) : clothes.length >= 20 ? (
+              'Max 20 items reached'
             ) : (
               'Upload Clothing Item'
             )}

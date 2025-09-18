@@ -55,6 +55,18 @@ export const useClothes = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Check current item count before upload
+      const { data: existingClothes, error: countError } = await supabase
+        .from('clothes')
+        .select('id')
+        .eq('user_id', user.id);
+
+      if (countError) throw countError;
+      
+      if (existingClothes && existingClothes.length >= 20) {
+        throw new Error("You've reached the maximum of 20 clothes items. Delete one to add more.");
+      }
+
       // Convert image to base64 for AI analysis
       const reader = new FileReader();
       const imageBase64 = await new Promise<string>((resolve, reject) => {

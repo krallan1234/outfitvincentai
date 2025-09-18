@@ -5,10 +5,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, TrendingUp, Palette } from 'lucide-react';
 import { useOutfits } from '@/hooks/useOutfits';
 import { useCommunity } from '@/hooks/useCommunity';
+import { OutfitCollage } from './OutfitCollage';
 
 const MOODS = [
   { value: 'casual', label: 'Casual' },
@@ -68,7 +70,7 @@ export const OutfitGenerator = () => {
             Generate Your Perfect Outfit
           </CardTitle>
           <CardDescription>
-            Describe what you're looking for or select a mood, and our AI will create an outfit from your wardrobe.
+            Describe what you're looking for or select a mood. Google Gemini AI will analyze your wardrobe with Pinterest trends to create the perfect outfit.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -143,12 +145,12 @@ export const OutfitGenerator = () => {
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating Your Outfit...
+                Generating with Gemini AI & Pinterest...
               </>
             ) : (
               <>
                 <Sparkles className="mr-2 h-4 w-4" />
-                Generate Outfit
+                Generate AI Outfit
               </>
             )}
           </Button>
@@ -164,39 +166,76 @@ export const OutfitGenerator = () => {
               {generatedOutfit.outfit.prompt} {generatedOutfit.outfit.mood && `• ${generatedOutfit.outfit.mood} mood`}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Generated Image */}
-            {generatedOutfit.outfit.generated_image_url && (
-              <div className="aspect-square max-w-md mx-auto">
-                <img
-                  src={generatedOutfit.outfit.generated_image_url}
-                  alt={generatedOutfit.outfit.title}
-                  className="w-full h-full object-cover rounded-lg"
+          <CardContent className="space-y-6">
+            {/* Outfit Collage */}
+            {generatedOutfit.outfit.ai_analysis?.outfit_visualization && (
+              <div className="flex justify-center">
+                <OutfitCollage
+                  items={generatedOutfit.outfit.ai_analysis.outfit_visualization.items}
+                  title={generatedOutfit.outfit.title}
+                  colorScheme={generatedOutfit.outfit.ai_analysis.color_harmony || 'Harmonious colors'}
                 />
               </div>
             )}
 
             {/* Description */}
             {generatedOutfit.outfit.description && (
-              <p className="text-muted-foreground">
-                {generatedOutfit.outfit.description}
-              </p>
+              <div>
+                <h4 className="font-semibold mb-2">AI Style Analysis</h4>
+                <p className="text-muted-foreground">{generatedOutfit.outfit.description}</p>
+              </div>
+            )}
+
+            {/* Color Harmony */}
+            {generatedOutfit.outfit.ai_analysis?.color_harmony && (
+              <div>
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <Palette className="h-4 w-4" />
+                  Color Harmony
+                </h4>
+                <p className="text-muted-foreground">{generatedOutfit.outfit.ai_analysis.color_harmony}</p>
+              </div>
+            )}
+
+            {/* Pinterest Trends */}
+            {generatedOutfit.outfit.ai_analysis?.pinterest_trends?.length > 0 && (
+              <div>
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Pinterest Inspiration
+                </h4>
+                <div className="space-y-2">
+                  {generatedOutfit.outfit.ai_analysis.pinterest_trends.map((trend: any, index: number) => (
+                    <div key={index} className="text-sm text-muted-foreground p-2 bg-muted/50 rounded">
+                      • {trend.description || 'Trending style inspiration'}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Recommended Clothes */}
             {generatedOutfit.recommendedClothes && generatedOutfit.recommendedClothes.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="font-medium">Recommended Items from Your Wardrobe:</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              <div>
+                <h4 className="font-semibold mb-3">Your Wardrobe Items</h4>
+                <div className="grid gap-3">
                   {generatedOutfit.recommendedClothes.map((item: any) => (
-                    <div key={item.id} className="border rounded-lg p-2">
+                    <div key={item.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                       <img
                         src={item.image_url}
                         alt={item.category}
-                        className="w-full h-24 object-cover rounded mb-1"
+                        className="w-16 h-16 object-cover rounded"
                       />
-                      <p className="text-xs font-medium">{item.category}</p>
-                      <p className="text-xs text-muted-foreground">{item.color}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium capitalize">{item.category}</span>
+                          <Badge variant="secondary">{item.color}</Badge>
+                          <Badge variant="outline">{item.style}</Badge>
+                        </div>
+                        {item.brand && (
+                          <p className="text-xs text-muted-foreground">{item.brand}</p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -205,11 +244,14 @@ export const OutfitGenerator = () => {
 
             {/* Styling Tips */}
             {generatedOutfit.outfit.ai_analysis?.styling_tips && (
-              <div className="space-y-2">
-                <h4 className="font-medium">Styling Tips:</h4>
-                <ul className="list-disc list-inside space-y-1">
+              <div>
+                <h4 className="font-semibold mb-2">Styling Tips</h4>
+                <ul className="space-y-2">
                   {generatedOutfit.outfit.ai_analysis.styling_tips.map((tip: string, index: number) => (
-                    <li key={index} className="text-sm text-muted-foreground">{tip}</li>
+                    <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                      <span className="text-primary mt-1">•</span>
+                      {tip}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -217,11 +259,9 @@ export const OutfitGenerator = () => {
 
             {/* Occasion */}
             {generatedOutfit.outfit.ai_analysis?.occasion && (
-              <div className="space-y-2">
-                <h4 className="font-medium">Perfect For:</h4>
-                <p className="text-sm text-muted-foreground">
-                  {generatedOutfit.outfit.ai_analysis.occasion}
-                </p>
+              <div>
+                <h4 className="font-semibold mb-2">Perfect For</h4>
+                <p className="text-muted-foreground">{generatedOutfit.outfit.ai_analysis.occasion}</p>
               </div>
             )}
           </CardContent>

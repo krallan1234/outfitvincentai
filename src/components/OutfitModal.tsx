@@ -17,6 +17,7 @@ interface OutfitModalProps {
 export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = false }: OutfitModalProps) => {
   const [clothesImages, setClothesImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -26,17 +27,37 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
     });
   };
 
+  // Load current user id once
   useEffect(() => {
-    if (isOpen && outfit) {
-      // Only fetch individual clothes for user's own outfits (when they have recommended_clothes)
-      if (outfit.recommended_clothes?.length > 0) {
-        fetchClothesImages();
-      } else {
-        setClothesImages([]);
-        setLoading(false);
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (!error) {
+        setUserId(data.user?.id ?? null);
       }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || !outfit) return;
+
+    const owner = !!userId && outfit.user_id === userId;
+
+    // For community outfits (not owner), use AI analysis clothes if available
+    if (!owner && Array.isArray(outfit.ai_analysis?.clothes_analysis) && outfit.ai_analysis.clothes_analysis.length > 0) {
+      setClothesImages(outfit.ai_analysis.clothes_analysis);
+      setLoading(false);
+      return;
     }
-  }, [isOpen, outfit]);
+
+    // For owner's outfits, fetch wardrobe items via IDs
+    if (owner && Array.isArray(outfit.recommended_clothes) && outfit.recommended_clothes.length > 0) {
+      fetchClothesImages();
+      return;
+    }
+
+    // Fallback: nothing to show
+    setClothesImages([]);
+    setLoading(false);
+  }, [isOpen, outfit, userId]);
 
   // Early return if outfit is null
   if (!outfit) {
@@ -148,12 +169,12 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                   {clothesImages.map((item, index) => (
                     <div key={item.id || index} className="bg-muted rounded-lg overflow-hidden">
                       <div className="aspect-square">
-                        <img
-                          src={item.image_url}
-                          alt={`${item.category || 'Item'} - ${item.color || 'Unknown color'}`}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
+                          <img
+                            src={item.image_url || item.image || item.url}
+                            alt={`${item.category || item.type || 'Item'} - ${item.color || (item.colors?.[0]) || 'Unknown color'}`}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
                       </div>
                       <div className="p-2">
                         <p className="text-xs font-medium capitalize">{item.category || 'Item'}</p>
@@ -169,13 +190,7 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                   ))}
                 </div>
               </div>
-            ) : outfit.recommended_clothes?.length > 0 ? (
-              <div className="text-center p-8">
-                <p className="text-muted-foreground">
-                  Unable to load wardrobe item images
-                </p>
-              </div>
-            ) : null}
+) : null}
           </div>
 
           {/* AI Analysis */}

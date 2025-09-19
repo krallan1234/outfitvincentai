@@ -27,8 +27,17 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
   };
 
   useEffect(() => {
-    if (isOpen && outfit?.recommended_clothes?.length > 0) {
-      fetchClothesImages();
+    if (isOpen && outfit) {
+      // For community outfits, use ai_analysis.clothes_analysis if available
+      if (outfit.ai_analysis?.clothes_analysis) {
+        setClothesImages(outfit.ai_analysis.clothes_analysis);
+        setLoading(false);
+      } else if (outfit.recommended_clothes?.length > 0) {
+        fetchClothesImages();
+      } else {
+        setClothesImages([]);
+        setLoading(false);
+      }
     }
   }, [isOpen, outfit]);
 
@@ -139,21 +148,24 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
               <div>
                 <h4 className="text-md font-medium mb-3">Wardrobe Items</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {clothesImages.map((item) => (
-                    <div key={item.id} className="bg-muted rounded-lg overflow-hidden">
+                  {clothesImages.map((item, index) => (
+                    <div key={item.id || index} className="bg-muted rounded-lg overflow-hidden">
                       <div className="aspect-square">
                         <img
                           src={item.image_url}
-                          alt={`${item.category} - ${item.color}`}
+                          alt={`${item.category || 'Item'} - ${item.color || 'Unknown color'}`}
                           className="w-full h-full object-cover"
                           loading="lazy"
                         />
                       </div>
                       <div className="p-2">
-                        <p className="text-xs font-medium capitalize">{item.category}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{item.color}</p>
+                        <p className="text-xs font-medium capitalize">{item.category || 'Item'}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{item.color || 'Unknown'}</p>
                         {item.style && (
                           <p className="text-xs text-muted-foreground capitalize">{item.style}</p>
+                        )}
+                        {item.item_name && (
+                          <p className="text-xs text-muted-foreground">{item.item_name}</p>
                         )}
                       </div>
                     </div>

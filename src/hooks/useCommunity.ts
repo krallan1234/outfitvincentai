@@ -13,6 +13,8 @@ export interface CommunityOutfit {
   likes_count: number;
   created_at: string;
   is_liked?: boolean;
+  recommended_clothes?: any;
+  ai_analysis?: any;
 }
 
 export interface RecommendedOutfit extends CommunityOutfit {
@@ -32,7 +34,7 @@ export const useCommunity = () => {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Get public outfits with likes count
+      // Get public outfits with likes count and ai_analysis
       const { data: outfits, error } = await supabase
         .from('outfits')
         .select(`
@@ -44,7 +46,9 @@ export const useCommunity = () => {
           mood,
           generated_image_url,
           likes_count,
-          created_at
+          created_at,
+          recommended_clothes,
+          ai_analysis
         `)
         .eq('is_public', true)
         .neq('user_id', user?.id || '') // Exclude user's own outfits

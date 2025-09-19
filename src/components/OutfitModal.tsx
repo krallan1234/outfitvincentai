@@ -41,14 +41,14 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
     const owner = !!userId && outfit.user_id === userId;
 
-    // For community outfits (not owner), use AI analysis clothes if available
-    if (!owner && Array.isArray(outfit.ai_analysis?.clothes_analysis) && outfit.ai_analysis.clothes_analysis.length > 0) {
-      setClothesImages(outfit.ai_analysis.clothes_analysis);
+    // For all outfits, prioritize outfit_visualization.items if available
+    if (Array.isArray(outfit.ai_analysis?.outfit_visualization?.items) && outfit.ai_analysis.outfit_visualization.items.length > 0) {
+      setClothesImages(outfit.ai_analysis.outfit_visualization.items);
       setLoading(false);
       return;
     }
 
-    // For owner's outfits, fetch wardrobe items via IDs
+    // Fallback for owner's outfits: fetch wardrobe items via IDs
     if (owner && Array.isArray(outfit.recommended_clothes) && outfit.recommended_clothes.length > 0) {
       fetchClothesImages();
       return;
@@ -164,7 +164,7 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
               </div>
             ) : clothesImages.length > 0 ? (
               <div>
-                <h4 className="text-md font-medium mb-3">Wardrobe Items</h4>
+                <h4 className="text-md font-medium mb-3">Outfit Items</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {clothesImages.map((item, index) => (
                     <div key={item.id || index} className="bg-muted rounded-lg overflow-hidden">

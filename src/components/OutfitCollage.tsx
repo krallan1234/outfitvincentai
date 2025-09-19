@@ -3,6 +3,7 @@ import { Canvas as FabricCanvas, FabricImage, Rect, Text } from 'fabric';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download, Palette } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OutfitItem {
   id: string;
@@ -15,9 +16,11 @@ interface OutfitCollageProps {
   items: OutfitItem[];
   title: string;
   colorScheme: string;
+  outfitId?: string; // Optional outfit ID for saving the image
+  onImageGenerated?: (imageUrl: string) => void; // Callback when image is generated
 }
 
-export const OutfitCollage = ({ items, title, colorScheme }: OutfitCollageProps) => {
+export const OutfitCollage = ({ items, title, colorScheme, outfitId, onImageGenerated }: OutfitCollageProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<FabricCanvas | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -155,10 +158,65 @@ export const OutfitCollage = ({ items, title, colorScheme }: OutfitCollageProps)
       canvas.add(description);
 
       canvas.renderAll();
+      
+      // Auto-save the generated image if outfitId is provided
+      if (outfitId && onImageGenerated) {
+        await saveGeneratedImage(canvas);
+      }
     } catch (error) {
       console.error('Error generating collage:', error);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const saveGeneratedImage = async (canvas: FabricCanvas) => {
+    try {
+      const dataURL = canvas.toDataURL({
+        format: 'png',
+        quality: 1,
+        multiplier: 2 // Higher resolution
+      });
+
+      // Convert data URL to blob
+      const response = await fetch(dataURL);
+      const blob = await response.blob();
+
+      // Upload to Supabase storage
+      const fileName = `outfit-${outfitId}-${Date.now()}.png`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('clothes')
+        .upload(`outfit-images/${fileName}`, blob, {
+          contentType: 'image/png',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        return;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('clothes')
+        .getPublicUrl(`outfit-images/${fileName}`);
+
+      const imageUrl = urlData.publicUrl;
+
+      // Update outfit with generated image URL
+      const { error: updateError } = await supabase
+        .from('outfits')
+        .update({ generated_image_url: imageUrl })
+        .eq('id', outfitId);
+
+      if (updateError) {
+        console.error('Error updating outfit with image URL:', updateError);
+      } else {
+        console.log('Outfit image saved successfully:', imageUrl);
+        onImageGenerated?.(imageUrl);
+      }
+    } catch (error) {
+      console.error('Error saving generated image:', error);
     }
   };
 

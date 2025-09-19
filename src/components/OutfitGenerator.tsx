@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Sparkles, Loader2, TrendingUp, Palette } from 'lucide-react';
 import { useOutfits } from '@/hooks/useOutfits';
 import { useCommunity } from '@/hooks/useCommunity';
@@ -35,17 +34,15 @@ const QUICK_PROMPTS = [
 export const OutfitGenerator = () => {
   const [prompt, setPrompt] = useState('');
   const [mood, setMood] = useState('');
-  const [isPublic, setIsPublic] = useState(true);
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
   
   const { generateOutfit, loading } = useOutfits();
-  const { updateOutfitPrivacy } = useCommunity();
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
 
     try {
-      const result = await generateOutfit(prompt, mood || undefined, isPublic);
+      const result = await generateOutfit(prompt, mood || undefined, true); // Always public
       setGeneratedOutfit(result);
     } catch (error) {
       // Error is handled in the hook
@@ -117,20 +114,6 @@ export const OutfitGenerator = () => {
             </Select>
           </div>
 
-          {/* Privacy Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="public">Share publicly</Label>
-              <p className="text-xs text-muted-foreground">
-                Allow others to see and like this outfit
-              </p>
-            </div>
-            <Switch
-              id="public"
-              checked={isPublic}
-              onCheckedChange={setIsPublic}
-            />
-          </div>
 
           <Button
             onClick={handleGenerate}
@@ -169,6 +152,14 @@ export const OutfitGenerator = () => {
                   items={generatedOutfit.outfit.ai_analysis.outfit_visualization.items}
                   title={generatedOutfit.outfit.title}
                   colorScheme={generatedOutfit.outfit.ai_analysis.color_harmony || 'Harmonious colors'}
+                  outfitId={generatedOutfit.outfit.id}
+                  onImageGenerated={(imageUrl) => {
+                    // Update the local state with the new image URL
+                    setGeneratedOutfit(prev => ({
+                      ...prev,
+                      outfit: { ...prev.outfit, generated_image_url: imageUrl }
+                    }));
+                  }}
                 />
               </div>
             )}

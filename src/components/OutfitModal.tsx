@@ -28,11 +28,8 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
   useEffect(() => {
     if (isOpen && outfit) {
-      // For community outfits, use ai_analysis.clothes_analysis if available
-      if (outfit.ai_analysis?.clothes_analysis) {
-        setClothesImages(outfit.ai_analysis.clothes_analysis);
-        setLoading(false);
-      } else if (outfit.recommended_clothes?.length > 0) {
+      // Only fetch individual clothes for user's own outfits (when they have recommended_clothes)
+      if (outfit.recommended_clothes?.length > 0) {
         fetchClothesImages();
       } else {
         setClothesImages([]);

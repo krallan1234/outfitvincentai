@@ -200,33 +200,6 @@ export const OutfitGenerator = () => {
               </div>
             )}
 
-            {/* Instagram Inspiration */}
-            {generatedOutfit.outfit.ai_analysis?.instagram_inspiration?.length > 0 && (
-              <div>
-                <h4 className="font-semibold mb-2 flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  Instagram Inspiration
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {generatedOutfit.outfit.ai_analysis.instagram_inspiration.map((inspo: any, index: number) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={inspo.image_url}
-                        alt={`Instagram outfit inspiration from @${inspo.username}`}
-                        className="w-full h-24 object-cover rounded-lg"
-                      />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-                        <div className="text-xs text-white text-center p-1">
-                          <div className="font-medium">@{inspo.username}</div>
-                          <div className="text-xs">#{inspo.hashtag}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Recommended Clothes */}
             {generatedOutfit.recommendedClothes && generatedOutfit.recommendedClothes.length > 0 && (
               <div>

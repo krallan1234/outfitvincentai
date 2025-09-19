@@ -56,7 +56,7 @@ serve(async (req) => {
       'bottom': ['pants', 'jeans', 'skirt', 'shorts', 'trousers'],
       'outerwear': ['jacket', 'coat', 'blazer', 'cardigan', 'hoodie'],
       'footwear': ['shoes', 'boots', 'sneakers', 'sandals', 'heels'],
-      'accessories': ['belt', 'necklace', 'scarf', 'hat', 'bag', 'watch']
+      'accessories': ['belt', 'necklace', 'scarf', 'hat', 'bag', 'watch', 'keps', 'kepsar', 'cap', 'caps', 'ring', 'ringar', 'rings']
     };
 
     // Normalize and group clothes by category
@@ -156,7 +156,7 @@ serve(async (req) => {
     }
 
     // Step 2: Use Gemini to generate outfit recommendations with category rules
-    const generateOutfitPrompt = (attempt = 1) => `
+    const generateOutfitPrompt = (attempt = 1, shouldIncludeAccessory = false) => `
       You are a professional fashion stylist with expertise in creating logical, category-based outfit combinations.
 
       CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
@@ -164,41 +164,47 @@ serve(async (req) => {
       2. NEVER select multiple items from the same main category (e.g., no two tops, no two bottoms)
       3. Minimum outfit must have: 1 top + 1 bottom
       4. Optional additions: 1 outerwear + 1 footwear + 1 accessory
+      5. ACCESSORY PRIORITY: ${shouldIncludeAccessory ? 'MUST include at least one accessory (kepsar/caps for casual, ringar/rings for elegant) if available in wardrobe' : 'Include accessories in 20-30% of outfits, prioritizing kepsar for casual moods and ringar for elegant/formal moods'}
 
       AVAILABLE CLOTHES BY CATEGORY:
       TOPS: ${JSON.stringify(clothesByCategory.top.map(item => ({
         id: item.id,
         name: item.category,
         color: item.analysis.color,
-        style: item.analysis.style
+        style: item.analysis.style,
+        image_url: item.image_url
       })))}
       
       BOTTOMS: ${JSON.stringify(clothesByCategory.bottom.map(item => ({
         id: item.id,
         name: item.category,
         color: item.analysis.color,
-        style: item.analysis.style
+        style: item.analysis.style,
+        image_url: item.image_url
       })))}
       
       OUTERWEAR: ${JSON.stringify(clothesByCategory.outerwear.map(item => ({
         id: item.id,
         name: item.category,
         color: item.analysis.color,
-        style: item.analysis.style
+        style: item.analysis.style,
+        image_url: item.image_url
       })))}
       
       FOOTWEAR: ${JSON.stringify(clothesByCategory.footwear.map(item => ({
         id: item.id,
         name: item.category,
         color: item.analysis.color,
-        style: item.analysis.style
+        style: item.analysis.style,
+        image_url: item.image_url
       })))}
       
       ACCESSORIES: ${JSON.stringify(clothesByCategory.accessories.map(item => ({
         id: item.id,
         name: item.category,
         color: item.analysis.color,
-        style: item.analysis.style
+        style: item.analysis.style,
+        image_url: item.image_url
       })))}
 
       USER REQUEST: "${prompt}" ${mood ? `with a ${mood} mood` : ''}
@@ -215,6 +221,8 @@ serve(async (req) => {
       3. Match formality levels (casual with casual, formal with formal)
       4. Incorporate Pinterest trends while respecting category rules
       5. Ensure outfit is appropriate for the requested mood/occasion
+      6. ACCESSORY MATCHING: For casual moods, prefer kepsar/caps; for elegant/formal moods, prefer ringar/rings if available
+      7. Use Pinterest trends to identify trendy accessory combinations
 
       REQUIRED JSON FORMAT - NO MARKDOWN WRAPPER:
       {
@@ -227,23 +235,25 @@ serve(async (req) => {
             "item_id": "actual_item_id",
             "item_name": "Black Shirt",
             "color": "black",
-            "style": "casual"
+            "style": "casual",
+            "image_url": "supabase_storage_url"
           }
         ],
         "perfect_for": ["occasion1", "occasion2"],
-        "styling_tips": ["tip1", "tip2", "tip3"]
+        "styling_tips": ["tip1", "tip2", "tip3${clothesByCategory.accessories.length > 0 && !shouldIncludeAccessory ? '", "Consider adding a keps or ring for extra style!"' : '"}]
       }
     `;
 
     let outfitRecommendation;
     let attemptCount = 0;
-    const maxAttempts = 2;
+    const maxAttempts = 3;
+    let shouldIncludeAccessory = false;
 
     while (attemptCount < maxAttempts) {
       attemptCount++;
       console.log(`Generating outfit (attempt ${attemptCount}/${maxAttempts})...`);
 
-      const outfitPrompt = generateOutfitPrompt(attemptCount);
+      const outfitPrompt = generateOutfitPrompt(attemptCount, shouldIncludeAccessory);
 
       const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
         method: 'POST',
@@ -324,6 +334,16 @@ serve(async (req) => {
           } else {
             throw new Error('Could not generate valid outfit with available clothes');
           }
+        }
+
+        // Check if accessories were included when available
+        const hasAccessories = categories.includes('accessories');
+        const accessoriesAvailable = clothesByCategory.accessories.length > 0;
+        
+        if (!hasAccessories && accessoriesAvailable && !shouldIncludeAccessory && attemptCount < maxAttempts) {
+          console.log('No accessories included despite availability. Re-prompting with accessory requirement...');
+          shouldIncludeAccessory = true;
+          continue; // Retry with accessory requirement
         }
 
         console.log('Valid outfit generated successfully');

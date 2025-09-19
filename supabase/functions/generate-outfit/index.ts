@@ -240,8 +240,10 @@ serve(async (req) => {
           }
         ],
         "perfect_for": ["occasion1", "occasion2"],
-        "styling_tips": ["tip1", "tip2", "tip3${clothesByCategory.accessories.length > 0 && !shouldIncludeAccessory ? '", "Consider adding a keps or ring for extra style!"' : '"}]
+        "styling_tips": ["tip1", "tip2", "tip3"]
       }
+
+      ${!shouldIncludeAccessory && clothesByCategory.accessories.length > 0 ? 'IMPORTANT: If no accessories are selected, add "Consider adding a keps or ring for extra style!" to styling_tips.' : ''}
     `;
 
     let outfitRecommendation;

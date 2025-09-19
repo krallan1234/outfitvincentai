@@ -1,1 +1,4 @@
 project_id = "bichfpvapfibrpplrtcr"
+
+[functions.cleanup-temp-data]
+verify_jwt = false

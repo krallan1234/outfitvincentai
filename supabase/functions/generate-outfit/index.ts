@@ -9,6 +9,9 @@ const corsHeaders = {
 
 const geminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
 const pinterestApiKey = Deno.env.get('PINTEREST_API_KEY');
+const metaAppId = Deno.env.get('META_APP_ID');
+const metaAppSecret = Deno.env.get('META_APP_SECRET');
+const metaAccessToken = Deno.env.get('META_ACCESS_TOKEN');
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -155,6 +158,80 @@ serve(async (req) => {
       }
     }
 
+    // Step 2: Get Instagram outfit inspiration (2nd API call)
+    let instagramInspo = [];
+    if (metaAccessToken && metaAppId) {
+      try {
+        // Create hashtag from prompt (e.g., "casual summer outfit" -> "casualoutfit")
+        const promptWords = prompt.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(' ');
+        const hashtag = promptWords.filter(word => word.length > 2).slice(0, 2).join('') + 'outfit';
+        
+        console.log(`Searching Instagram for hashtag: #${hashtag}`);
+        
+        // First, search for the hashtag ID
+        const hashtagSearchUrl = `https://graph.facebook.com/v18.0/ig_hashtag_search?user_id=${metaAppId}&q=${hashtag}&access_token=${metaAccessToken}`;
+        
+        const hashtagResponse = await fetch(hashtagSearchUrl);
+        if (hashtagResponse.ok) {
+          const hashtagData = await hashtagResponse.json();
+          
+          if (hashtagData.data && hashtagData.data.length > 0) {
+            const hashtagId = hashtagData.data[0].id;
+            
+            // Then get recent media for this hashtag
+            const mediaUrl = `https://graph.facebook.com/v18.0/${hashtagId}/recent_media?fields=id,media_url,permalink,username,caption&limit=8&access_token=${metaAccessToken}`;
+            
+            const mediaResponse = await fetch(mediaUrl);
+            if (mediaResponse.ok) {
+              const mediaData = await mediaResponse.json();
+              instagramInspo = (mediaData.data || [])
+                .filter(post => post.media_url && post.media_url.includes('.jpg') || post.media_url.includes('.png'))
+                .slice(0, 5)
+                .map(post => ({
+                  id: post.id,
+                  image_url: post.media_url,
+                  permalink: post.permalink,
+                  username: post.username,
+                  caption: post.caption ? post.caption.substring(0, 100) : 'Instagram outfit inspiration',
+                  source: 'instagram',
+                  hashtag: hashtag
+                }));
+              
+              console.log(`Found ${instagramInspo.length} Instagram inspiration posts for #${hashtag}`);
+              
+              // Store temporarily in Supabase for analysis
+              if (instagramInspo.length > 0) {
+                try {
+                  await supabase
+                    .from('outfits')
+                    .upsert({
+                      id: `temp_instagram_${userId}_${Date.now()}`,
+                      user_id: userId,
+                      title: `Instagram Inspiration - #${hashtag}`,
+                      prompt: `Temporary storage for Instagram inspiration`,
+                      is_public: false,
+                      ai_analysis: {
+                        instagram_inspiration: instagramInspo,
+                        created_at: new Date().toISOString(),
+                        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+                      }
+                    });
+                } catch (tempStoreError) {
+                  console.warn('Failed to temporarily store Instagram data:', tempStoreError);
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Instagram API failed, continuing without inspiration:', error);
+        // Rate limiting handling
+        if (error.message && error.message.includes('rate limit')) {
+          console.warn('Instagram rate limit reached, skipping for this request');
+        }
+      }
+    }
+
     // Step 2: Use Gemini to generate outfit recommendations with category rules
     const generateOutfitPrompt = (attempt = 1) => `
       You are a professional fashion stylist with expertise in creating logical, category-based outfit combinations.
@@ -206,6 +283,10 @@ serve(async (req) => {
       PINTEREST INSPIRATION: ${pinterestTrends.length > 0 ? 
         pinterestTrends.map(trend => trend.description || 'trending style').join(', ') : 
         'classic styling'}
+      
+      INSTAGRAM INSPIRATION: ${instagramInspo.length > 0 ? 
+        `#${instagramInspo[0].hashtag} trending posts with ${instagramInspo.length} outfit examples` : 
+        'general outfit trends'}
 
       ${attempt > 1 ? 'PREVIOUS ATTEMPT FAILED - Fix: Remove duplicates and select exactly one item per category.' : ''}
 
@@ -379,6 +460,7 @@ serve(async (req) => {
           occasion: outfitRecommendation.perfect_for,
           color_harmony: outfitRecommendation.color_harmony,
           pinterest_trends: pinterestTrends.slice(0, 2),
+          instagram_inspiration: instagramInspo.slice(0, 3),
           clothes_analysis: validClothes,
           outfit_visualization: outfitVisualization,
           structured_items: outfitRecommendation.items // New structured format

@@ -52,11 +52,21 @@ serve(async (req) => {
     
     // Define category mappings for logical outfit creation
     const categoryMappings = {
-      'top': ['shirt', 'blouse', 't-shirt', 'sweater', 'tank top', 'crop top'],
-      'bottom': ['pants', 'jeans', 'skirt', 'shorts', 'trousers'],
-      'outerwear': ['jacket', 'coat', 'blazer', 'cardigan', 'hoodie'],
-      'footwear': ['shoes', 'boots', 'sneakers', 'sandals', 'heels'],
-      'accessories': ['belt', 'necklace', 'scarf', 'hat', 'bag', 'watch', 'keps', 'kepsar', 'cap', 'caps', 'ring', 'ringar', 'rings']
+      'top': ['shirt', 'blouse', 't-shirt', 'sweater', 'tank top', 'crop top', 'tank-top', 'crop-top'],
+      'bottom': ['pants', 'jeans', 'skirt', 'shorts', 'trousers', 'leggings'],
+      'outerwear': ['jacket', 'coat', 'blazer', 'cardigan', 'hoodie', 'vest'],
+      'dress': ['dress', 'suit', 'jumpsuit'],
+      'footwear': ['shoes', 'boots', 'sneakers', 'sandals', 'heels', 'slippers'],
+      'accessories': [
+        // Jewelry
+        'belt', 'necklace', 'scarf', 'bracelet', 'earrings',
+        // Headwear
+        'hat', 'bag', 'cap', 'caps', 'beanie', 'kepsar',
+        // Watches & Rings
+        'watch', 'watches', 'klockor', 'ring', 'ringar', 'rings',
+        // Other
+        'gloves', 'socks', 'strumpor', 'sunglasses', 'tie'
+      ]
     };
 
     // Normalize and group clothes by category
@@ -120,6 +130,7 @@ serve(async (req) => {
     const clothesByCategory = {
       top: validClothes.filter(item => item.analysis.main_category === 'top'),
       bottom: validClothes.filter(item => item.analysis.main_category === 'bottom'),
+      dress: validClothes.filter(item => item.analysis.main_category === 'dress'),
       outerwear: validClothes.filter(item => item.analysis.main_category === 'outerwear'),
       footwear: validClothes.filter(item => item.analysis.main_category === 'footwear'),
       accessories: validClothes.filter(item => item.analysis.main_category === 'accessories')
@@ -128,6 +139,7 @@ serve(async (req) => {
     console.log('Clothes grouped by category:', {
       top: clothesByCategory.top.length,
       bottom: clothesByCategory.bottom.length,
+      dress: clothesByCategory.dress.length,
       outerwear: clothesByCategory.outerwear.length,
       footwear: clothesByCategory.footwear.length,
       accessories: clothesByCategory.accessories.length
@@ -165,11 +177,11 @@ serve(async (req) => {
       3. Finally, combine items logically - selecting exactly one item per category that creates a harmonious outfit
 
       CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
-      1. Select AT MOST ONE item per category: top, bottom, outerwear, footwear, accessories
+      1. Select AT MOST ONE item per category: top, bottom, dress, outerwear, footwear, accessories
       2. NEVER select multiple items from the same main category (e.g., no two tops, no two bottoms)
-      3. Minimum outfit must have: 1 top + 1 bottom
+      3. Minimum outfit must have: (1 top + 1 bottom) OR (1 dress)
       4. Optional additions: 1 outerwear + 1 footwear + 1 accessory
-      5. ACCESSORY PRIORITY: ${shouldIncludeAccessory ? 'MUST include at least one accessory (kepsar/caps for casual, ringar/rings for elegant) if available in wardrobe' : 'Include accessories in 20-30% of outfits, prioritizing kepsar for casual moods and ringar for elegant/formal moods'}
+      5. ACCESSORY PRIORITY: ${shouldIncludeAccessory ? 'MUST include at least one accessory (kepsar/caps for casual, ringar/rings or klockor/watches for elegant) if available in wardrobe' : 'Include accessories in 20-30% of outfits, prioritizing kepsar for casual moods and ringar/klockor for elegant/formal moods'}
 
       AVAILABLE CLOTHES BY CATEGORY:
       TOPS: ${JSON.stringify(clothesByCategory.top.map(item => ({
@@ -181,6 +193,14 @@ serve(async (req) => {
       })))}
       
       BOTTOMS: ${JSON.stringify(clothesByCategory.bottom.map(item => ({
+        id: item.id,
+        name: item.category,
+        color: item.analysis.color,
+        style: item.analysis.style,
+        image_url: item.image_url
+      })))}
+      
+      DRESSES: ${JSON.stringify(clothesByCategory.dress.map(item => ({
         id: item.id,
         name: item.category,
         color: item.analysis.color,
@@ -347,12 +367,15 @@ serve(async (req) => {
           }
         }
 
-        // Validate minimum outfit requirements (at least top + bottom or dress)
+        // Validate minimum outfit requirements (at least top + bottom OR dress)
         const hasTop = categories.includes('top');
         const hasBottom = categories.includes('bottom');
+        const hasDress = categories.includes('dress');
         
-        if (!hasTop && !hasBottom) {
-          console.log('Outfit missing essential items, retrying...');
+        const isValidOutfit = (hasTop && hasBottom) || hasDress;
+        
+        if (!isValidOutfit) {
+          console.log('Outfit missing essential items (needs top+bottom or dress), retrying...');
           if (attemptCount < maxAttempts) {
             continue; // Retry
           } else {

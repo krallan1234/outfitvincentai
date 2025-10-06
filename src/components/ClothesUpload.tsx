@@ -10,15 +10,68 @@ import { useClothes } from '@/hooks/useClothes';
 import { useToast } from '@/hooks/use-toast';
 
 const CATEGORIES = [
+  // Tops
+  't-shirt',
   'shirt',
-  'pants',
-  'dress',
-  'shoes',
-  'jacket',
+  'blouse',
   'sweater',
+  'hoodie',
+  'tank-top',
+  'crop-top',
+  
+  // Outerwear
+  'jacket',
+  'coat',
+  'blazer',
+  'cardigan',
+  'vest',
+  
+  // Bottoms
+  'pants',
+  'jeans',
   'shorts',
   'skirt',
-  'accessories',
+  'leggings',
+  'trousers',
+  
+  // Dresses & Suits
+  'dress',
+  'suit',
+  'jumpsuit',
+  
+  // Footwear
+  'shoes',
+  'sneakers',
+  'boots',
+  'sandals',
+  'heels',
+  'slippers',
+  
+  // Accessories - Jewelry
+  'ring',
+  'watch',
+  'bracelet',
+  'necklace',
+  'earrings',
+  
+  // Accessories - Headwear
+  'hat',
+  'cap',
+  'beanie',
+  'kepsar',
+  
+  // Accessories - Other
+  'belt',
+  'scarf',
+  'gloves',
+  'socks',
+  'strumpor',
+  'sunglasses',
+  'bag',
+  'tie',
+  
+  // Underwear & Other
+  'underwear',
   'other'
 ];
 
@@ -61,11 +114,11 @@ export const ClothesUpload = () => {
     e.preventDefault();
     if (!file || !category || !style) return;
 
-    // Check for 20 image limit
-    if (clothes.length >= 20) {
+    // Check for 100 image limit
+    if (clothes.length >= 100) {
       toast({
         title: 'Upload Limit Reached',
-        description: "You've reached the maximum of 20 clothes items. Delete one to add more.",
+        description: "You've reached the maximum of 100 clothes items. Delete some to add more.",
         variant: 'destructive',
       });
       return;
@@ -98,7 +151,7 @@ export const ClothesUpload = () => {
       <CardHeader>
         <CardTitle>Upload Clothing Item</CardTitle>
         <CardDescription>
-          Upload a photo of your clothing item ({clothes.length}/20 items used). Google Gemini AI will detect the color automatically, but you'll need to manually tag category and style.
+          Upload a photo of your clothing item ({clothes.length}/100 items used). Google Gemini AI will detect the color automatically, but you'll need to manually tag category and style.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -215,15 +268,15 @@ export const ClothesUpload = () => {
           <Button 
             type="submit" 
             className="w-full" 
-            disabled={!file || !category || !style || loading || clothes.length >= 20}
+            disabled={!file || !category || !style || loading || clothes.length >= 100}
           >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Uploading & Detecting Color...
               </>
-            ) : clothes.length >= 20 ? (
-              'Max 20 items reached'
+            ) : clothes.length >= 100 ? (
+              'Max 100 items reached'
             ) : (
               'Upload Clothing Item'
             )}

@@ -63,8 +63,8 @@ export const useClothes = () => {
 
       if (countError) throw countError;
       
-      if (existingClothes && existingClothes.length >= 20) {
-        throw new Error("You've reached the maximum of 20 clothes items. Delete one to add more.");
+      if (existingClothes && existingClothes.length >= 100) {
+        throw new Error("You've reached the maximum of 100 clothes items. Delete some to add more.");
       }
 
       // Convert image to base64 for AI analysis

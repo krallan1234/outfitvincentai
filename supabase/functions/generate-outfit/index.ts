@@ -171,10 +171,10 @@ serve(async (req) => {
     const generateOutfitPrompt = (attempt = 1, shouldIncludeAccessory = false) => `
       You are a professional fashion stylist with expertise in creating logical, category-based outfit combinations.
       
-      THINK STEP-BY-STEP:
-      1. First, analyze the user's available clothes by examining colors, styles, and categories
-      2. Then, consider the Pinterest trends and current fashion for inspiration
-      3. Finally, combine items logically - selecting exactly one item per category that creates a harmonious outfit
+      ANALYZE AND COMBINE:
+      1. Review available clothes by colors, styles, and categories
+      2. Use Pinterest trends for inspiration
+      3. Select exactly one item per category for a harmonious outfit
 
       CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
       1. Select AT MOST ONE item per category: top, bottom, dress, outerwear, footwear, accessories
@@ -295,8 +295,8 @@ serve(async (req) => {
             }]
           }],
           generationConfig: {
-            maxOutputTokens: 2000,
-            temperature: 0.7,  // Increased for more creative outputs
+            maxOutputTokens: 8000,  // Increased significantly for Gemini 2.5 Pro thinking + output
+            temperature: 0.7,
             topP: 0.95,
             topK: 40
           }
@@ -326,8 +326,30 @@ serve(async (req) => {
       }
       
       const candidate = geminiData.candidates[0];
+      
+      // Check for MAX_TOKENS finish reason
+      if (candidate.finishReason === 'MAX_TOKENS') {
+        console.error('Gemini hit MAX_TOKENS limit. Response was truncated.');
+        console.error('Usage metadata:', geminiData.usageMetadata);
+        
+        // If we have partial content, try to use it
+        if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+          console.log('Attempting to use partial response despite MAX_TOKENS');
+        } else {
+          console.error('No content available after MAX_TOKENS limit');
+          if (attemptCount < maxAttempts) {
+            console.log('Will retry with adjusted parameters...');
+            continue; // Retry
+          }
+          throw new Error('Gemini response was cut off due to token limit. Please try with a simpler prompt or fewer clothes.');
+        }
+      }
+      
       if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
         console.error('Invalid candidate structure:', candidate);
+        if (attemptCount < maxAttempts) {
+          continue; // Retry
+        }
         throw new Error('Gemini API returned invalid response structure.');
       }
       

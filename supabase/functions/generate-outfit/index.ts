@@ -155,9 +155,14 @@ serve(async (req) => {
       }
     }
 
-    // Step 2: Use Gemini to generate outfit recommendations with category rules
+    // Step 2: Use Gemini 2.5 Pro to generate outfit recommendations with enhanced thinking
     const generateOutfitPrompt = (attempt = 1, shouldIncludeAccessory = false) => `
       You are a professional fashion stylist with expertise in creating logical, category-based outfit combinations.
+      
+      THINK STEP-BY-STEP:
+      1. First, analyze the user's available clothes by examining colors, styles, and categories
+      2. Then, consider the Pinterest trends and current fashion for inspiration
+      3. Finally, combine items logically - selecting exactly one item per category that creates a harmonious outfit
 
       CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
       1. Select AT MOST ONE item per category: top, bottom, outerwear, footwear, accessories
@@ -257,7 +262,7 @@ serve(async (req) => {
 
       const outfitPrompt = generateOutfitPrompt(attemptCount, shouldIncludeAccessory);
 
-      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
+      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${geminiApiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

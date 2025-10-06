@@ -220,14 +220,15 @@ serve(async (req) => {
 
       ${attempt > 1 ? 'PREVIOUS ATTEMPT FAILED - Fix: Remove duplicates and select exactly one item per category.' : ''}
 
-      STYLING INSTRUCTIONS:
-      1. Choose items that complement each other in color, style, and mood
-      2. Consider color harmony (complementary, analogous, or monochromatic)
-      3. Match formality levels (casual with casual, formal with formal)
-      4. Incorporate Pinterest trends while respecting category rules
-      5. Ensure outfit is appropriate for the requested mood/occasion
+      CREATIVE STYLING INSTRUCTIONS:
+      1. Use your fashion expertise to choose items that complement each other in color, style, and mood
+      2. Draw inspiration from Pinterest trends to create modern, trendy combinations
+      3. Consider color harmony (complementary, analogous, or monochromatic schemes)
+      4. Match formality levels (casual with casual, formal with formal)
+      5. Ensure the outfit is appropriate for the requested mood/occasion
       6. ACCESSORY MATCHING: For casual moods, prefer kepsar/caps; for elegant/formal moods, prefer ringar/rings if available
-      7. Use Pinterest trends to identify trendy accessory combinations
+      7. Be creative and confident in your choices - select items that create a cohesive, stylish look
+      8. If Pinterest trends suggest specific accessory combinations (e.g., caps with streetwear, rings with elegant outfits), incorporate them
 
       REQUIRED JSON FORMAT - NO MARKDOWN WRAPPER:
       {
@@ -274,8 +275,10 @@ serve(async (req) => {
             }]
           }],
           generationConfig: {
-            maxOutputTokens: 1000,
-            temperature: 0.3
+            maxOutputTokens: 2000,
+            temperature: 0.7,  // Increased for more creative outputs
+            topP: 0.95,
+            topK: 40
           }
         }),
       });
@@ -294,7 +297,21 @@ serve(async (req) => {
       }
 
       const geminiData = await geminiResponse.json();
-      const content = geminiData.candidates[0].content.parts[0].text;
+      console.log('Full Gemini API response:', JSON.stringify(geminiData));
+      
+      // Handle Gemini 2.5 Pro response structure
+      if (!geminiData.candidates || geminiData.candidates.length === 0) {
+        console.error('No candidates in Gemini response:', geminiData);
+        throw new Error('Gemini API returned no candidates. Please try again.');
+      }
+      
+      const candidate = geminiData.candidates[0];
+      if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+        console.error('Invalid candidate structure:', candidate);
+        throw new Error('Gemini API returned invalid response structure.');
+      }
+      
+      const content = candidate.content.parts[0].text;
       
       // Log raw response for debugging
       console.log(`Raw Gemini response (attempt ${attemptCount}):`, content);

@@ -145,12 +145,39 @@ serve(async (req) => {
       accessories: clothesByCategory.accessories.length
     });
 
-    // Step 1: Get Pinterest trends for inspiration (1st API call)
+    // Step 1: Get Pinterest trends for inspiration with variety (1st API call)
     let pinterestTrends = [];
     if (pinterestApiKey) {
       try {
-        const pinterestQuery = `${prompt} ${mood || ''} outfit style`.trim();
-        const pinterestResponse = await fetch(`https://api.pinterest.com/v5/search/pins/?query=${encodeURIComponent(pinterestQuery)}&limit=5`, {
+        // Add scenario-specific keywords for more varied results
+        const scenarioKeywords = {
+          'office': ['professional', 'workwear', 'business'],
+          'casual': ['streetstyle', 'everyday', 'relaxed'],
+          'date': ['romantic', 'elegant', 'datenight'],
+          'summer': ['summervibes', 'lightweight', 'vacation'],
+          'winter': ['cozy', 'layering', 'winterfashion'],
+          'formal': ['formal', 'dresscode', 'sophisticated'],
+          'sporty': ['athletic', 'activewear', 'sporty']
+        };
+        
+        // Detect scenario from prompt and add specific hashtags
+        let additionalKeywords = '';
+        const lowerPrompt = prompt.toLowerCase();
+        for (const [scenario, keywords] of Object.entries(scenarioKeywords)) {
+          if (lowerPrompt.includes(scenario)) {
+            additionalKeywords = keywords[Math.floor(Math.random() * keywords.length)];
+            break;
+          }
+        }
+        
+        // Randomize query to get varied Pinterest results
+        const randomVariations = ['trending', 'inspo', '2025', 'lookbook', 'OOTD'];
+        const randomVariation = randomVariations[Math.floor(Math.random() * randomVariations.length)];
+        
+        const pinterestQuery = `${prompt} ${mood || ''} ${additionalKeywords} ${randomVariation} outfit`.trim();
+        console.log('Pinterest query:', pinterestQuery);
+        
+        const pinterestResponse = await fetch(`https://api.pinterest.com/v5/search/pins/?query=${encodeURIComponent(pinterestQuery)}&limit=8`, {
           headers: {
             'Authorization': `Bearer ${pinterestApiKey}`,
             'Content-Type': 'application/json',
@@ -159,29 +186,63 @@ serve(async (req) => {
         
         if (pinterestResponse.ok) {
           const pinterestData = await pinterestResponse.json();
-          pinterestTrends = pinterestData.items?.slice(0, 3) || [];
-          console.log(`Found ${pinterestTrends.length} Pinterest inspiration items`);
+          // Randomly select 3 from 8 results for variety
+          const allTrends = pinterestData.items || [];
+          pinterestTrends = allTrends
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 3);
+          console.log(`Found ${pinterestTrends.length} Pinterest inspiration items from ${allTrends.length} total`);
         }
       } catch (error) {
         console.warn('Pinterest API failed, continuing without trends:', error);
       }
     }
 
+    // Get recent outfits to avoid repeats
+    const { data: recentOutfits } = await supabase
+      .from('outfits')
+      .select('recommended_clothes, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    
+    const recentItemIds = recentOutfits
+      ?.flatMap(o => o.recommended_clothes || [])
+      .filter((id, index, self) => self.indexOf(id) === index) || [];
+    
+    console.log(`Avoiding ${recentItemIds.length} recently used items for variety`);
+
     // Step 2: Use Gemini 2.5 Pro to generate outfit recommendations with enhanced thinking
-    const generateOutfitPrompt = (attempt = 1, shouldIncludeAccessory = false) => `
+    const generateOutfitPrompt = (attempt = 1, shouldIncludeAccessory = false) => {
+      // Determine accessory type based on mood/prompt for smarter selection
+      const lowerPrompt = `${prompt} ${mood || ''}`.toLowerCase();
+      const suggestedAccessory = 
+        lowerPrompt.includes('casual') || lowerPrompt.includes('summer') || lowerPrompt.includes('sporty') ? 'kepsar (caps)' :
+        lowerPrompt.includes('elegant') || lowerPrompt.includes('formal') || lowerPrompt.includes('office') ? 'ringar (rings) or klockor (watches)' :
+        'any appropriate accessory';
+      
+      return `
       You are a professional fashion stylist with expertise in creating logical, category-based outfit combinations.
       
+      DIVERSITY & CREATIVITY INSTRUCTIONS:
+      1. AVOID RECENTLY USED ITEMS: These item IDs were used in recent outfits, try to select different items: ${recentItemIds.slice(0, 10).join(', ') || 'none'}
+      2. EXPLORE THE WARDROBE: Don't always pick the "safest" items - mix unexpected combinations that still follow fashion rules
+      3. VARY YOUR SELECTIONS: Even for similar prompts, select different color combinations and styles
+      4. BE CREATIVE: Use the Pinterest trends as inspiration but interpret them uniquely with available clothes
+      ${attempt > 1 ? '5. PREVIOUS ATTEMPT FAILED: Try a completely different combination than before' : ''}
+
       ANALYZE AND COMBINE:
       1. Review available clothes by colors, styles, and categories
-      2. Use Pinterest trends for inspiration
+      2. Use Pinterest trends for inspiration but interpret them creatively
       3. Select exactly one item per category for a harmonious outfit
+      4. Prioritize items NOT in the recent list for freshness
 
       CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
       1. Select AT MOST ONE item per category: top, bottom, dress, outerwear, footwear, accessories
       2. NEVER select multiple items from the same main category (e.g., no two tops, no two bottoms)
       3. Minimum outfit must have: (1 top + 1 bottom) OR (1 dress)
       4. Optional additions: 1 outerwear + 1 footwear + 1 accessory
-      5. ACCESSORY PRIORITY: ${shouldIncludeAccessory ? 'MUST include at least one accessory (kepsar/caps for casual, ringar/rings or klockor/watches for elegant) if available in wardrobe' : 'Include accessories in 20-30% of outfits, prioritizing kepsar for casual moods and ringar/klockor for elegant/formal moods'}
+      5. ACCESSORY PRIORITY: ${shouldIncludeAccessory ? `MUST include at least one accessory (prefer ${suggestedAccessory}) if available in wardrobe` : `Include accessories in 50% of outfits, preferring ${suggestedAccessory} based on the mood/scenario`}
 
       AVAILABLE CLOTHES BY CATEGORY:
       TOPS: ${JSON.stringify(clothesByCategory.top.map(item => ({
@@ -246,9 +307,11 @@ serve(async (req) => {
       3. Consider color harmony (complementary, analogous, or monochromatic schemes)
       4. Match formality levels (casual with casual, formal with formal)
       5. Ensure the outfit is appropriate for the requested mood/occasion
-      6. ACCESSORY MATCHING: For casual moods, prefer kepsar/caps; for elegant/formal moods, prefer ringar/rings if available
+      6. ACCESSORY MATCHING: For casual moods, prefer kepsar/caps; for elegant/formal moods, prefer ringar/rings or klockor/watches
       7. Be creative and confident in your choices - select items that create a cohesive, stylish look
       8. If Pinterest trends suggest specific accessory combinations (e.g., caps with streetwear, rings with elegant outfits), incorporate them
+      9. RANDOMIZE WITHIN STYLE RULES: Don't default to "white shirt + black pants" every time - explore color combinations
+      10. SURPRISE ME: Take calculated fashion risks that still result in a wearable, stylish outfit
 
       REQUIRED JSON FORMAT - NO MARKDOWN WRAPPER:
       {
@@ -271,6 +334,7 @@ serve(async (req) => {
 
       ${!shouldIncludeAccessory && clothesByCategory.accessories.length > 0 ? 'IMPORTANT: If no accessories are selected, add "Consider adding a keps or ring for extra style!" to styling_tips.' : ''}
     `;
+    };
 
     let outfitRecommendation;
     let attemptCount = 0;
@@ -296,7 +360,7 @@ serve(async (req) => {
           }],
           generationConfig: {
             maxOutputTokens: 8000,  // Increased significantly for Gemini 2.5 Pro thinking + output
-            temperature: 0.7,
+            temperature: 0.8,  // Increased to 0.8 for more variety and creativity
             topP: 0.95,
             topK: 40
           }
@@ -405,14 +469,15 @@ serve(async (req) => {
           }
         }
 
-        // Check if accessories were included when available
+        // Check if accessories should be included (50% chance initially, then force on retry)
         const hasAccessories = categories.includes('accessories');
         const accessoriesAvailable = clothesByCategory.accessories.length > 0;
         
-        if (!hasAccessories && accessoriesAvailable && !shouldIncludeAccessory && attemptCount < maxAttempts) {
-          console.log('No accessories included despite availability. Re-prompting with accessory requirement...');
+        // Increase accessory inclusion from 20-30% to 50% chance initially
+        if (!hasAccessories && accessoriesAvailable && !shouldIncludeAccessory && attemptCount < maxAttempts && Math.random() < 0.5) {
+          console.log('No accessories included. Re-prompting with accessory suggestion...');
           shouldIncludeAccessory = true;
-          continue; // Retry with accessory requirement
+          continue; // Retry with accessory preference
         }
 
         console.log('Valid outfit generated successfully');

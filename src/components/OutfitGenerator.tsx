@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Loader2, TrendingUp, Palette } from 'lucide-react';
+import { Sparkles, Loader2, TrendingUp, Palette, RefreshCw } from 'lucide-react';
 import { useOutfits } from '@/hooks/useOutfits';
 import { useCommunity } from '@/hooks/useCommunity';
 import { OutfitCollage } from './OutfitCollage';
@@ -38,11 +38,16 @@ export const OutfitGenerator = () => {
   
   const { generateOutfit, loading } = useOutfits();
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (forceVariety = false) => {
     if (!prompt.trim()) return;
 
     try {
-      const result = await generateOutfit(prompt, mood || undefined, true); // Always public
+      // Add random variation seed to force different results when regenerating
+      const varietyPrompt = forceVariety 
+        ? `${prompt} (style variation ${Math.floor(Math.random() * 10000)})` 
+        : prompt;
+      
+      const result = await generateOutfit(varietyPrompt, mood || undefined, true); // Always public
       setGeneratedOutfit(result);
     } catch (error) {
       // Error is handled in the hook
@@ -115,23 +120,37 @@ export const OutfitGenerator = () => {
           </div>
 
 
-          <Button
-            onClick={handleGenerate}
-            className="w-full" 
-            disabled={!prompt.trim() || loading}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating with Gemini AI & Pinterest...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate AI Outfit
-              </>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => handleGenerate(false)}
+              className="flex-1" 
+              disabled={!prompt.trim() || loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Generate AI Outfit
+                </>
+              )}
+            </Button>
+            
+            {generatedOutfit && (
+              <Button
+                onClick={() => handleGenerate(true)}
+                variant="outline"
+                disabled={loading}
+                title="Regenerate with more variety - creates a different outfit combination"
+                className="px-3"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             )}
-          </Button>
+          </div>
         </CardContent>
       </Card>
 

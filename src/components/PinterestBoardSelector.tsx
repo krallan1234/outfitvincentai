@@ -27,10 +27,16 @@ export const PinterestBoardSelector = ({ onBoardConnected }: PinterestBoardSelec
   }, [connectedBoard]);
 
   const handleConnect = async () => {
-    await connectPinterest();
-    // After connection, fetch boards
-    const userBoards = await fetchBoards();
-    setBoards(userBoards);
+    try {
+      await connectPinterest();
+      // After connection, fetch boards
+      console.log('Connection successful, fetching boards...');
+      const userBoards = await fetchBoards();
+      console.log('Boards fetched:', userBoards.length);
+      setBoards(userBoards);
+    } catch (error) {
+      console.error('Connection or board fetch failed:', error);
+    }
   };
 
   const handleSelectBoard = async (boardId: string) => {

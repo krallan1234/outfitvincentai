@@ -26,11 +26,14 @@ export const usePinterestBoard = () => {
   const connectPinterest = async () => {
     try {
       setLoading(true);
+      console.log('Starting Pinterest OAuth flow...');
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const redirectUri = `${window.location.origin}/outfit`;
 
+      console.log('Requesting auth URL from edge function...');
       const { data, error } = await supabase.functions.invoke('pinterest-auth', {
         body: {
           action: 'getAuthUrl',
@@ -39,9 +42,20 @@ export const usePinterestBoard = () => {
         },
       });
 
-      if (error) throw error;
+      console.log('Auth URL response:', { hasData: !!data, hasError: !!error });
+
+      if (error) {
+        console.error('Failed to get auth URL:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to initialize Pinterest connection',
+          variant: 'destructive',
+        });
+        throw error;
+      }
 
       // Open Pinterest OAuth in popup
+      console.log('Opening OAuth popup...');
       const width = 600;
       const height = 700;
       const left = (window.screen.width - width) / 2;
@@ -56,10 +70,12 @@ export const usePinterestBoard = () => {
       // Listen for OAuth callback
       const handleMessage = async (event: MessageEvent) => {
         if (event.data.type === 'pinterest-oauth-success') {
+          console.log('OAuth callback received with code');
           window.removeEventListener('message', handleMessage);
           const { code } = event.data;
 
           // Exchange code for access token
+          console.log('Exchanging code for token...');
           const { data: tokenData, error: tokenError } = await supabase.functions.invoke('pinterest-auth', {
             body: {
               action: 'exchangeCode',
@@ -69,14 +85,35 @@ export const usePinterestBoard = () => {
             },
           });
 
-          if (tokenError) throw tokenError;
+          console.log('Token exchange response:', { hasData: !!tokenData, hasError: !!tokenError });
+
+          if (tokenError) {
+            console.error('Token exchange failed:', tokenError);
+            toast({
+              title: 'Error',
+              description: 'Failed to complete Pinterest authentication',
+              variant: 'destructive',
+            });
+            throw tokenError;
+          }
+
+          if (tokenData?.error) {
+            console.error('Pinterest auth error:', tokenData);
+            toast({
+              title: 'Pinterest Authentication Error',
+              description: tokenData.details?.hint || tokenData.error,
+              variant: 'destructive',
+            });
+            throw new Error(tokenData.error);
+          }
 
           // Store access token in local state for board selection
+          console.log('Storing access token, scopes:', tokenData.scope);
           sessionStorage.setItem('pinterest_access_token', tokenData.accessToken);
 
           toast({
             title: 'Success',
-            description: 'Connected to Pinterest! Now select a board.',
+            description: `Connected to Pinterest! Scopes: ${tokenData.scope || 'N/A'}`,
           });
 
           setLoading(false);
@@ -107,12 +144,24 @@ export const usePinterestBoard = () => {
 
   const fetchBoards = async (): Promise<PinterestBoard[]> => {
     try {
+      console.log('Fetching Pinterest boards...');
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const accessToken = sessionStorage.getItem('pinterest_access_token');
-      if (!accessToken) throw new Error('Not connected to Pinterest');
+      
+      if (!accessToken) {
+        const error = 'No access token found. Please connect Pinterest first.';
+        console.error(error);
+        toast({
+          title: 'Error',
+          description: error,
+          variant: 'destructive',
+        });
+        throw new Error(error);
+      }
 
+      console.log('Calling fetch-pinterest-board function...');
       const { data, error } = await supabase.functions.invoke('fetch-pinterest-board', {
         body: {
           userId: user.id,
@@ -120,16 +169,42 @@ export const usePinterestBoard = () => {
         },
       });
 
-      if (error) throw error;
-      return data.boards || [];
+      console.log('Function response:', { hasData: !!data, hasError: !!error });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        toast({
+          title: 'Error',
+          description: `Failed to fetch boards: ${error.message || 'Unknown error'}`,
+          variant: 'destructive',
+        });
+        throw error;
+      }
+
+      if (data?.error) {
+        console.error('Pinterest API error:', data);
+        const errorMsg = data.details?.hint || data.error || 'Failed to fetch boards';
+        toast({
+          title: 'Pinterest API Error',
+          description: errorMsg,
+          variant: 'destructive',
+        });
+        throw new Error(data.error);
+      }
+
+      const boards = data.boards || [];
+      console.log('Boards fetched successfully:', boards.length);
+      return boards;
 
     } catch (error) {
-      console.error('Fetch boards error:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch boards',
-        variant: 'destructive',
-      });
+      console.error('Error fetching boards:', error);
+      if (error instanceof Error && !error.message.includes('Failed to fetch boards')) {
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch boards. Check console for details.',
+          variant: 'destructive',
+        });
+      }
       return [];
     }
   };

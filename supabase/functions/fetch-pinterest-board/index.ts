@@ -16,8 +16,10 @@ serve(async (req) => {
 
   try {
     const { userId, accessToken, boardId } = await req.json();
+    console.log('Fetch Pinterest board request:', { userId, hasBoardId: !!boardId, hasToken: !!accessToken });
 
     if (!userId || !accessToken) {
+      console.error('Missing required parameters:', { userId: !!userId, accessToken: !!accessToken });
       throw new Error('User ID and access token are required');
     }
 
@@ -25,21 +27,48 @@ serve(async (req) => {
 
     // Fetch user's boards if no boardId specified
     if (!boardId) {
-      console.log('Fetching user boards...');
-      const boardsResponse = await fetch('https://api.pinterest.com/v5/boards', {
+      console.log('Fetching user boards from Pinterest API...');
+      const boardsUrl = 'https://api.pinterest.com/v5/boards';
+      console.log('API URL:', boardsUrl);
+      
+      const boardsResponse = await fetch(boardsUrl, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
         },
       });
 
+      console.log('Boards API response status:', boardsResponse.status);
+
       if (!boardsResponse.ok) {
-        const error = await boardsResponse.text();
-        console.error('Failed to fetch boards:', error);
-        throw new Error('Failed to fetch Pinterest boards');
+        const errorText = await boardsResponse.text();
+        console.error('Failed to fetch boards:', {
+          status: boardsResponse.status,
+          statusText: boardsResponse.statusText,
+          error: errorText
+        });
+        
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to fetch boards from Pinterest',
+            details: {
+              status: boardsResponse.status,
+              message: boardsResponse.statusText,
+              hint: boardsResponse.status === 401 ? 'Access token expired or invalid' : 
+                    boardsResponse.status === 403 ? 'Missing required scopes (boards:read, user_accounts:read)' :
+                    'Pinterest API error',
+              errorResponse: errorText
+            }
+          }),
+          { status: boardsResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       const boardsData = await boardsResponse.json();
-      console.log(`Found ${boardsData.items?.length || 0} boards`);
+      console.log('Boards fetched successfully:', {
+        count: boardsData.items?.length || 0,
+        hasItems: !!boardsData.items
+      });
 
       return new Response(
         JSON.stringify({ boards: boardsData.items || [] }),
@@ -48,22 +77,32 @@ serve(async (req) => {
     }
 
     // Fetch pins from specific board
-    console.log(`Fetching pins from board ${boardId}...`);
-    const pinsResponse = await fetch(`https://api.pinterest.com/v5/boards/${boardId}/pins?page_size=25`, {
+    console.log('Fetching pins for board:', boardId);
+    const pinsUrl = `https://api.pinterest.com/v5/boards/${boardId}/pins?page_size=25`;
+    console.log('Pins API URL:', pinsUrl);
+    
+    const pinsResponse = await fetch(pinsUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
       },
     });
 
+    console.log('Pins API response status:', pinsResponse.status);
+
     if (!pinsResponse.ok) {
-      const error = await pinsResponse.text();
-      console.error('Failed to fetch pins:', error);
-      throw new Error('Failed to fetch board pins');
+      const errorText = await pinsResponse.text();
+      console.error('Failed to fetch pins:', {
+        status: pinsResponse.status,
+        statusText: pinsResponse.statusText,
+        error: errorText
+      });
+      throw new Error(`Failed to fetch board pins: ${pinsResponse.statusText}`);
     }
 
     const pinsData = await pinsResponse.json();
     const pins = pinsData.items || [];
-    console.log(`Fetched ${pins.length} pins from board`);
+    console.log('Pins fetched successfully:', { count: pins.length });
 
     // Extract relevant data from pins
     const pinsAnalysis = pins.map((pin: any) => ({
@@ -77,11 +116,15 @@ serve(async (req) => {
     }));
 
     // Get board details
+    console.log('Fetching board details for:', boardId);
     const boardResponse = await fetch(`https://api.pinterest.com/v5/boards/${boardId}`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
       },
     });
+
+    console.log('Board details API response status:', boardResponse.status);
 
     let boardName = 'My Board';
     let boardUrl = '';
@@ -90,6 +133,13 @@ serve(async (req) => {
       const boardData = await boardResponse.json();
       boardName = boardData.name || boardName;
       boardUrl = boardData.url || '';
+      console.log('Board details fetched:', { name: boardName, pinsCount: pins.length });
+    } else {
+      const errorText = await boardResponse.text();
+      console.error('Failed to fetch board details:', {
+        status: boardResponse.status,
+        error: errorText
+      });
     }
 
     // Store board data in Supabase
@@ -128,9 +178,19 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Fetch board error:', error);
+    console.error('Error fetching Pinterest board:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to fetch board' }),
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Failed to fetch board',
+        details: {
+          type: error instanceof Error ? error.constructor.name : 'Unknown',
+          hint: 'Check the edge function logs for more details'
+        }
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

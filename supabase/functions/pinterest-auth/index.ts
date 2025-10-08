@@ -6,10 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const PINTEREST_APP_ID = Deno.env.get('META_APP_ID'); // Using Meta credentials for Pinterest OAuth
-const PINTEREST_APP_SECRET = Deno.env.get('META_APP_SECRET');
+// Pinterest OAuth credentials - Using dedicated Pinterest app credentials
+const PINTEREST_APP_ID = Deno.env.get('PINTEREST_APP_ID') || Deno.env.get('META_APP_ID');
+const PINTEREST_APP_SECRET = Deno.env.get('PINTEREST_APP_SECRET') || Deno.env.get('META_APP_SECRET');
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+console.log('Pinterest Auth initialized with App ID:', PINTEREST_APP_ID ? 'Present' : 'Missing');
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -18,17 +21,22 @@ serve(async (req) => {
 
   try {
     const { action, code, redirectUri, userId } = await req.json();
+    console.log('Pinterest auth request:', { action, userId, hasCode: !!code });
+    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     if (action === 'getAuthUrl') {
-      // Generate Pinterest OAuth URL
-      const scope = 'boards:read,pins:read';
+      // Generate Pinterest OAuth URL with proper scopes
+      const scope = 'boards:read,pins:read,user_accounts:read';
       const authUrl = `https://www.pinterest.com/oauth/?` +
         `client_id=${PINTEREST_APP_ID}&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `response_type=code&` +
         `scope=${scope}&` +
         `state=${userId}`;
+
+      console.log('Generated auth URL with scopes:', scope);
+      console.log('Redirect URI:', redirectUri);
 
       return new Response(
         JSON.stringify({ authUrl }),
@@ -37,6 +45,9 @@ serve(async (req) => {
     }
 
     if (action === 'exchangeCode') {
+      console.log('Exchanging code for access token...');
+      console.log('Using redirect URI:', redirectUri);
+      
       // Exchange authorization code for access token
       const tokenResponse = await fetch('https://api.pinterest.com/v5/oauth/token', {
         method: 'POST',
@@ -51,17 +62,41 @@ serve(async (req) => {
         }),
       });
 
+      console.log('Token exchange response status:', tokenResponse.status);
+
       if (!tokenResponse.ok) {
         const error = await tokenResponse.text();
-        console.error('Pinterest token exchange failed:', error);
-        throw new Error('Failed to authenticate with Pinterest');
+        console.error('Pinterest token exchange failed:', {
+          status: tokenResponse.status,
+          statusText: tokenResponse.statusText,
+          error: error
+        });
+        
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to authenticate with Pinterest',
+            details: {
+              status: tokenResponse.status,
+              message: tokenResponse.statusText,
+              hint: tokenResponse.status === 401 ? 'Invalid app credentials' : 
+                    tokenResponse.status === 400 ? 'Invalid authorization code or redirect URI mismatch' :
+                    'Pinterest API error'
+            }
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       const tokenData = await tokenResponse.json();
-      console.log('Pinterest authentication successful');
+      console.log('Pinterest authentication successful, token received');
+      console.log('Token data keys:', Object.keys(tokenData));
 
       return new Response(
-        JSON.stringify({ accessToken: tokenData.access_token }),
+        JSON.stringify({ 
+          accessToken: tokenData.access_token,
+          tokenType: tokenData.token_type,
+          scope: tokenData.scope 
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

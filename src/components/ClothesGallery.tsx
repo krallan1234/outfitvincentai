@@ -2,10 +2,16 @@ import { ClothingItem, useClothes } from '@/hooks/useClothes';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Loader2 } from 'lucide-react';
+import { Trash2, Loader2, Sparkles } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
-export const ClothesGallery = () => {
+interface ClothesGalleryProps {
+  selectionMode?: boolean;
+  selectedItemId?: string;
+  onSelectItem?: (item: ClothingItem) => void;
+}
+
+export const ClothesGallery = ({ selectionMode = false, selectedItemId, onSelectItem }: ClothesGalleryProps) => {
   const { clothes, loading, deleteClothing } = useClothes();
 
   if (loading && clothes.length === 0) {
@@ -30,7 +36,10 @@ export const ClothesGallery = () => {
         <ClothingCard 
           key={item.id} 
           item={item} 
-          onDelete={() => deleteClothing(item.id)} 
+          onDelete={() => deleteClothing(item.id)}
+          selectionMode={selectionMode}
+          isSelected={selectedItemId === item.id}
+          onSelect={() => onSelectItem?.(item)}
         />
       ))}
     </div>
@@ -40,19 +49,41 @@ export const ClothesGallery = () => {
 interface ClothingCardProps {
   item: ClothingItem;
   onDelete: () => void;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
 }
 
-const ClothingCard = ({ item, onDelete }: ClothingCardProps) => {
+const ClothingCard = ({ item, onDelete, selectionMode, isSelected, onSelect }: ClothingCardProps) => {
   return (
-    <Card className="overflow-hidden">
-      <div className="aspect-square relative">
+    <Card className={`overflow-hidden transition-all ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''} ${selectionMode ? 'cursor-pointer hover:shadow-md' : ''}`}>
+      <div className="aspect-square relative" onClick={selectionMode ? onSelect : undefined}>
         <img
           src={item.image_url}
           alt={item.description || 'Clothing item'}
           className="w-full h-full object-cover"
         />
-        <div className="absolute top-2 right-2">
-          <AlertDialog>
+        {selectionMode && isSelected && (
+          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+            <Badge className="bg-primary text-primary-foreground">Selected</Badge>
+          </div>
+        )}
+        <div className="absolute top-2 right-2 flex gap-2">
+          {selectionMode && (
+            <Button 
+              variant={isSelected ? "default" : "secondary"} 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect?.();
+              }}
+            >
+              <Sparkles className="h-4 w-4" />
+            </Button>
+          )}
+          {!selectionMode && (
+            <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" size="icon" className="h-8 w-8">
                 <Trash2 className="h-4 w-4" />
@@ -71,6 +102,7 @@ const ClothingCard = ({ item, onDelete }: ClothingCardProps) => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          )}
         </div>
       </div>
       <CardContent className="p-4">

@@ -11,6 +11,8 @@ import { useOutfits } from '@/hooks/useOutfits';
 import { usePinterestBoard } from '@/hooks/usePinterestBoard';
 import { OutfitCollage } from './OutfitCollage';
 import { PinterestBoardSelector } from './PinterestBoardSelector';
+import { ClothesGallery } from './ClothesGallery';
+import { ClothingItem } from '@/hooks/useClothes';
 
 const MOODS = [
   { value: 'casual', label: 'Casual' },
@@ -37,6 +39,7 @@ export const OutfitGenerator = () => {
   const [mood, setMood] = useState('');
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
   const [enablePinterestBoard, setEnablePinterestBoard] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
   
   const { generateOutfit, loading } = useOutfits();
   const { connectedBoard, getConnectedBoard } = usePinterestBoard();
@@ -61,7 +64,8 @@ export const OutfitGenerator = () => {
         varietyPrompt, 
         mood || undefined, 
         true, 
-        enablePinterestBoard && connectedBoard ? connectedBoard.id : undefined
+        enablePinterestBoard && connectedBoard ? connectedBoard.id : undefined,
+        selectedItem || undefined
       );
       setGeneratedOutfit(result);
     } catch (error) {
@@ -139,6 +143,34 @@ export const OutfitGenerator = () => {
             onBoardConnected={(connected) => setEnablePinterestBoard(connected)}
           />
 
+          {/* Selected Item Display */}
+          <div className="space-y-2">
+            <Label>Base Outfit on Specific Item (Optional)</Label>
+            {selectedItem ? (
+              <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted">
+                <img 
+                  src={selectedItem.image_url} 
+                  alt={selectedItem.category}
+                  className="w-16 h-16 object-cover rounded"
+                />
+                <div className="flex-1">
+                  <p className="font-medium capitalize">{selectedItem.category}</p>
+                  <p className="text-sm text-muted-foreground">{selectedItem.color}</p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setSelectedItem(null)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Select an item from your wardrobe below to build an outfit around it
+              </p>
+            )}
+          </div>
 
           <div className="flex gap-2">
             <Button
@@ -171,6 +203,23 @@ export const OutfitGenerator = () => {
               </Button>
             )}
           </div>
+          </CardContent>
+        </Card>
+
+      {/* Item Selection Gallery */}
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle>Select Item to Build Around (Optional)</CardTitle>
+          <CardDescription>
+            Click the sparkle icon on any item to build your outfit around it
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ClothesGallery 
+            selectionMode={true}
+            selectedItemId={selectedItem?.id}
+            onSelectItem={(item) => setSelectedItem(item.id === selectedItem?.id ? null : item)}
+          />
         </CardContent>
       </Card>
 

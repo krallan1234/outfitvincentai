@@ -18,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, mood, userId, isPublic = true, pinterestBoardId } = await req.json();
+    const { prompt, mood, userId, isPublic = true, pinterestBoardId, selectedItem } = await req.json();
 
     if (!prompt || !userId) {
       throw new Error('Prompt and userId are required');
@@ -257,6 +257,24 @@ serve(async (req) => {
       3. VARY YOUR SELECTIONS: Even for similar prompts, select different color combinations and styles
       4. BE CREATIVE: Use the Pinterest trends as inspiration but interpret them uniquely with available clothes
       ${attempt > 1 ? '5. PREVIOUS ATTEMPT FAILED: Try a completely different combination than before' : ''}
+
+      ${selectedItem ? `
+      SPECIAL REQUIREMENT - SELECTED ITEM FOCUS:
+      The user has specifically selected this item to build the outfit around:
+      - Category: ${selectedItem.category}
+      - Color: ${selectedItem.color || 'Not specified'}
+      - Style: ${selectedItem.style || 'Not specified'}
+      - Brand: ${selectedItem.brand || 'Not specified'}
+      - Description: ${selectedItem.description || 'Not specified'}
+      - Image URL: ${selectedItem.image_url}
+      - Item ID: ${selectedItem.id}
+
+      YOU MUST:
+      1. ALWAYS include this selected item in the final outfit (mark it with "is_selected": true)
+      2. Build the ENTIRE outfit to complement and highlight this item
+      3. Choose colors, styles, and accessories that work harmoniously with this piece
+      4. Explain in your reasoning how each item complements the selected piece
+      ` : ''}
 
       ${boardInspiration.length > 0 ? `
       PINTEREST BOARD ANALYSIS (User's Personal Board):

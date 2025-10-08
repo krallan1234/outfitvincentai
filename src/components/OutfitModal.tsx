@@ -167,14 +167,27 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                 <h4 className="text-md font-medium mb-3">Outfit Items</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {clothesImages.map((item, index) => (
-                    <div key={item.id || index} className="bg-muted rounded-lg overflow-hidden">
-                      <div className="aspect-square">
+                    <div 
+                      key={item.id || index} 
+                      className={cn(
+                        "bg-muted rounded-lg overflow-hidden transition-all",
+                        item.is_selected && "ring-2 ring-primary shadow-lg"
+                      )}
+                    >
+                      <div className="aspect-square relative">
                           <img
                             src={item.image_url || item.image || item.url}
                             alt={`${item.category || item.type || 'Item'} - ${item.color || (item.colors?.[0]) || 'Unknown color'}`}
                             className="w-full h-full object-cover"
                             loading="lazy"
                           />
+                          {item.is_selected && (
+                            <div className="absolute top-2 right-2">
+                              <Badge className="bg-primary text-primary-foreground">
+                                Base Item
+                              </Badge>
+                            </div>
+                          )}
                       </div>
                       <div className="p-2">
                         <p className="text-xs font-medium capitalize">{item.category || 'Item'}</p>
@@ -184,6 +197,9 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                         )}
                         {item.item_name && (
                           <p className="text-xs text-muted-foreground">{item.item_name}</p>
+                        )}
+                        {item.is_selected && item.reasoning && (
+                          <p className="text-xs text-primary mt-1 italic">{item.reasoning}</p>
                         )}
                       </div>
                     </div>

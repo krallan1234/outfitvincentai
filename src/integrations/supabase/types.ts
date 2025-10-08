@@ -133,6 +133,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pinterest_boards: {
+        Row: {
+          access_token: string
+          board_id: string
+          board_name: string
+          board_url: string | null
+          created_at: string
+          id: string
+          last_synced_at: string | null
+          pins_data: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          board_id: string
+          board_name: string
+          board_url?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          pins_data?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          board_id?: string
+          board_name?: string
+          board_url?: string | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          pins_data?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

@@ -18,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, mood, userId, isPublic = true } = await req.json();
+    const { prompt, mood, userId, isPublic = true, pinterestBoardId } = await req.json();
 
     if (!prompt || !userId) {
       throw new Error('Prompt and userId are required');
@@ -145,9 +145,36 @@ serve(async (req) => {
       accessories: clothesByCategory.accessories.length
     });
 
-    // Step 1: Get Pinterest trends for inspiration with variety (1st API call)
+    // Step 1: Get Pinterest inspiration - either from user's board or search
     let pinterestTrends = [];
-    if (pinterestApiKey) {
+    let boardInspiration = [];
+    
+    // If user has connected a Pinterest board, use pins from their board
+    if (pinterestBoardId) {
+      console.log(`Using connected Pinterest board: ${pinterestBoardId}`);
+      try {
+        const { data: boardData, error: boardError } = await supabase
+          .from('pinterest_boards')
+          .select('pins_data, board_name')
+          .eq('user_id', userId)
+          .eq('board_id', pinterestBoardId)
+          .single();
+        
+        if (!boardError && boardData && boardData.pins_data) {
+          const pins = boardData.pins_data as any[];
+          // Randomly select 5 pins from user's board for analysis
+          boardInspiration = pins
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 5);
+          console.log(`Analyzing ${boardInspiration.length} pins from board "${boardData.board_name}"`);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch Pinterest board data:', error);
+      }
+    }
+    
+    // Fallback to Pinterest search if no board or as additional inspiration
+    if (pinterestApiKey && boardInspiration.length === 0) {
       try {
         // Add scenario-specific keywords for more varied results
         const scenarioKeywords = {
@@ -175,7 +202,7 @@ serve(async (req) => {
         const randomVariation = randomVariations[Math.floor(Math.random() * randomVariations.length)];
         
         const pinterestQuery = `${prompt} ${mood || ''} ${additionalKeywords} ${randomVariation} outfit`.trim();
-        console.log('Pinterest query:', pinterestQuery);
+        console.log('Pinterest search query:', pinterestQuery);
         
         const pinterestResponse = await fetch(`https://api.pinterest.com/v5/search/pins/?query=${encodeURIComponent(pinterestQuery)}&limit=8`, {
           headers: {
@@ -191,10 +218,10 @@ serve(async (req) => {
           pinterestTrends = allTrends
             .sort(() => Math.random() - 0.5)
             .slice(0, 3);
-          console.log(`Found ${pinterestTrends.length} Pinterest inspiration items from ${allTrends.length} total`);
+          console.log(`Found ${pinterestTrends.length} Pinterest search results from ${allTrends.length} total`);
         }
       } catch (error) {
-        console.warn('Pinterest API failed, continuing without trends:', error);
+        console.warn('Pinterest search failed, continuing without trends:', error);
       }
     }
 
@@ -231,9 +258,26 @@ serve(async (req) => {
       4. BE CREATIVE: Use the Pinterest trends as inspiration but interpret them uniquely with available clothes
       ${attempt > 1 ? '5. PREVIOUS ATTEMPT FAILED: Try a completely different combination than before' : ''}
 
+      ${boardInspiration.length > 0 ? `
+      PINTEREST BOARD ANALYSIS (User's Personal Board):
+      The user has connected their personal Pinterest board. Analyze these pins for style preferences:
+      ${JSON.stringify(boardInspiration.map((pin: any) => ({
+        title: pin.title,
+        description: pin.description,
+        imageUrl: pin.imageUrl,
+        dominantColor: pin.dominantColor
+      })))}
+      
+      INSTRUCTIONS FOR BOARD-INSPIRED OUTFITS:
+      - Identify common themes, colors, and styles from the board pins
+      - Match the aesthetic and vibe shown in the Pinterest images
+      - Use the dominant colors and style patterns as guidance
+      - Create an outfit that reflects the user's Pinterest taste using their actual wardrobe
+      ` : ''}
+
       ANALYZE AND COMBINE:
-      1. Review available clothes by colors, styles, and categories
-      2. Use Pinterest trends for inspiration but interpret them creatively
+      1. ${boardInspiration.length > 0 ? 'Start by analyzing the Pinterest board pins to understand user preferences' : 'Review available clothes by colors, styles, and categories'}
+      2. ${pinterestTrends.length > 0 || boardInspiration.length > 0 ? 'Use Pinterest data for inspiration but interpret creatively' : 'Focus on creating harmonious combinations'}
       3. Select exactly one item per category for a harmonious outfit
       4. Prioritize items NOT in the recent list for freshness
 
@@ -332,6 +376,7 @@ serve(async (req) => {
         "styling_tips": ["tip1", "tip2", "tip3"]
       }
 
+      ${boardInspiration.length > 0 ? 'PINTEREST BOARD ATTRIBUTION: Add "Inspired by your Pinterest board" to the description' : ''}
       ${!shouldIncludeAccessory && clothesByCategory.accessories.length > 0 ? 'IMPORTANT: If no accessories are selected, add "Consider adding a keps or ring for extra style!" to styling_tips.' : ''}
     `;
     };

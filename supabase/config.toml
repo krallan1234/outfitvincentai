@@ -1,1 +1,7 @@
 project_id = "bichfpvapfibrpplrtcr"
+
+[functions.pinterest-auth]
+verify_jwt = false
+
+[functions.fetch-pinterest-board]
+verify_jwt = true

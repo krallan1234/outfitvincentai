@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,10 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Loader2, TrendingUp, Palette, RefreshCw } from 'lucide-react';
+import { Sparkles, Loader2, TrendingUp, Palette, RefreshCw, Link as LinkIcon } from 'lucide-react';
 import { useOutfits } from '@/hooks/useOutfits';
-import { useCommunity } from '@/hooks/useCommunity';
+import { usePinterestBoard } from '@/hooks/usePinterestBoard';
 import { OutfitCollage } from './OutfitCollage';
+import { PinterestBoardSelector } from './PinterestBoardSelector';
 
 const MOODS = [
   { value: 'casual', label: 'Casual' },
@@ -35,8 +36,17 @@ export const OutfitGenerator = () => {
   const [prompt, setPrompt] = useState('');
   const [mood, setMood] = useState('');
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
+  const [enablePinterestBoard, setEnablePinterestBoard] = useState(false);
   
   const { generateOutfit, loading } = useOutfits();
+  const { connectedBoard, getConnectedBoard } = usePinterestBoard();
+
+  useEffect(() => {
+    const loadBoard = async () => {
+      await getConnectedBoard();
+    };
+    loadBoard();
+  }, []);
 
   const handleGenerate = async (forceVariety = false) => {
     if (!prompt.trim()) return;
@@ -47,7 +57,12 @@ export const OutfitGenerator = () => {
         ? `${prompt} (style variation ${Math.floor(Math.random() * 10000)})` 
         : prompt;
       
-      const result = await generateOutfit(varietyPrompt, mood || undefined, true); // Always public
+      const result = await generateOutfit(
+        varietyPrompt, 
+        mood || undefined, 
+        true, 
+        enablePinterestBoard && connectedBoard ? connectedBoard.id : undefined
+      );
       setGeneratedOutfit(result);
     } catch (error) {
       // Error is handled in the hook
@@ -118,6 +133,11 @@ export const OutfitGenerator = () => {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Pinterest Board Integration */}
+          <PinterestBoardSelector 
+            onBoardConnected={(connected) => setEnablePinterestBoard(connected)}
+          />
 
 
           <div className="flex gap-2">

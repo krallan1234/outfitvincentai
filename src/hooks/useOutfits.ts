@@ -49,7 +49,7 @@ export const useOutfits = () => {
     }
   };
 
-  const generateOutfit = async (prompt: string, mood?: string, isPublic: boolean = true) => {
+  const generateOutfit = async (prompt: string, mood?: string, isPublic: boolean = true, pinterestBoardId?: string) => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -60,7 +60,8 @@ export const useOutfits = () => {
           prompt,
           mood,
           userId: user.id,
-          isPublic
+          isPublic,
+          pinterestBoardId
         },
       });
 

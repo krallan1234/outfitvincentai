@@ -12,6 +12,7 @@ import CommunityPage from "./pages/CommunityPage";
 import ProfilePage from "./pages/ProfilePage";
 import PolicyPage from "./pages/PolicyPage";
 import AuthPage from "./pages/AuthPage";
+import PinterestCallback from "./pages/PinterestCallback";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/policy" element={<PolicyPage />} />
+            <Route path="/auth/pinterest/callback" element={<PinterestCallback />} />
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <Dashboard />

@@ -32,7 +32,7 @@ export const usePinterestBoard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const redirectUri = `${window.location.origin}/outfit`;
+      const redirectUri = `${window.location.origin}/auth/pinterest/callback`;
 
       console.log('Requesting auth URL from edge function...');
       const { data, error } = await supabase.functions.invoke('pinterest-auth', {
@@ -70,6 +70,23 @@ export const usePinterestBoard = () => {
 
       // Listen for OAuth callback
       const handleMessage = async (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) {
+          console.warn('Message from unexpected origin:', event.origin);
+          return;
+        }
+        
+        if (event.data.type === 'pinterest-oauth-error') {
+          console.error('OAuth error from callback:', event.data);
+          toast({
+            title: 'Pinterest Authentication Failed',
+            description: event.data.description || event.data.error,
+            variant: 'destructive',
+          });
+          window.removeEventListener('message', handleMessage);
+          setLoading(false);
+          return;
+        }
+        
         if (event.data.type === 'pinterest-oauth-success') {
           console.log('OAuth callback received with code');
           window.removeEventListener('message', handleMessage);

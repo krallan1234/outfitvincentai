@@ -28,7 +28,6 @@ serve(async (req) => {
     // Fetch user's boards if no boardId specified
     if (!boardId) {
       console.log('Fetching user boards from Pinterest API...');
-      // Use the correct endpoint for fetching user boards
       const boardsUrl = 'https://api.pinterest.com/v5/boards';
       console.log('API URL:', boardsUrl);
       
@@ -120,22 +119,6 @@ serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
-      return new Response(
-        JSON.stringify({ boards: boardsData.items || [] }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-          }),
-          { status: boardsResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const boardsData = await boardsResponse.json();
-      console.log('Boards fetched successfully:', {
-        count: boardsData.items?.length || 0,
-        hasItems: !!boardsData.items
-      });
 
       return new Response(
         JSON.stringify({ boards: boardsData.items || [] }),

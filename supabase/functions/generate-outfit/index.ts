@@ -404,154 +404,185 @@ serve(async (req) => {
     const maxAttempts = 3;
     let shouldIncludeAccessory = false;
 
+    // Helper function for exponential backoff delay
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
     while (attemptCount < maxAttempts) {
       attemptCount++;
       console.log(`Generating outfit (attempt ${attemptCount}/${maxAttempts})...`);
 
+      // Add exponential backoff delay for retries
+      if (attemptCount > 1) {
+        const delayMs = Math.min(1000 * Math.pow(2, attemptCount - 2), 8000); // 1s, 2s, 4s max
+        console.log(`Waiting ${delayMs}ms before retry...`);
+        await sleep(delayMs);
+      }
+
       const outfitPrompt = generateOutfitPrompt(attemptCount, shouldIncludeAccessory);
 
-      const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${geminiApiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: outfitPrompt
-            }]
-          }],
-          generationConfig: {
-            maxOutputTokens: 8000,  // Increased significantly for Gemini 2.5 Pro thinking + output
-            temperature: 0.8,  // Increased to 0.8 for more variety and creativity
-            topP: 0.95,
-            topK: 40
-          }
-        }),
-      });
-
-      if (!geminiResponse.ok) {
-        const errorData = await geminiResponse.text();
-        console.error('Gemini API error:', geminiResponse.status, errorData);
-        
-        if (geminiResponse.status === 429) {
-          throw new Error('Gemini quota exceeded. Please try again later or contact support.');
-        } else if (geminiResponse.status === 401) {
-          throw new Error('Gemini API authentication failed. Please check your API key.');
-        } else {
-          throw new Error(`Gemini API error (${geminiResponse.status}): Failed to generate outfit recommendation`);
-        }
-      }
-
-      const geminiData = await geminiResponse.json();
-      console.log('Full Gemini API response:', JSON.stringify(geminiData));
-      
-      // Handle Gemini 2.5 Pro response structure
-      if (!geminiData.candidates || geminiData.candidates.length === 0) {
-        console.error('No candidates in Gemini response:', geminiData);
-        throw new Error('Gemini API returned no candidates. Please try again.');
-      }
-      
-      const candidate = geminiData.candidates[0];
-      
-      // Check for MAX_TOKENS finish reason
-      if (candidate.finishReason === 'MAX_TOKENS') {
-        console.error('Gemini hit MAX_TOKENS limit. Response was truncated.');
-        console.error('Usage metadata:', geminiData.usageMetadata);
-        
-        // If we have partial content, try to use it
-        if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-          console.log('Attempting to use partial response despite MAX_TOKENS');
-        } else {
-          console.error('No content available after MAX_TOKENS limit');
-          if (attemptCount < maxAttempts) {
-            console.log('Will retry with adjusted parameters...');
-            continue; // Retry
-          }
-          throw new Error('Gemini response was cut off due to token limit. Please try with a simpler prompt or fewer clothes.');
-        }
-      }
-      
-      if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
-        console.error('Invalid candidate structure:', candidate);
-        if (attemptCount < maxAttempts) {
-          continue; // Retry
-        }
-        throw new Error('Gemini API returned invalid response structure.');
-      }
-      
-      const content = candidate.content.parts[0].text;
-      
-      // Log raw response for debugging
-      console.log(`Raw Gemini response (attempt ${attemptCount}):`, content);
-      
-      // Parse JSON from potentially markdown-wrapped response
       try {
-        // Try to extract JSON from markdown code blocks first
-        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (jsonMatch) {
-          console.log('Found markdown-wrapped JSON, extracting...');
-          outfitRecommendation = JSON.parse(jsonMatch[1].trim());
-        } else {
-          // Fallback to direct parsing
-          console.log('No markdown wrapper found, parsing directly...');
-          outfitRecommendation = JSON.parse(content.trim());
-        }
+        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${geminiApiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: outfitPrompt
+              }]
+            }],
+            generationConfig: {
+              maxOutputTokens: 8000,
+              temperature: 0.8,
+              topP: 0.95,
+              topK: 40
+            }
+          }),
+        });
 
-        // Validate outfit for category duplicates
-        if (!outfitRecommendation.items || !Array.isArray(outfitRecommendation.items)) {
-          throw new Error('Invalid outfit format: missing items array');
-        }
-
-        // Check for category duplicates
-        const categories = outfitRecommendation.items.map(item => item.category);
-        const uniqueCategories = new Set(categories);
-        
-        if (categories.length !== uniqueCategories.size) {
-          console.log('Found duplicate categories, retrying...');
-          if (attemptCount < maxAttempts) {
-            continue; // Retry with fix prompt
+        if (!geminiResponse.ok) {
+          const errorData = await geminiResponse.text();
+          console.error('Gemini API error:', geminiResponse.status, errorData);
+          
+          if (geminiResponse.status === 503) {
+            console.log('Gemini API overloaded (503), will retry if attempts remain...');
+            if (attemptCount < maxAttempts) {
+              continue; // Retry with backoff
+            }
+            throw new Error('Gemini API is currently overloaded. Please try again in a few moments.');
+          } else if (geminiResponse.status === 429) {
+            console.log('Rate limit exceeded (429), will retry if attempts remain...');
+            if (attemptCount < maxAttempts) {
+              continue; // Retry with backoff
+            }
+            throw new Error('Rate limit exceeded. Please try again in a few moments.');
+          } else if (geminiResponse.status === 401) {
+            throw new Error('Gemini API authentication failed. Please contact support.');
           } else {
-            throw new Error('Multiple attempts failed to generate valid outfit');
+            throw new Error(`Gemini API error (${geminiResponse.status}): Failed to generate outfit recommendation`);
           }
         }
 
-        // Validate minimum outfit requirements (at least top + bottom OR dress)
-        const hasTop = categories.includes('top');
-        const hasBottom = categories.includes('bottom');
-        const hasDress = categories.includes('dress');
+        const geminiData = await geminiResponse.json();
+        console.log('Gemini API request successful');
         
-        const isValidOutfit = (hasTop && hasBottom) || hasDress;
-        
-        if (!isValidOutfit) {
-          console.log('Outfit missing essential items (needs top+bottom or dress), retrying...');
+        // Handle Gemini 2.5 Pro response structure
+        if (!geminiData.candidates || geminiData.candidates.length === 0) {
+          console.error('No candidates in Gemini response:', geminiData);
           if (attemptCount < maxAttempts) {
             continue; // Retry
+          }
+          throw new Error('Gemini API returned no candidates. Please try again.');
+        }
+        
+        const candidate = geminiData.candidates[0];
+        
+        // Check for MAX_TOKENS finish reason
+        if (candidate.finishReason === 'MAX_TOKENS') {
+          console.error('Gemini hit MAX_TOKENS limit. Response was truncated.');
+          console.error('Usage metadata:', geminiData.usageMetadata);
+          
+          // If we have partial content, try to use it
+          if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+            console.log('Attempting to use partial response despite MAX_TOKENS');
           } else {
-            throw new Error('Could not generate valid outfit with available clothes');
+            console.error('No content available after MAX_TOKENS limit');
+            if (attemptCount < maxAttempts) {
+              console.log('Will retry with adjusted parameters...');
+              continue; // Retry
+            }
+            throw new Error('Gemini response was cut off due to token limit. Please try with a simpler prompt or fewer clothes.');
           }
         }
-
-        // Check if accessories should be included (50% chance initially, then force on retry)
-        const hasAccessories = categories.includes('accessories');
-        const accessoriesAvailable = clothesByCategory.accessories.length > 0;
         
-        // Increase accessory inclusion from 20-30% to 50% chance initially
-        if (!hasAccessories && accessoriesAvailable && !shouldIncludeAccessory && attemptCount < maxAttempts && Math.random() < 0.5) {
-          console.log('No accessories included. Re-prompting with accessory suggestion...');
-          shouldIncludeAccessory = true;
-          continue; // Retry with accessory preference
+        if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+          console.error('Invalid candidate structure:', candidate);
+          if (attemptCount < maxAttempts) {
+            continue; // Retry
+          }
+          throw new Error('Gemini API returned invalid response structure.');
         }
-
-        console.log('Valid outfit generated successfully');
-        break; // Success, exit loop
-
-      } catch (parseError) {
-        console.error(`Parse error on attempt ${attemptCount}:`, parseError);
-        console.error('Content that failed to parse:', content);
         
+        const content = candidate.content.parts[0].text;
+        
+        // Log raw response for debugging
+        console.log(`Gemini response received (attempt ${attemptCount})`);
+        
+        // Parse JSON from potentially markdown-wrapped response
+        try {
+          // Try to extract JSON from markdown code blocks first
+          const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          if (jsonMatch) {
+            console.log('Found markdown-wrapped JSON, extracting...');
+            outfitRecommendation = JSON.parse(jsonMatch[1].trim());
+          } else {
+            // Fallback to direct parsing
+            console.log('No markdown wrapper found, parsing directly...');
+            outfitRecommendation = JSON.parse(content.trim());
+          }
+
+          // Validate outfit for category duplicates
+          if (!outfitRecommendation.items || !Array.isArray(outfitRecommendation.items)) {
+            throw new Error('Invalid outfit format: missing items array');
+          }
+
+          // Check for category duplicates
+          const categories = outfitRecommendation.items.map(item => item.category);
+          const uniqueCategories = new Set(categories);
+          
+          if (categories.length !== uniqueCategories.size) {
+            console.log('Found duplicate categories, retrying...');
+            if (attemptCount < maxAttempts) {
+              continue; // Retry with fix prompt
+            } else {
+              throw new Error('Multiple attempts failed to generate valid outfit');
+            }
+          }
+
+          // Validate minimum outfit requirements (at least top + bottom OR dress)
+          const hasTop = categories.includes('top');
+          const hasBottom = categories.includes('bottom');
+          const hasDress = categories.includes('dress');
+          
+          const isValidOutfit = (hasTop && hasBottom) || hasDress;
+          
+          if (!isValidOutfit) {
+            console.log('Outfit missing essential items (needs top+bottom or dress), retrying...');
+            if (attemptCount < maxAttempts) {
+              continue; // Retry
+            } else {
+              throw new Error('Could not generate valid outfit with available clothes');
+            }
+          }
+
+          // Check if accessories should be included (50% chance initially, then force on retry)
+          const hasAccessories = categories.includes('accessories');
+          const accessoriesAvailable = clothesByCategory.accessories.length > 0;
+          
+          // Increase accessory inclusion from 20-30% to 50% chance initially
+          if (!hasAccessories && accessoriesAvailable && !shouldIncludeAccessory && attemptCount < maxAttempts && Math.random() < 0.5) {
+            console.log('No accessories included. Re-prompting with accessory suggestion...');
+            shouldIncludeAccessory = true;
+            continue; // Retry with accessory preference
+          }
+
+          console.log('Valid outfit generated successfully');
+          break; // Success, exit loop
+
+        } catch (parseError) {
+          console.error(`Parse error on attempt ${attemptCount}:`, parseError);
+          console.error('Content that failed to parse:', content);
+          
+          if (attemptCount >= maxAttempts) {
+            throw new Error('Invalid JSON response from AI after multiple attempts. Please try again.');
+          }
+          // Continue to retry
+        }
+      } catch (fetchError) {
+        console.error(`Network error on attempt ${attemptCount}:`, fetchError);
         if (attemptCount >= maxAttempts) {
-          throw new Error('Invalid JSON response from AI after multiple attempts. Please try again.');
+          throw new Error('Failed to connect to Gemini API after multiple attempts. Please check your connection and try again.');
         }
         // Continue to retry
       }

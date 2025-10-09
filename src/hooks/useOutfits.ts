@@ -92,9 +92,30 @@ export const useOutfits = () => {
       };
     } catch (error) {
       console.error('Error generating outfit:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate outfit';
+      
+      // Extract user-friendly error messages
+      let errorMessage = 'Failed to generate outfit';
+      
+      if (error instanceof Error) {
+        // Check for specific error patterns
+        if (error.message.includes('overloaded') || error.message.includes('503')) {
+          errorMessage = 'AI service is currently busy. Please try again in a few moments.';
+        } else if (error.message.includes('Rate limit') || error.message.includes('429')) {
+          errorMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (error.message.includes('authentication') || error.message.includes('401')) {
+          errorMessage = 'Service configuration issue. Please contact support.';
+        } else if (error.message.includes('No clothes found')) {
+          errorMessage = 'Please upload some clothing items to your wardrobe first.';
+        } else if (error.message.includes('connection') || error.message.includes('network')) {
+          errorMessage = 'Connection issue. Please check your internet and try again.';
+        } else {
+          // Use the error message if it's user-friendly
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
-        title: 'Error',
+        title: 'Generation Failed',
         description: errorMessage,
         variant: 'destructive',
       });

@@ -27,6 +27,35 @@ export const PinterestBoardSelector = ({ onBoardConnected }: PinterestBoardSelec
     }
   }, [connectedBoard]);
 
+  // Handle return from OAuth redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('pinterest_success');
+    const error = urlParams.get('pinterest_error');
+
+    if (success === 'true') {
+      console.log('Pinterest connection successful, fetching boards...');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+      
+      // Fetch boards automatically
+      const autoFetchBoards = async () => {
+        try {
+          const userBoards = await fetchBoards();
+          setBoards(userBoards);
+        } catch (err) {
+          console.error('Auto-fetch boards failed:', err);
+        }
+      };
+      
+      autoFetchBoards();
+    } else if (error) {
+      console.error('Pinterest connection failed:', error);
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   // Countdown timer for rate limit retry
   useEffect(() => {
     if (!rateLimitRetryAt) {
@@ -49,13 +78,9 @@ export const PinterestBoardSelector = ({ onBoardConnected }: PinterestBoardSelec
   const handleConnect = async () => {
     try {
       await connectPinterest();
-      // After connection, fetch boards
-      console.log('Connection successful, fetching boards...');
-      const userBoards = await fetchBoards();
-      console.log('Boards fetched:', userBoards.length);
-      setBoards(userBoards);
+      // Connection will redirect, so boards will be fetched on return
     } catch (error) {
-      console.error('Connection or board fetch failed:', error);
+      console.error('Connection failed:', error);
     }
   };
 

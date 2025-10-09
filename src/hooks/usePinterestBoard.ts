@@ -27,7 +27,7 @@ export const usePinterestBoard = () => {
   const connectPinterest = async () => {
     try {
       setLoading(true);
-      console.log('Starting Pinterest OAuth flow...');
+      console.log('Starting Pinterest OAuth flow (redirect mode)...');
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -52,102 +52,18 @@ export const usePinterestBoard = () => {
           description: 'Failed to initialize Pinterest connection',
           variant: 'destructive',
         });
+        setLoading(false);
         throw error;
       }
 
-      // Open Pinterest OAuth in popup
-      console.log('Opening OAuth popup...');
-      const width = 600;
-      const height = 700;
-      const left = (window.screen.width - width) / 2;
-      const top = (window.screen.height - height) / 2;
-      
-      const popup = window.open(
-        data.authUrl,
-        'Pinterest OAuth',
-        `width=${width},height=${height},left=${left},top=${top}`
-      );
+      // Store return URL and user ID for callback
+      sessionStorage.setItem('pinterest_oauth_return', window.location.pathname);
+      sessionStorage.setItem('pinterest_oauth_user_id', user.id);
+      sessionStorage.setItem('pinterest_oauth_redirect_uri', redirectUri);
 
-      // Listen for OAuth callback
-      const handleMessage = async (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) {
-          console.warn('Message from unexpected origin:', event.origin);
-          return;
-        }
-        
-        if (event.data.type === 'pinterest-oauth-error') {
-          console.error('OAuth error from callback:', event.data);
-          toast({
-            title: 'Pinterest Authentication Failed',
-            description: event.data.description || event.data.error,
-            variant: 'destructive',
-          });
-          window.removeEventListener('message', handleMessage);
-          setLoading(false);
-          return;
-        }
-        
-        if (event.data.type === 'pinterest-oauth-success') {
-          console.log('OAuth callback received with code');
-          window.removeEventListener('message', handleMessage);
-          const { code } = event.data;
-
-          // Exchange code for access token
-          console.log('Exchanging code for token...');
-          const { data: tokenData, error: tokenError } = await supabase.functions.invoke('pinterest-auth', {
-            body: {
-              action: 'exchangeCode',
-              code,
-              redirectUri,
-              userId: user.id,
-            },
-          });
-
-          console.log('Token exchange response:', { hasData: !!tokenData, hasError: !!tokenError });
-
-          if (tokenError) {
-            console.error('Token exchange failed:', tokenError);
-            toast({
-              title: 'Error',
-              description: 'Failed to complete Pinterest authentication',
-              variant: 'destructive',
-            });
-            throw tokenError;
-          }
-
-          if (tokenData?.error) {
-            console.error('Pinterest auth error:', tokenData);
-            toast({
-              title: 'Pinterest Authentication Error',
-              description: tokenData.details?.hint || tokenData.error,
-              variant: 'destructive',
-            });
-            throw new Error(tokenData.error);
-          }
-
-          // Store access token in local state for board selection
-          console.log('Storing access token, scopes:', tokenData.scope);
-          sessionStorage.setItem('pinterest_access_token', tokenData.accessToken);
-
-          toast({
-            title: 'Success',
-            description: `Connected to Pinterest! Scopes: ${tokenData.scope || 'N/A'}`,
-          });
-
-          setLoading(false);
-        }
-      };
-
-      window.addEventListener('message', handleMessage);
-
-      // Cleanup if popup is closed
-      const checkClosed = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkClosed);
-          window.removeEventListener('message', handleMessage);
-          setLoading(false);
-        }
-      }, 500);
+      console.log('Redirecting to Pinterest OAuth...');
+      // Use redirect instead of popup to avoid COOP issues
+      window.location.href = data.authUrl;
 
     } catch (error) {
       console.error('Pinterest connection error:', error);

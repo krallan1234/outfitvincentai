@@ -28,6 +28,7 @@ serve(async (req) => {
     // Fetch user's boards if no boardId specified
     if (!boardId) {
       console.log('Fetching user boards from Pinterest API...');
+      // Use the correct endpoint for fetching user boards
       const boardsUrl = 'https://api.pinterest.com/v5/boards';
       console.log('API URL:', boardsUrl);
       
@@ -48,17 +49,83 @@ serve(async (req) => {
           error: errorText
         });
         
+        // Handle specific error codes
+        if (boardsResponse.status === 401) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Authentication failed',
+              requiresReauth: true,
+              details: {
+                status: 401,
+                hint: 'Your Pinterest session has expired. Please reconnect your account.'
+              }
+            }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (boardsResponse.status === 403) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Permission denied',
+              requiresReauth: true,
+              details: {
+                status: 403,
+                hint: 'Missing required permissions (boards:read, user_accounts:read). Please reconnect with all permissions.'
+              }
+            }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (boardsResponse.status === 429) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Rate limit exceeded',
+              rateLimited: true,
+              details: {
+                status: 429,
+                hint: 'Too many requests to Pinterest. Please wait 60 seconds before trying again.',
+                retryAfter: 60
+              }
+            }),
+            { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
         return new Response(
           JSON.stringify({ 
             error: 'Failed to fetch boards from Pinterest',
             details: {
               status: boardsResponse.status,
               message: boardsResponse.statusText,
-              hint: boardsResponse.status === 401 ? 'Access token expired or invalid' : 
-                    boardsResponse.status === 403 ? 'Missing required scopes (boards:read, user_accounts:read)' :
-                    'Pinterest API error',
               errorResponse: errorText
             }
+          }),
+          { status: boardsResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const boardsData = await boardsResponse.json();
+      console.log('Boards fetched successfully:', {
+        count: boardsData.items?.length || 0,
+        hasItems: !!boardsData.items
+      });
+
+      // If no boards found, return empty array (frontend will handle fallback)
+      if (!boardsData.items || boardsData.items.length === 0) {
+        console.log('No boards found for user');
+        return new Response(
+          JSON.stringify({ boards: [], noBoardsFound: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ boards: boardsData.items || [] }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
           }),
           { status: boardsResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );

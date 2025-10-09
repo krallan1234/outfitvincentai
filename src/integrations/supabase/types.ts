@@ -143,6 +143,8 @@ export type Database = {
           id: string
           last_synced_at: string | null
           pins_data: Json | null
+          refresh_token: string | null
+          token_expires_at: string | null
           updated_at: string
           user_id: string
         }
@@ -155,6 +157,8 @@ export type Database = {
           id?: string
           last_synced_at?: string | null
           pins_data?: Json | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -167,6 +171,8 @@ export type Database = {
           id?: string
           last_synced_at?: string | null
           pins_data?: Json | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
           updated_at?: string
           user_id?: string
         }

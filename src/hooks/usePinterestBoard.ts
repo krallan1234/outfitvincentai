@@ -21,6 +21,7 @@ export interface PinterestPin {
 export const usePinterestBoard = () => {
   const [loading, setLoading] = useState(false);
   const [connectedBoard, setConnectedBoard] = useState<PinterestBoard | null>(null);
+  const [rateLimitRetryAt, setRateLimitRetryAt] = useState<number | null>(null);
   const { toast } = useToast();
 
   const connectPinterest = async () => {
@@ -145,6 +146,18 @@ export const usePinterestBoard = () => {
   const fetchBoards = async (): Promise<PinterestBoard[]> => {
     try {
       console.log('Fetching Pinterest boards...');
+      
+      // Check if we're currently rate limited
+      if (rateLimitRetryAt && Date.now() < rateLimitRetryAt) {
+        const secondsLeft = Math.ceil((rateLimitRetryAt - Date.now()) / 1000);
+        toast({
+          title: 'Rate Limited',
+          description: `Please wait ${secondsLeft} seconds before trying again.`,
+          variant: 'destructive',
+        });
+        return [];
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
@@ -181,6 +194,34 @@ export const usePinterestBoard = () => {
         throw error;
       }
 
+      // Handle rate limiting
+      if (data?.rateLimited) {
+        console.warn('Rate limited by Pinterest API');
+        const retryAfter = data.details?.retryAfter || 60;
+        setRateLimitRetryAt(Date.now() + (retryAfter * 1000));
+        
+        toast({
+          title: 'Rate Limited',
+          description: `Too many requests. Please wait ${retryAfter} seconds.`,
+          variant: 'destructive',
+        });
+        return [];
+      }
+
+      // Handle authentication errors
+      if (data?.requiresReauth) {
+        console.error('Pinterest authentication failed:', data);
+        sessionStorage.removeItem('pinterest_access_token');
+        
+        toast({
+          title: 'Authentication Required',
+          description: data.details?.hint || 'Please reconnect your Pinterest account.',
+          variant: 'destructive',
+        });
+        return [];
+      }
+
+      // Handle general errors
       if (data?.error) {
         console.error('Pinterest API error:', data);
         const errorMsg = data.details?.hint || data.error || 'Failed to fetch boards';
@@ -190,6 +231,16 @@ export const usePinterestBoard = () => {
           variant: 'destructive',
         });
         throw new Error(data.error);
+      }
+
+      // Handle no boards found
+      if (data?.noBoardsFound) {
+        console.log('No boards found - user may not have any Pinterest boards');
+        toast({
+          title: 'No Boards Found',
+          description: 'No Pinterest boards found. The app will use general Pinterest trends instead.',
+        });
+        return [];
       }
 
       const boards = data.boards || [];
@@ -290,5 +341,6 @@ export const usePinterestBoard = () => {
     fetchBoards,
     selectBoard,
     getConnectedBoard,
+    rateLimitRetryAt,
   };
 };

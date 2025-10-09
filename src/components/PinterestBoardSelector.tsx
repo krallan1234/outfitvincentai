@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
-import { Loader2, Link as LinkIcon, Check } from 'lucide-react';
+import { Loader2, Link as LinkIcon, Check, RefreshCw, Clock } from 'lucide-react';
 import { usePinterestBoard, PinterestBoard } from '@/hooks/usePinterestBoard';
 import { Switch } from '@/components/ui/switch';
 
@@ -15,8 +15,9 @@ export const PinterestBoardSelector = ({ onBoardConnected }: PinterestBoardSelec
   const [boards, setBoards] = useState<PinterestBoard[]>([]);
   const [selectedBoardId, setSelectedBoardId] = useState<string>('');
   const [enabled, setEnabled] = useState(false);
+  const [retryCountdown, setRetryCountdown] = useState<number>(0);
   
-  const { loading, connectedBoard, connectPinterest, fetchBoards, selectBoard } = usePinterestBoard();
+  const { loading, connectedBoard, connectPinterest, fetchBoards, selectBoard, rateLimitRetryAt } = usePinterestBoard();
 
   useEffect(() => {
     if (connectedBoard) {
@@ -25,6 +26,25 @@ export const PinterestBoardSelector = ({ onBoardConnected }: PinterestBoardSelec
       onBoardConnected?.(true);
     }
   }, [connectedBoard]);
+
+  // Countdown timer for rate limit retry
+  useEffect(() => {
+    if (!rateLimitRetryAt) {
+      setRetryCountdown(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const secondsLeft = Math.ceil((rateLimitRetryAt - Date.now()) / 1000);
+      if (secondsLeft <= 0) {
+        setRetryCountdown(0);
+      } else {
+        setRetryCountdown(secondsLeft);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [rateLimitRetryAt]);
 
   const handleConnect = async () => {
     try {
@@ -76,11 +96,19 @@ export const PinterestBoardSelector = ({ onBoardConnected }: PinterestBoardSelec
           <p className="text-sm text-muted-foreground">
             Connect your Pinterest board to get outfit inspiration based on your saved pins.
           </p>
+          
+          {retryCountdown > 0 ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>Rate limited. Retry in {retryCountdown}s</span>
+            </div>
+          ) : null}
+          
           <Button
             onClick={handleConnect}
             variant="outline"
             size="sm"
-            disabled={loading}
+            disabled={loading || retryCountdown > 0}
           >
             {loading ? (
               <>
@@ -115,19 +143,25 @@ export const PinterestBoardSelector = ({ onBoardConnected }: PinterestBoardSelec
       {boards.length > 0 && !connectedBoard && (
         <div className="space-y-2">
           <Label>Select a Board</Label>
-          <Select value={selectedBoardId} onValueChange={handleSelectBoard}>
+          <Select value={selectedBoardId} onValueChange={handleSelectBoard} disabled={loading}>
             <SelectTrigger>
               <SelectValue placeholder="Choose a Pinterest board" />
             </SelectTrigger>
             <SelectContent>
               {boards.map((board) => (
                 <SelectItem key={board.id} value={board.id}>
-                  {board.name}
+                  {board.name} {board.pinsCount ? `(${board.pinsCount} pins)` : ''}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
+      )}
+      
+      {boards.length === 0 && !connectedBoard && !loading && retryCountdown === 0 && (
+        <p className="text-xs text-muted-foreground">
+          No boards found. The app will use general Pinterest trends for inspiration.
+        </p>
       )}
     </div>
   );

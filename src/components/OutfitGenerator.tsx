@@ -16,7 +16,6 @@ import { PinterestBoardSelector } from './PinterestBoardSelector';
 import { ClothesGallery } from './ClothesGallery';
 import { ProfilePreferences } from './ProfilePreferences';
 import { OutfitHistory } from './OutfitHistory';
-import { VirtualMannequin } from './VirtualMannequin';
 import { AdvancedMoodSelector } from './AdvancedMoodSelector';
 import { ClothingItem } from '@/hooks/useClothes';
 import { supabase } from '@/integrations/supabase/client';
@@ -444,13 +443,6 @@ export const OutfitGenerator = () => {
           </div>
           </CardContent>
         </Card>
-
-      {/* Virtual Mannequin Preview */}
-      {selectedItems.length > 0 && (
-        <div className="w-full max-w-2xl mx-auto">
-          <VirtualMannequin selectedItems={selectedItems} />
-        </div>
-      )}
 
       {/* Item Selection Gallery */}
       <Card className="w-full max-w-2xl mx-auto">

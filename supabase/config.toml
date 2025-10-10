@@ -8,6 +8,3 @@ verify_jwt = true
 
 [functions.weather]
 verify_jwt = false
-
-[functions.outfit-feedback]
-verify_jwt = false

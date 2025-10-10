@@ -59,7 +59,7 @@ export const useOutfits = () => {
     mood?: string, 
     isPublic: boolean = true, 
     pinterestBoardId?: string,
-    selectedItem?: any,
+    selectedItem?: any | any[],
     purchaseLinks?: any[]
   ) => {
     try {

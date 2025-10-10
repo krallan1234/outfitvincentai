@@ -259,21 +259,44 @@ serve(async (req) => {
       ${attempt > 1 ? '5. PREVIOUS ATTEMPT FAILED: Try a completely different combination than before' : ''}
 
       ${selectedItem ? `
-      SPECIAL REQUIREMENT - SELECTED ITEM FOCUS:
-      The user has specifically selected this item to build the outfit around:
-      - Category: ${selectedItem.category}
-      - Color: ${selectedItem.color || 'Not specified'}
-      - Style: ${selectedItem.style || 'Not specified'}
-      - Brand: ${selectedItem.brand || 'Not specified'}
-      - Description: ${selectedItem.description || 'Not specified'}
-      - Image URL: ${selectedItem.image_url}
-      - Item ID: ${selectedItem.id}
-
-      YOU MUST:
-      1. ALWAYS include this selected item in the final outfit (mark it with "is_selected": true)
-      2. Build the ENTIRE outfit to complement and highlight this item
-      3. Choose colors, styles, and accessories that work harmoniously with this piece
-      4. Explain in your reasoning how each item complements the selected piece
+      CRITICAL REQUIREMENT - SELECTED ITEMS MUST BE INCLUDED:
+      The user has specifically selected ${Array.isArray(selectedItem) ? `${selectedItem.length} items` : '1 item'} to build the outfit around.
+      
+      ${Array.isArray(selectedItem) ? 
+        `SELECTED ITEMS (ALL MUST BE INCLUDED):
+        ${selectedItem.map((item: any, idx: number) => `
+        Item ${idx + 1}:
+        - Category: ${item.category}
+        - Color: ${item.color || 'Not specified'}
+        - Style: ${item.style || 'Not specified'}
+        - Brand: ${item.brand || 'Not specified'}
+        - Image URL: ${item.image_url}
+        - Item ID: ${item.id}
+        `).join('\n')}
+        
+        MULTI-SELECT REQUIREMENTS:
+        1. MANDATORY: Include ALL ${selectedItem.length} selected items in the final outfit (mark each with "is_selected": true)
+        2. Think step-by-step: Analyze each selected item and ensure they work together
+        3. Add complementary pieces from the wardrobe to complete the outfit
+        4. Ensure one item per category rule is maintained (selected items already count toward their categories)
+        5. Add matching accessories, outerwear, or footwear as needed from the rest of the wardrobe
+        6. Explain how the selected items work together and how added pieces complement them
+        ` 
+        : 
+        `SELECTED ITEM:
+        - Category: ${selectedItem.category}
+        - Color: ${selectedItem.color || 'Not specified'}
+        - Style: ${selectedItem.style || 'Not specified'}
+        - Brand: ${selectedItem.brand || 'Not specified'}
+        - Image URL: ${selectedItem.image_url}
+        - Item ID: ${selectedItem.id}
+        
+        SINGLE ITEM REQUIREMENTS:
+        1. ALWAYS include this selected item in the final outfit (mark it with "is_selected": true)
+        2. Build the ENTIRE outfit to complement and highlight this item
+        3. Choose colors, styles, and accessories that work harmoniously with this piece
+        4. Explain in your reasoning how each item complements the selected piece
+        `}
       ` : ''}
 
       ${boardInspiration.length > 0 ? `
@@ -537,6 +560,25 @@ serve(async (req) => {
               continue; // Retry with fix prompt
             } else {
               throw new Error('Multiple attempts failed to generate valid outfit');
+            }
+          }
+
+          // Validate selected items are included
+          if (selectedItem) {
+            const selectedItemIds = Array.isArray(selectedItem) 
+              ? selectedItem.map((item: any) => item.id)
+              : [selectedItem.id];
+            
+            const outfitItemIds = outfitRecommendation.items.map(item => item.item_id);
+            const allSelectedIncluded = selectedItemIds.every(id => outfitItemIds.includes(id));
+            
+            if (!allSelectedIncluded) {
+              console.log('Selected items not included in outfit, retrying...');
+              if (attemptCount < maxAttempts) {
+                continue; // Retry
+              } else {
+                throw new Error('Could not generate outfit including all selected items');
+              }
             }
           }
 

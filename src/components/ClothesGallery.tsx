@@ -8,10 +8,18 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 interface ClothesGalleryProps {
   selectionMode?: boolean;
   selectedItemId?: string;
+  selectedItemIds?: string[];
   onSelectItem?: (item: ClothingItem) => void;
+  multiSelect?: boolean;
 }
 
-export const ClothesGallery = ({ selectionMode = false, selectedItemId, onSelectItem }: ClothesGalleryProps) => {
+export const ClothesGallery = ({ 
+  selectionMode = false, 
+  selectedItemId, 
+  selectedItemIds = [],
+  onSelectItem,
+  multiSelect = false 
+}: ClothesGalleryProps) => {
   const { clothes, loading, deleteClothing } = useClothes();
 
   if (loading && clothes.length === 0) {
@@ -38,7 +46,7 @@ export const ClothesGallery = ({ selectionMode = false, selectedItemId, onSelect
           item={item} 
           onDelete={() => deleteClothing(item.id)}
           selectionMode={selectionMode}
-          isSelected={selectedItemId === item.id}
+          isSelected={multiSelect ? selectedItemIds.includes(item.id) : selectedItemId === item.id}
           onSelect={() => onSelectItem?.(item)}
         />
       ))}

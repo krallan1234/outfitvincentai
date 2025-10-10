@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, Loader2, TrendingUp, Palette, RefreshCw, Link as LinkIcon } from 'lucide-react';
 import { useOutfits } from '@/hooks/useOutfits';
 import { usePinterestBoard } from '@/hooks/usePinterestBoard';
+import { useToast } from '@/hooks/use-toast';
 import { OutfitCollage } from './OutfitCollage';
 import { PinterestBoardSelector } from './PinterestBoardSelector';
 import { ClothesGallery } from './ClothesGallery';
@@ -45,11 +46,13 @@ export const OutfitGenerator = () => {
   const [mood, setMood] = useState('');
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
   const [enablePinterestBoard, setEnablePinterestBoard] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
+  const [selectedItems, setSelectedItems] = useState<ClothingItem[]>([]);
   const [purchaseLinks, setPurchaseLinks] = useState<PurchaseLink[]>([{ store_name: '', price: '', url: '' }]);
+  const [loadingTip, setLoadingTip] = useState('');
   
   const { generateOutfit, loading } = useOutfits();
   const { connectedBoard, getConnectedBoard } = usePinterestBoard();
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadBoard = async () => {
@@ -60,6 +63,74 @@ export const OutfitGenerator = () => {
 
   const handleGenerate = async (forceVariety = false) => {
     if (!prompt.trim()) return;
+
+    // Check for conflicts (e.g., multiple tops, multiple bottoms, multiple dresses)
+    if (selectedItems.length > 0) {
+      const categories = selectedItems.map(item => item.category.toLowerCase());
+      
+      const topCategories = categories.filter(cat => 
+        cat.includes('top') || cat.includes('shirt') || cat.includes('blouse') || 
+        cat.includes('sweater') || cat.includes('t-shirt') || cat.includes('tank')
+      );
+      const bottomCategories = categories.filter(cat => 
+        cat.includes('bottom') || cat.includes('pants') || cat.includes('jeans') || 
+        cat.includes('skirt') || cat.includes('shorts') || cat.includes('trousers')
+      );
+      const dressCategories = categories.filter(cat => 
+        cat.includes('dress') || cat.includes('jumpsuit')
+      );
+      
+      if (topCategories.length > 1) {
+        toast({
+          title: 'Selection Conflict',
+          description: 'You can only select one top item. Please remove duplicate tops.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      if (bottomCategories.length > 1) {
+        toast({
+          title: 'Selection Conflict',
+          description: 'You can only select one bottom item. Please remove duplicate bottoms.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      if (dressCategories.length > 1) {
+        toast({
+          title: 'Selection Conflict',
+          description: 'You can only select one dress. Please remove duplicates.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      // Check if dress is selected with top/bottom
+      if (dressCategories.length > 0 && (topCategories.length > 0 || bottomCategories.length > 0)) {
+        toast({
+          title: 'Selection Conflict',
+          description: 'Cannot select a dress with tops or bottoms. Choose either a dress OR top+bottom combination.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    const tips = [
+      "Analyzing your selections...",
+      "Finding complementary pieces...",
+      "Checking Pinterest trends...",
+      "Matching colors and styles...",
+      "Creating your perfect outfit..."
+    ];
+    
+    let tipIndex = 0;
+    const tipInterval = setInterval(() => {
+      setLoadingTip(tips[tipIndex % tips.length]);
+      tipIndex++;
+    }, 2000);
 
     try {
       // Add random variation seed to force different results when regenerating
@@ -75,12 +146,15 @@ export const OutfitGenerator = () => {
         mood || undefined, 
         true, 
         enablePinterestBoard && connectedBoard ? connectedBoard.id : undefined,
-        selectedItem || undefined,
+        selectedItems.length > 0 ? selectedItems : undefined,
         validPurchaseLinks.length > 0 ? validPurchaseLinks : undefined
       );
       setGeneratedOutfit(result);
     } catch (error) {
       // Error is handled in the hook
+    } finally {
+      clearInterval(tipInterval);
+      setLoadingTip('');
     }
   };
 
@@ -168,31 +242,38 @@ export const OutfitGenerator = () => {
             onBoardConnected={(connected) => setEnablePinterestBoard(connected)}
           />
 
-          {/* Selected Item Display */}
+          {/* Selected Items Display */}
           <div className="space-y-2">
-            <Label>Base Outfit on Specific Item (Optional)</Label>
-            {selectedItem ? (
-              <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted">
-                <img 
-                  src={selectedItem.image_url} 
-                  alt={selectedItem.category}
-                  className="w-16 h-16 object-cover rounded"
-                />
-                <div className="flex-1">
-                  <p className="font-medium capitalize">{selectedItem.category}</p>
-                  <p className="text-sm text-muted-foreground">{selectedItem.color}</p>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setSelectedItem(null)}
-                >
-                  Remove
-                </Button>
+            <Label>Base Outfit on Specific Items (Optional - Multi-Select)</Label>
+            {selectedItems.length > 0 ? (
+              <div className="space-y-2">
+                {selectedItems.map((item) => (
+                  <div key={item.id} className="flex items-center gap-2 p-3 border rounded-lg bg-muted">
+                    <img 
+                      src={item.image_url} 
+                      alt={item.category}
+                      className="w-16 h-16 object-cover rounded"
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium capitalize">{item.category}</p>
+                      <p className="text-sm text-muted-foreground">{item.color}</p>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setSelectedItems(selectedItems.filter(i => i.id !== item.id))}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+                <p className="text-xs text-muted-foreground">
+                  {selectedItems.length} item{selectedItems.length > 1 ? 's' : ''} selected
+                </p>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Select an item from your wardrobe below to build an outfit around it
+                Select multiple items from your wardrobe below to build an outfit around them
               </p>
             )}
           </div>
@@ -246,6 +327,13 @@ export const OutfitGenerator = () => {
             ))}
           </div>
 
+          {loading && loadingTip && (
+            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <p className="text-sm text-muted-foreground">{loadingTip}</p>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <Button
               onClick={() => handleGenerate(false)}
@@ -283,16 +371,24 @@ export const OutfitGenerator = () => {
       {/* Item Selection Gallery */}
       <Card className="w-full max-w-2xl mx-auto">
         <CardHeader>
-          <CardTitle>Select Item to Build Around (Optional)</CardTitle>
+          <CardTitle>Select Items to Build Around (Optional - Multi-Select)</CardTitle>
           <CardDescription>
-            Click the sparkle icon on any item to build your outfit around it
+            Click the sparkle icon on items to select multiple pieces for your outfit base
           </CardDescription>
         </CardHeader>
         <CardContent>
           <ClothesGallery 
             selectionMode={true}
-            selectedItemId={selectedItem?.id}
-            onSelectItem={(item) => setSelectedItem(item.id === selectedItem?.id ? null : item)}
+            multiSelect={true}
+            selectedItemIds={selectedItems.map(i => i.id)}
+            onSelectItem={(item) => {
+              const isSelected = selectedItems.some(i => i.id === item.id);
+              if (isSelected) {
+                setSelectedItems(selectedItems.filter(i => i.id !== item.id));
+              } else {
+                setSelectedItems([...selectedItems, item]);
+              }
+            }}
           />
         </CardContent>
       </Card>

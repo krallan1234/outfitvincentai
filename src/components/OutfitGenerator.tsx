@@ -16,6 +16,8 @@ import { PinterestBoardSelector } from './PinterestBoardSelector';
 import { ClothesGallery } from './ClothesGallery';
 import { ProfilePreferences } from './ProfilePreferences';
 import { OutfitHistory } from './OutfitHistory';
+import { VirtualMannequin } from './VirtualMannequin';
+import { AdvancedMoodSelector } from './AdvancedMoodSelector';
 import { ClothingItem } from '@/hooks/useClothes';
 import { supabase } from '@/integrations/supabase/client';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -309,23 +311,8 @@ export const OutfitGenerator = () => {
             />
           </div>
 
-          {/* Mood Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="mood">Mood (Optional)</Label>
-            <Select value={mood} onValueChange={setMood}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a mood for your outfit" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No specific mood</SelectItem>
-                {MOODS.map((moodOption) => (
-                  <SelectItem key={moodOption.value} value={moodOption.value}>
-                    {moodOption.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Advanced Mood Selection */}
+          <AdvancedMoodSelector value={mood} onChange={setMood} />
 
           {/* Pinterest Board Integration */}
           <PinterestBoardSelector 
@@ -457,6 +444,13 @@ export const OutfitGenerator = () => {
           </div>
           </CardContent>
         </Card>
+
+      {/* Virtual Mannequin Preview */}
+      {selectedItems.length > 0 && (
+        <div className="w-full max-w-2xl mx-auto">
+          <VirtualMannequin selectedItems={selectedItems} />
+        </div>
+      )}
 
       {/* Item Selection Gallery */}
       <Card className="w-full max-w-2xl mx-auto">

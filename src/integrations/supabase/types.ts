@@ -261,31 +261,43 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          body_type: string | null
           created_at: string
           display_name: string | null
+          favorite_colors: Json | null
           followers_count: number
           following_count: number
           id: string
+          location: string | null
+          style_preferences: Json | null
           updated_at: string
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
+          body_type?: string | null
           created_at?: string
           display_name?: string | null
+          favorite_colors?: Json | null
           followers_count?: number
           following_count?: number
           id?: string
+          location?: string | null
+          style_preferences?: Json | null
           updated_at?: string
           user_id: string
         }
         Update: {
           avatar_url?: string | null
+          body_type?: string | null
           created_at?: string
           display_name?: string | null
+          favorite_colors?: Json | null
           followers_count?: number
           following_count?: number
           id?: string
+          location?: string | null
+          style_preferences?: Json | null
           updated_at?: string
           user_id?: string
         }

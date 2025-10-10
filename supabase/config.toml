@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.fetch-pinterest-board]
 verify_jwt = true
+
+[functions.weather]
+verify_jwt = false

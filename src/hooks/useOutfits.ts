@@ -60,7 +60,9 @@ export const useOutfits = () => {
     isPublic: boolean = true, 
     pinterestBoardId?: string,
     selectedItem?: any | any[],
-    purchaseLinks?: any[]
+    purchaseLinks?: any[],
+    weatherData?: any,
+    userPreferences?: any
   ) => {
     try {
       setLoading(true);
@@ -75,7 +77,9 @@ export const useOutfits = () => {
           isPublic,
           pinterestBoardId,
           selectedItem,
-          purchaseLinks
+          purchaseLinks,
+          weatherData,
+          userPreferences
         },
       });
 

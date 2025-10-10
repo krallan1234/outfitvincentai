@@ -6,14 +6,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Loader2, TrendingUp, Palette, RefreshCw, Link as LinkIcon } from 'lucide-react';
+import { Sparkles, Loader2, TrendingUp, Palette, RefreshCw, Link as LinkIcon, CloudRain, Settings } from 'lucide-react';
 import { useOutfits } from '@/hooks/useOutfits';
 import { usePinterestBoard } from '@/hooks/usePinterestBoard';
 import { useToast } from '@/hooks/use-toast';
+import { useWeather } from '@/hooks/useWeather';
 import { OutfitCollage } from './OutfitCollage';
 import { PinterestBoardSelector } from './PinterestBoardSelector';
 import { ClothesGallery } from './ClothesGallery';
+import { ProfilePreferences } from './ProfilePreferences';
+import { OutfitHistory } from './OutfitHistory';
 import { ClothingItem } from '@/hooks/useClothes';
+import { supabase } from '@/integrations/supabase/client';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const MOODS = [
   { value: 'casual', label: 'Casual' },
@@ -49,17 +54,40 @@ export const OutfitGenerator = () => {
   const [selectedItems, setSelectedItems] = useState<ClothingItem[]>([]);
   const [purchaseLinks, setPurchaseLinks] = useState<PurchaseLink[]>([{ store_name: '', price: '', url: '' }]);
   const [loadingTip, setLoadingTip] = useState('');
+  const [userLocation, setUserLocation] = useState('');
+  const [showPreferences, setShowPreferences] = useState(false);
   
   const { generateOutfit, loading } = useOutfits();
   const { connectedBoard, getConnectedBoard } = usePinterestBoard();
   const { toast } = useToast();
+  const { weather } = useWeather(userLocation);
 
   useEffect(() => {
     const loadBoard = async () => {
       await getConnectedBoard();
     };
     loadBoard();
+    loadUserPreferences();
   }, []);
+
+  const loadUserPreferences = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('location')
+        .eq('user_id', user.id)
+        .single();
+
+      if (data?.location) {
+        setUserLocation(data.location);
+      }
+    } catch (error) {
+      console.error('Error loading user preferences:', error);
+    }
+  };
 
   const handleGenerate = async (forceVariety = false) => {
     if (!prompt.trim()) return;
@@ -122,7 +150,7 @@ export const OutfitGenerator = () => {
       "Analyzing your selections...",
       "Finding complementary pieces...",
       "Checking Pinterest trends...",
-      "Matching colors and styles...",
+      weather ? "Considering current weather..." : "Matching colors and styles...",
       "Creating your perfect outfit..."
     ];
     
@@ -133,6 +161,19 @@ export const OutfitGenerator = () => {
     }, 2000);
 
     try {
+      // Get user preferences for personalization
+      const { data: { user } } = await supabase.auth.getUser();
+      let userPreferences = null;
+      
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('body_type, style_preferences, favorite_colors')
+          .eq('user_id', user.id)
+          .single();
+        userPreferences = data;
+      }
+
       // Add random variation seed to force different results when regenerating
       const varietyPrompt = forceVariety 
         ? `${prompt} (style variation ${Math.floor(Math.random() * 10000)})` 
@@ -147,7 +188,9 @@ export const OutfitGenerator = () => {
         true, 
         enablePinterestBoard && connectedBoard ? connectedBoard.id : undefined,
         selectedItems.length > 0 ? selectedItems : undefined,
-        validPurchaseLinks.length > 0 ? validPurchaseLinks : undefined
+        validPurchaseLinks.length > 0 ? validPurchaseLinks : undefined,
+        weather || undefined,
+        userPreferences || undefined
       );
       setGeneratedOutfit(result);
     } catch (error) {
@@ -178,6 +221,53 @@ export const OutfitGenerator = () => {
 
   return (
     <div className="space-y-6">
+      {/* Outfit History Insights */}
+      <OutfitHistory />
+
+      {/* Profile Preferences Section */}
+      <Collapsible open={showPreferences} onOpenChange={setShowPreferences}>
+        <Card className="w-full max-w-2xl mx-auto">
+          <CardHeader>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
+                <div className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  <CardTitle>Personalization Settings</CardTitle>
+                </div>
+                <Badge variant="secondary">Click to {showPreferences ? 'hide' : 'show'}</Badge>
+              </Button>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent>
+              <ProfilePreferences />
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
+      {/* Weather Widget */}
+      {weather && (
+        <Card className="w-full max-w-2xl mx-auto bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CloudRain className="h-8 w-8 text-blue-500" />
+                <div>
+                  <p className="text-sm font-medium">{userLocation}</p>
+                  <p className="text-2xl font-bold">{weather.temperature}°C</p>
+                  <p className="text-sm text-muted-foreground capitalize">{weather.description}</p>
+                </div>
+              </div>
+              <div className="text-right text-sm text-muted-foreground">
+                <p>Humidity: {weather.humidity}%</p>
+                <p>Wind: {weather.windSpeed} m/s</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="w-full max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -185,7 +275,7 @@ export const OutfitGenerator = () => {
             Generate Your Perfect Outfit
           </CardTitle>
           <CardDescription>
-            Describe what you're looking for or select a mood. Google Gemini AI will analyze your wardrobe with Pinterest trends to create the perfect outfit.
+            Describe what you're looking for or select a mood. Google Gemini AI will analyze your wardrobe{weather ? ', current weather,' : ''} and Pinterest trends to create the perfect outfit.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

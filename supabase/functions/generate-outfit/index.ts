@@ -18,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, mood, userId, isPublic = true, pinterestBoardId, selectedItem, purchaseLinks } = await req.json();
+    const { prompt, mood, userId, isPublic = true, pinterestBoardId, selectedItem, purchaseLinks, weatherData, userPreferences } = await req.json();
 
     if (!prompt || !userId) {
       throw new Error('Prompt and userId are required');
@@ -27,6 +27,9 @@ serve(async (req) => {
     if (!geminiApiKey) {
       throw new Error('Google Gemini API key not configured');
     }
+
+    console.log('Weather data:', weatherData ? `${weatherData.temperature}°C, ${weatherData.condition}` : 'Not provided');
+    console.log('User preferences:', userPreferences ? 'Provided' : 'Not provided');
 
     // Initialize Supabase client
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -250,6 +253,28 @@ serve(async (req) => {
       
       return `
       You are a professional fashion stylist with expertise in creating logical, category-based outfit combinations.
+      
+      ${weatherData ? `
+      CURRENT WEATHER CONDITIONS:
+      - Temperature: ${weatherData.temperature}°C
+      - Condition: ${weatherData.condition} (${weatherData.description})
+      - Humidity: ${weatherData.humidity}%
+      - Wind Speed: ${weatherData.windSpeed} m/s
+      
+      WEATHER-BASED REQUIREMENTS:
+      ${weatherData.temperature < 10 ? '- COLD WEATHER: Include warm layers (outerwear, long sleeves, pants). Suggest waterproof options if rainy.' : ''}
+      ${weatherData.temperature >= 10 && weatherData.temperature < 20 ? '- MILD WEATHER: Light layers recommended. Consider a light jacket or cardigan.' : ''}
+      ${weatherData.temperature >= 20 ? '- WARM WEATHER: Light, breathable fabrics. Shorts, skirts, or light pants suitable.' : ''}
+      ${weatherData.condition.toLowerCase().includes('rain') ? '- RAINY: Prioritize waterproof outerwear if available. Suggest practical footwear.' : ''}
+      ${weatherData.condition.toLowerCase().includes('snow') ? '- SNOWY: Include warm boots and heavy outerwear. Multiple warm layers essential.' : ''}
+      ` : ''}
+
+      ${userPreferences ? `
+      USER PROFILE & PREFERENCES:
+      ${userPreferences.body_type ? `- Body Type: ${userPreferences.body_type} - Consider fit recommendations for this body type` : ''}
+      ${userPreferences.style_preferences && userPreferences.style_preferences.length > 0 ? `- Preferred Styles: ${userPreferences.style_preferences.join(', ')} - Try to match these style preferences when possible` : ''}
+      ${userPreferences.favorite_colors && userPreferences.favorite_colors.length > 0 ? `- Favorite Colors: ${userPreferences.favorite_colors.join(', ')} - Prioritize these colors when creating color harmony` : ''}
+      ` : ''}
       
       DIVERSITY & CREATIVITY INSTRUCTIONS:
       1. AVOID RECENTLY USED ITEMS: These item IDs were used in recent outfits, try to select different items: ${recentItemIds.slice(0, 10).join(', ') || 'none'}

@@ -148,7 +148,12 @@ export const CommunityStats = () => {
               </p>
             </>
           ) : (
-            <div className="text-sm text-muted-foreground">No likes yet</div>
+            <>
+              <div className="text-2xl font-bold">0</div>
+              <p className="text-xs text-muted-foreground">
+                Share your first outfit to compete!
+              </p>
+            </>
           )}
         </CardContent>
       </Card>

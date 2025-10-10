@@ -1,9 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Heart, ExternalLink, ShoppingBag } from 'lucide-react';
+import { Calendar, Heart, ExternalLink, ShoppingBag, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { CommentsSection } from '@/components/CommentsSection';
 import { cn } from '@/lib/utils';
 
 interface OutfitModalProps {
@@ -281,6 +282,11 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
               </div>
             </div>
           )}
+
+          {/* Comments Section */}
+          <div className="mt-6">
+            <CommentsSection outfitId={outfit.id} />
+          </div>
         </div>
       </DialogContent>
     </Dialog>

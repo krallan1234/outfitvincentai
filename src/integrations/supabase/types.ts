@@ -56,6 +56,83 @@ export type Database = {
         }
         Relationships: []
       }
+      comment_likes: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_likes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "outfit_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outfit_comments: {
+        Row: {
+          comment_text: string
+          created_at: string
+          id: string
+          likes_count: number
+          outfit_id: string
+          parent_comment_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment_text: string
+          created_at?: string
+          id?: string
+          likes_count?: number
+          outfit_id: string
+          parent_comment_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comment_text?: string
+          created_at?: string
+          id?: string
+          likes_count?: number
+          outfit_id?: string
+          parent_comment_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outfit_comments_outfit_id_fkey"
+            columns: ["outfit_id"]
+            isOneToOne: false
+            referencedRelation: "outfits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outfit_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "outfit_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outfit_likes: {
         Row: {
           created_at: string
@@ -186,6 +263,8 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           display_name: string | null
+          followers_count: number
+          following_count: number
           id: string
           updated_at: string
           user_id: string
@@ -194,6 +273,8 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
+          followers_count?: number
+          following_count?: number
           id?: string
           updated_at?: string
           user_id: string
@@ -202,9 +283,32 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
+          followers_count?: number
+          following_count?: number
           id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_follows: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+          id?: string
         }
         Relationships: []
       }

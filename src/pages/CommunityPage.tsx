@@ -1,23 +1,29 @@
-import { useState, useEffect } from 'react';
-import { Heart, Users, TrendingUp, Sparkles } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Heart, Users, TrendingUp, Sparkles, UserPlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCommunity, CommunityOutfit, RecommendedOutfit } from '@/hooks/useCommunity';
+import { useFollow } from '@/hooks/useFollow';
 import { CommunityStats } from '@/components/CommunityStats';
 import { OutfitModal } from '@/components/OutfitModal';
+import { SearchFilters } from '@/components/SearchFilters';
 import { cn } from '@/lib/utils';
 
 export const CommunityOutfitCard = ({ 
   outfit, 
   onLike, 
   onClick,
+  onFollowUser,
+  isFollowing,
   showRecommendationReason = false 
 }: { 
   outfit: CommunityOutfit | RecommendedOutfit; 
   onLike: (id: string) => void;
   onClick: () => void;
+  onFollowUser?: (userId: string) => void;
+  isFollowing?: boolean;
   showRecommendationReason?: boolean;
 }) => {
   const formatDate = (dateString: string) => {
@@ -106,6 +112,21 @@ export const CommunityOutfitCard = ({
             />
             <span>{outfit.likes_count}</span>
           </Button>
+
+          {/* Follow Button */}
+          {onFollowUser && (
+            <Button
+              variant={isFollowing ? "secondary" : "outline"}
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onFollowUser(outfit.user_id);
+              }}
+            >
+              <UserPlus className="h-3 w-3 mr-1" />
+              {isFollowing ? 'Following' : 'Follow'}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -121,7 +142,35 @@ const CommunityPage = () => {
     toggleLike, 
     fetchRecommendations 
   } = useCommunity();
+  const { following, toggleFollow, isFollowing } = useFollow();
   const [selectedOutfit, setSelectedOutfit] = useState<CommunityOutfit | RecommendedOutfit | null>(null);
+  
+  // Search and filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStyle, setSelectedStyle] = useState('all');
+  const [selectedColor, setSelectedColor] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+
+  // Filter outfits based on search and filters
+  const filteredOutfits = useMemo(() => {
+    return communityOutfits.filter(outfit => {
+      const matchesSearch = outfit.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          outfit.prompt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          outfit.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStyle = selectedStyle === 'all' || 
+                          outfit.mood?.toLowerCase() === selectedStyle ||
+                          outfit.ai_analysis?.style_analysis?.toLowerCase().includes(selectedStyle);
+      
+      const matchesColor = selectedColor === 'all' ||
+                          outfit.ai_analysis?.color_harmony?.toLowerCase().includes(selectedColor) ||
+                          outfit.ai_analysis?.outfit_visualization?.items?.some((item: any) => 
+                            item.color?.toLowerCase().includes(selectedColor)
+                          );
+
+      return matchesSearch && matchesStyle && matchesColor;
+    });
+  }, [communityOutfits, searchTerm, selectedStyle, selectedColor]);
 
   useEffect(() => {
     fetchRecommendations();
@@ -143,6 +192,20 @@ const CommunityPage = () => {
         {/* Community Stats */}
         <div className="mb-8">
           <CommunityStats />
+        </div>
+
+        {/* Search and Filters */}
+        <div className="mb-8">
+          <SearchFilters
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            selectedStyle={selectedStyle}
+            onStyleChange={setSelectedStyle}
+            selectedColor={selectedColor}
+            onColorChange={setSelectedColor}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+          />
         </div>
 
         {/* Top Liked Outfits - Style Trends */}
@@ -169,13 +232,15 @@ const CommunityPage = () => {
                     outfit={outfit}
                     onLike={toggleLike}
                     onClick={() => setSelectedOutfit(outfit)}
+                    onFollowUser={toggleFollow}
+                    isFollowing={isFollowing(outfit.user_id)}
                   />
                 ))}
               </div>
             ) : (
               <div className="text-center p-8">
                 <p className="text-muted-foreground">
-                  No liked outfits yet. Be the first to like and share!
+                  No liked outfits yet. Share your first outfit and like others to see trends here!
                 </p>
               </div>
             )}
@@ -218,6 +283,8 @@ const CommunityPage = () => {
                         outfit={outfit}
                         onLike={toggleLike}
                         onClick={() => setSelectedOutfit(outfit)}
+                        onFollowUser={toggleFollow}
+                        isFollowing={isFollowing(outfit.user_id)}
                         showRecommendationReason={true}
                       />
                     ))}
@@ -241,7 +308,9 @@ const CommunityPage = () => {
                   Trending Outfits
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Latest public outfits from the community
+                  {searchTerm || selectedStyle !== 'all' || selectedColor !== 'all' 
+                    ? `Found ${filteredOutfits.length} matching outfits`
+                    : 'Latest public outfits from the community'}
                 </p>
               </CardHeader>
               <CardContent>
@@ -249,21 +318,25 @@ const CommunityPage = () => {
                   <div className="flex items-center justify-center p-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
-                ) : communityOutfits.length > 0 ? (
+                ) : filteredOutfits.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {communityOutfits.map((outfit) => (
+                    {filteredOutfits.map((outfit) => (
                       <CommunityOutfitCard
                         key={outfit.id}
                         outfit={outfit}
                         onLike={toggleLike}
                         onClick={() => setSelectedOutfit(outfit)}
+                        onFollowUser={toggleFollow}
+                        isFollowing={isFollowing(outfit.user_id)}
                       />
                     ))}
                   </div>
                 ) : (
                   <div className="text-center p-8">
                     <p className="text-muted-foreground">
-                      No public outfits available yet. Be the first to share your style!
+                      {searchTerm || selectedStyle !== 'all' || selectedColor !== 'all'
+                        ? 'No outfits match your filters. Try adjusting your search!'
+                        : 'No public outfits available yet. Be the first to share your style!'}
                     </p>
                   </div>
                 )}

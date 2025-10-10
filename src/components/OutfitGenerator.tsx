@@ -11,12 +11,15 @@ import { useOutfits } from '@/hooks/useOutfits';
 import { usePinterestBoard } from '@/hooks/usePinterestBoard';
 import { useToast } from '@/hooks/use-toast';
 import { useWeather } from '@/hooks/useWeather';
+import { usePWA } from '@/hooks/usePWA';
 import { OutfitCollage } from './OutfitCollage';
 import { PinterestBoardSelector } from './PinterestBoardSelector';
 import { ClothesGallery } from './ClothesGallery';
 import { ProfilePreferences } from './ProfilePreferences';
 import { OutfitHistory } from './OutfitHistory';
 import { AdvancedMoodSelector } from './AdvancedMoodSelector';
+import { OnboardingTooltips } from './OnboardingTooltips';
+import { ErrorModal, useErrorModal } from './ErrorModal';
 import { ClothingItem } from '@/hooks/useClothes';
 import { supabase } from '@/integrations/supabase/client';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -57,11 +60,28 @@ export const OutfitGenerator = () => {
   const [loadingTip, setLoadingTip] = useState('');
   const [userLocation, setUserLocation] = useState('');
   const [showPreferences, setShowPreferences] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   
   const { generateOutfit, loading } = useOutfits();
   const { connectedBoard, getConnectedBoard } = usePinterestBoard();
   const { toast } = useToast();
   const { weather } = useWeather(userLocation);
+  const { errorState, showError, closeError } = useErrorModal();
+  usePWA(); // Initialize PWA support
+
+  useEffect(() => {
+    const loadBoard = async () => {
+      await getConnectedBoard();
+    };
+    loadBoard();
+    loadUserPreferences();
+    
+    // Show onboarding for first-time users
+    const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
+    if (!hasSeenOnboarding) {
+      setShowOnboarding(true);
+    }
+  }, []);
 
   useEffect(() => {
     const loadBoard = async () => {
@@ -221,25 +241,49 @@ export const OutfitGenerator = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Outfit Generator">
+      {/* Onboarding Tooltips */}
+      {showOnboarding && (
+        <OnboardingTooltips 
+          onComplete={() => {
+            setShowOnboarding(false);
+            localStorage.setItem('hasSeenOnboarding', 'true');
+          }} 
+        />
+      )}
+
+      {/* Error Modal */}
+      {errorState.error && (
+        <ErrorModal 
+          isOpen={errorState.isOpen}
+          onClose={closeError}
+          error={errorState.error}
+        />
+      )}
+
       {/* Outfit History Insights */}
       <OutfitHistory />
 
       {/* Profile Preferences Section */}
       <Collapsible open={showPreferences} onOpenChange={setShowPreferences}>
-        <Card className="w-full max-w-2xl mx-auto">
+        <Card className="w-full max-w-2xl mx-auto" id="preferences-section">
           <CardHeader>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
+              <Button 
+                variant="ghost" 
+                className="w-full justify-between p-0 h-auto hover:bg-transparent"
+                aria-expanded={showPreferences}
+                aria-controls="preferences-content"
+              >
                 <div className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
+                  <Settings className="h-5 w-5" aria-hidden="true" />
                   <CardTitle>Personalization Settings</CardTitle>
                 </div>
                 <Badge variant="secondary">Click to {showPreferences ? 'hide' : 'show'}</Badge>
               </Button>
             </CollapsibleTrigger>
           </CardHeader>
-          <CollapsibleContent>
+          <CollapsibleContent id="preferences-content">
             <CardContent>
               <ProfilePreferences />
             </CardContent>
@@ -249,14 +293,21 @@ export const OutfitGenerator = () => {
 
       {/* Weather Widget */}
       {weather && (
-        <Card className="w-full max-w-2xl mx-auto bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950">
+        <Card 
+          className="w-full max-w-2xl mx-auto bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950" 
+          id="weather-widget"
+          role="region"
+          aria-label="Current weather information"
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <CloudRain className="h-8 w-8 text-blue-500" />
+                <CloudRain className="h-8 w-8 text-blue-500" aria-hidden="true" />
                 <div>
                   <p className="text-sm font-medium">{userLocation}</p>
-                  <p className="text-2xl font-bold">{weather.temperature}°C</p>
+                  <p className="text-2xl font-bold" aria-label={`Temperature ${weather.temperature} degrees Celsius`}>
+                    {weather.temperature}°C
+                  </p>
                   <p className="text-sm text-muted-foreground capitalize">{weather.description}</p>
                 </div>
               </div>
@@ -272,7 +323,7 @@ export const OutfitGenerator = () => {
       <Card className="w-full max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
+            <Sparkles className="h-5 w-5" aria-hidden="true" />
             Generate Your Perfect Outfit
           </CardTitle>
           <CardDescription>
@@ -281,9 +332,9 @@ export const OutfitGenerator = () => {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Quick Prompts */}
-          <div className="space-y-2">
-            <Label>Quick Ideas</Label>
-            <div className="flex flex-wrap gap-2">
+          <div className="space-y-2" id="quick-ideas">
+            <Label htmlFor="quick-ideas-section">Quick Ideas</Label>
+            <div className="flex flex-wrap gap-2" id="quick-ideas-section" role="group" aria-label="Quick outfit idea buttons">
               {QUICK_PROMPTS.map((quickPrompt) => (
                 <Button
                   key={quickPrompt}
@@ -311,7 +362,9 @@ export const OutfitGenerator = () => {
           </div>
 
           {/* Advanced Mood Selection */}
-          <AdvancedMoodSelector value={mood} onChange={setMood} />
+          <div id="mood-selector">
+            <AdvancedMoodSelector value={mood} onChange={setMood} />
+          </div>
 
           {/* Pinterest Board Integration */}
           <PinterestBoardSelector 
@@ -445,7 +498,7 @@ export const OutfitGenerator = () => {
         </Card>
 
       {/* Item Selection Gallery */}
-      <Card className="w-full max-w-2xl mx-auto">
+      <Card className="w-full max-w-2xl mx-auto" id="clothes-gallery">
         <CardHeader>
           <CardTitle>Select Items to Build Around (Optional - Multi-Select)</CardTitle>
           <CardDescription>
@@ -453,19 +506,21 @@ export const OutfitGenerator = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ClothesGallery 
-            selectionMode={true}
-            multiSelect={true}
-            selectedItemIds={selectedItems.map(i => i.id)}
-            onSelectItem={(item) => {
-              const isSelected = selectedItems.some(i => i.id === item.id);
-              if (isSelected) {
-                setSelectedItems(selectedItems.filter(i => i.id !== item.id));
-              } else {
-                setSelectedItems([...selectedItems, item]);
-              }
-            }}
-          />
+          <div role="region" aria-label="Clothing items gallery">
+            <ClothesGallery 
+              selectionMode={true}
+              multiSelect={true}
+              selectedItemIds={selectedItems.map(i => i.id)}
+              onSelectItem={(item) => {
+                const isSelected = selectedItems.some(i => i.id === item.id);
+                if (isSelected) {
+                  setSelectedItems(selectedItems.filter(i => i.id !== item.id));
+                } else {
+                  setSelectedItems([...selectedItems, item]);
+                }
+              }}
+            />
+          </div>
         </CardContent>
       </Card>
 

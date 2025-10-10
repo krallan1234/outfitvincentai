@@ -34,12 +34,19 @@ const QUICK_PROMPTS = [
   'Business meeting attire'
 ];
 
+interface PurchaseLink {
+  store_name: string;
+  price?: string;
+  url?: string;
+}
+
 export const OutfitGenerator = () => {
   const [prompt, setPrompt] = useState('');
   const [mood, setMood] = useState('');
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
   const [enablePinterestBoard, setEnablePinterestBoard] = useState(false);
   const [selectedItem, setSelectedItem] = useState<ClothingItem | null>(null);
+  const [purchaseLinks, setPurchaseLinks] = useState<PurchaseLink[]>([{ store_name: '', price: '', url: '' }]);
   
   const { generateOutfit, loading } = useOutfits();
   const { connectedBoard, getConnectedBoard } = usePinterestBoard();
@@ -60,12 +67,16 @@ export const OutfitGenerator = () => {
         ? `${prompt} (style variation ${Math.floor(Math.random() * 10000)})` 
         : prompt;
       
+      // Filter out empty purchase links
+      const validPurchaseLinks = purchaseLinks.filter(link => link.store_name.trim() !== '');
+      
       const result = await generateOutfit(
         varietyPrompt, 
         mood || undefined, 
         true, 
         enablePinterestBoard && connectedBoard ? connectedBoard.id : undefined,
-        selectedItem || undefined
+        selectedItem || undefined,
+        validPurchaseLinks.length > 0 ? validPurchaseLinks : undefined
       );
       setGeneratedOutfit(result);
     } catch (error) {
@@ -75,6 +86,20 @@ export const OutfitGenerator = () => {
 
   const handleQuickPrompt = (quickPrompt: string) => {
     setPrompt(quickPrompt);
+  };
+
+  const addPurchaseLink = () => {
+    setPurchaseLinks([...purchaseLinks, { store_name: '', price: '', url: '' }]);
+  };
+
+  const removePurchaseLink = (index: number) => {
+    setPurchaseLinks(purchaseLinks.filter((_, i) => i !== index));
+  };
+
+  const updatePurchaseLink = (index: number, field: keyof PurchaseLink, value: string) => {
+    const updated = [...purchaseLinks];
+    updated[index] = { ...updated[index], [field]: value };
+    setPurchaseLinks(updated);
   };
 
   return (
@@ -170,6 +195,55 @@ export const OutfitGenerator = () => {
                 Select an item from your wardrobe below to build an outfit around it
               </p>
             )}
+          </div>
+
+          {/* Purchase Links */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <LinkIcon className="h-4 w-4" />
+                Where to Buy (Optional - for sharing)
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addPurchaseLink}
+              >
+                Add Link
+              </Button>
+            </div>
+            {purchaseLinks.map((link, index) => (
+              <div key={index} className="flex gap-2 items-start">
+                <div className="flex-1 grid grid-cols-3 gap-2">
+                  <Input
+                    placeholder="Store name"
+                    value={link.store_name}
+                    onChange={(e) => updatePurchaseLink(index, 'store_name', e.target.value)}
+                  />
+                  <Input
+                    placeholder="Price (optional)"
+                    value={link.price || ''}
+                    onChange={(e) => updatePurchaseLink(index, 'price', e.target.value)}
+                  />
+                  <Input
+                    placeholder="URL (optional)"
+                    value={link.url || ''}
+                    onChange={(e) => updatePurchaseLink(index, 'url', e.target.value)}
+                  />
+                </div>
+                {purchaseLinks.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removePurchaseLink(index)}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
 
           <div className="flex gap-2">

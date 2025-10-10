@@ -15,6 +15,7 @@ export interface CommunityOutfit {
   is_liked?: boolean;
   recommended_clothes?: any;
   ai_analysis?: any;
+  purchase_links?: any[];
 }
 
 export interface RecommendedOutfit extends CommunityOutfit {
@@ -25,6 +26,7 @@ export interface RecommendedOutfit extends CommunityOutfit {
 export const useCommunity = () => {
   const [communityOutfits, setCommunityOutfits] = useState<CommunityOutfit[]>([]);
   const [recommendations, setRecommendations] = useState<RecommendedOutfit[]>([]);
+  const [topLikedOutfits, setTopLikedOutfits] = useState<CommunityOutfit[]>([]);
   const [loading, setLoading] = useState(false);
   const [userLikes, setUserLikes] = useState<Set<string>>(new Set());
   const { toast } = useToast();
@@ -81,6 +83,56 @@ export const useCommunity = () => {
       toast({
         title: 'Error',
         description: 'Failed to load community outfits',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTopLikedOutfits = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Get top 10 most liked public outfits
+      const { data: outfits, error } = await supabase
+        .from('outfits')
+        .select(`
+          id,
+          user_id,
+          title,
+          description,
+          prompt,
+          mood,
+          generated_image_url,
+          likes_count,
+          created_at,
+          recommended_clothes,
+          ai_analysis,
+          purchase_links
+        `)
+        .eq('is_public', true)
+        .gt('likes_count', 0)
+        .order('likes_count', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      // Mark outfits as liked if user has liked them
+      const outfitsWithLikes = outfits?.map(outfit => ({
+        ...outfit,
+        purchase_links: Array.isArray(outfit.purchase_links) ? outfit.purchase_links : [],
+        is_liked: user ? userLikes.has(outfit.id) : false
+      })) as CommunityOutfit[] || [];
+
+      setTopLikedOutfits(outfitsWithLikes);
+    } catch (error) {
+      console.error('Error fetching top liked outfits:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load top liked outfits',
         variant: 'destructive',
       });
     } finally {
@@ -204,16 +256,19 @@ export const useCommunity = () => {
 
   useEffect(() => {
     fetchCommunityOutfits();
+    fetchTopLikedOutfits();
   }, []);
 
   return {
     communityOutfits,
     recommendations,
+    topLikedOutfits,
     loading,
     userLikes,
     toggleLike,
     updateOutfitPrivacy,
     fetchRecommendations,
+    fetchTopLikedOutfits,
     refetch: fetchCommunityOutfits,
   };
 };

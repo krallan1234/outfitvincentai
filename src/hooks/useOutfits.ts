@@ -12,6 +12,7 @@ export interface Outfit {
   description?: string;
   recommended_clothes?: any;
   ai_analysis?: any;
+  purchase_links?: any[];
   is_public?: boolean;
   likes_count?: number;
   created_at: string;
@@ -36,7 +37,11 @@ export const useOutfits = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setOutfits(data || []);
+      const outfitsWithLinks = data?.map(outfit => ({
+        ...outfit,
+        purchase_links: Array.isArray(outfit.purchase_links) ? outfit.purchase_links : []
+      })) as Outfit[] || [];
+      setOutfits(outfitsWithLinks);
     } catch (error) {
       console.error('Error fetching outfits:', error);
       toast({
@@ -54,7 +59,8 @@ export const useOutfits = () => {
     mood?: string, 
     isPublic: boolean = true, 
     pinterestBoardId?: string,
-    selectedItem?: any
+    selectedItem?: any,
+    purchaseLinks?: any[]
   ) => {
     try {
       setLoading(true);
@@ -68,7 +74,8 @@ export const useOutfits = () => {
           userId: user.id,
           isPublic,
           pinterestBoardId,
-          selectedItem
+          selectedItem,
+          purchaseLinks
         },
       });
 

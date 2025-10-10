@@ -96,6 +96,7 @@ export type Database = {
           likes_count: number
           mood: string | null
           prompt: string
+          purchase_links: Json | null
           recommended_clothes: Json | null
           title: string
           updated_at: string
@@ -111,6 +112,7 @@ export type Database = {
           likes_count?: number
           mood?: string | null
           prompt: string
+          purchase_links?: Json | null
           recommended_clothes?: Json | null
           title: string
           updated_at?: string
@@ -126,6 +128,7 @@ export type Database = {
           likes_count?: number
           mood?: string | null
           prompt?: string
+          purchase_links?: Json | null
           recommended_clothes?: Json | null
           title?: string
           updated_at?: string

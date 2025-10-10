@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Heart } from 'lucide-react';
+import { Calendar, Heart, ExternalLink, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -245,6 +245,40 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                   <span className="text-muted-foreground">{outfit.ai_analysis.style_analysis}</span>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Where to Buy Section */}
+          {outfit.purchase_links && outfit.purchase_links.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5" />
+                Where to Buy
+              </h3>
+              <div className="grid gap-3">
+                {outfit.purchase_links.map((link: any, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="flex-1">
+                      <p className="font-medium">{link.store_name}</p>
+                      {link.price && (
+                        <p className="text-sm text-muted-foreground">{link.price}</p>
+                      )}
+                    </div>
+                    {link.url && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                      >
+                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                          Visit Store
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

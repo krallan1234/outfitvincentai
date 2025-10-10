@@ -116,6 +116,7 @@ const CommunityPage = () => {
   const { 
     communityOutfits, 
     recommendations, 
+    topLikedOutfits,
     loading, 
     toggleLike, 
     fetchRecommendations 
@@ -143,6 +144,43 @@ const CommunityPage = () => {
         <div className="mb-8">
           <CommunityStats />
         </div>
+
+        {/* Top Liked Outfits - Style Trends */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Style Trends - Most Loved Outfits
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Top outfits from the community with the most likes
+            </p>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : topLikedOutfits.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                {topLikedOutfits.map((outfit) => (
+                  <CommunityOutfitCard
+                    key={outfit.id}
+                    outfit={outfit}
+                    onLike={toggleLike}
+                    onClick={() => setSelectedOutfit(outfit)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center p-8">
+                <p className="text-muted-foreground">
+                  No liked outfits yet. Be the first to like and share!
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Tabs defaultValue="recommended" className="w-full">
           <TabsList className="grid w-full grid-cols-2 max-w-md">

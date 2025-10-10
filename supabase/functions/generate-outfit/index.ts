@@ -18,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, mood, userId, isPublic = true, pinterestBoardId, selectedItem } = await req.json();
+    const { prompt, mood, userId, isPublic = true, pinterestBoardId, selectedItem, purchaseLinks } = await req.json();
 
     if (!prompt || !userId) {
       throw new Error('Prompt and userId are required');
@@ -622,6 +622,7 @@ serve(async (req) => {
         generated_image_url: null, // Will be generated on frontend with Canvas
         description: outfitRecommendation.description,
         recommended_clothes: legacyRecommendedItems,
+        purchase_links: purchaseLinks || [],
         ai_analysis: {
           styling_tips: outfitRecommendation.styling_tips,
           occasion: outfitRecommendation.perfect_for,

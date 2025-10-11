@@ -53,14 +53,16 @@ export const AppNavigation = () => {
             onClick={onItemClick}
             className={({ isActive }) => cn(
               mobile 
-                ? "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground"
-                : "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted",
+                ? "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-colors hover:text-foreground touch-manipulation"
+                : "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted touch-manipulation",
               isActive && (mobile 
                 ? "bg-muted text-foreground" 
                 : "bg-muted text-foreground")
             )}
+            aria-label={item.name}
+            aria-current={isActive(item.href) ? 'page' : undefined}
           >
-            <IconComponent className={mobile ? "h-5 w-5" : "h-4 w-4"} />
+            <IconComponent className={mobile ? "h-5 w-5" : "h-4 w-4"} aria-hidden="true" />
             {item.name}
           </NavLink>
         );
@@ -77,10 +79,11 @@ export const AppNavigation = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="fixed top-4 left-4 z-50 lg:hidden"
+              className="fixed top-4 left-4 z-50 lg:hidden touch-manipulation"
               aria-label="Open navigation menu"
+              aria-expanded={isOpen}
             >
-              <Menu className="h-6 w-6" />
+              <Menu className="h-6 w-6" aria-hidden="true" />
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-72 p-0">

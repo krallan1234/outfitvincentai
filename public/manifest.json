@@ -1,12 +1,16 @@
 {
   "name": "AI Outfit Generator",
   "short_name": "Outfit AI",
-  "description": "Generate perfect outfits from your wardrobe using AI",
+  "description": "Generate perfect outfits from your wardrobe using AI with weather-based suggestions, outfit planning, and community features",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/favicon.png",
@@ -22,5 +26,41 @@
     }
   ],
   "categories": ["lifestyle", "fashion", "productivity"],
-  "screenshots": []
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Generate Outfit",
+      "short_name": "Generate",
+      "description": "Create a new AI-generated outfit",
+      "url": "/outfits",
+      "icons": [{ "src": "/favicon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Wardrobe",
+      "short_name": "Wardrobe",
+      "description": "View and manage your clothing items",
+      "url": "/dashboard",
+      "icons": [{ "src": "/favicon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Planner",
+      "short_name": "Planner",
+      "description": "Plan outfits and create packing lists",
+      "url": "/planner",
+      "icons": [{ "src": "/favicon.png", "sizes": "192x192" }]
+    }
+  ],
+  "share_target": {
+    "action": "/dashboard",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "image",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  }
 }

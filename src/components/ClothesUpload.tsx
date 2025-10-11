@@ -94,6 +94,7 @@ export const ClothesUpload = () => {
   const [style, setStyle] = useState('');
   const [brand, setBrand] = useState('');
   const [description, setDescription] = useState('');
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
   
   const { uploadClothing, loading, clothes } = useClothes();
   const { toast } = useToast();
@@ -107,6 +108,42 @@ export const ClothesUpload = () => {
         setPreview(reader.result as string);
       };
       reader.readAsDataURL(selectedFile);
+    }
+  };
+
+  const handleCameraCapture = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.play();
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      video.onloadedmetadata = () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx?.drawImage(video, 0, 0);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
+            setFile(file);
+            setPreview(canvas.toDataURL());
+          }
+          stream.getTracks().forEach(track => track.stop());
+        }, 'image/jpeg');
+      };
+    } catch (error) {
+      toast({
+        title: 'Camera Error',
+        description: 'Unable to access camera. Please use file upload instead.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -164,20 +201,26 @@ export const ClothesUpload = () => {
                 <div className="space-y-4">
                   <img
                     src={preview}
-                    alt="Preview"
+                    alt="Preview of clothing item"
                     className="mx-auto max-h-64 rounded-lg object-cover"
+                    loading="lazy"
                   />
-                  <Button type="button" variant="outline" onClick={() => {
-                    setFile(null);
-                    setPreview('');
-                  }}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setFile(null);
+                      setPreview('');
+                    }}
+                    aria-label="Change photo"
+                  >
                     Change Photo
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <div>
+                  <Upload className="mx-auto h-12 w-12 text-muted-foreground" aria-hidden="true" />
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
                     <Label htmlFor="file" className="cursor-pointer">
                       <Button type="button" variant="outline" asChild>
                         <span>Choose Photo</span>
@@ -189,7 +232,17 @@ export const ClothesUpload = () => {
                       accept="image/*"
                       onChange={handleFileChange}
                       className="hidden"
+                      aria-label="Upload clothing photo"
                     />
+                    <Button 
+                      type="button" 
+                      variant="outline"
+                      onClick={handleCameraCapture}
+                      className="md:hidden"
+                      aria-label="Take photo with camera"
+                    >
+                      📷 Take Photo
+                    </Button>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Upload a clear photo of your clothing item
@@ -203,7 +256,7 @@ export const ClothesUpload = () => {
           <div className="space-y-2">
             <Label htmlFor="category">Category *</Label>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger>
+              <SelectTrigger aria-label="Select clothing category">
                 <SelectValue placeholder="Select clothing category" />
               </SelectTrigger>
               <SelectContent>

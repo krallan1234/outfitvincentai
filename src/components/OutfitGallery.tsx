@@ -1,27 +1,63 @@
+import { useState, useRef } from 'react';
 import { useOutfits, Outfit } from '@/hooks/useOutfits';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Loader2, Calendar } from 'lucide-react';
+import { Trash2, Loader2, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { OutfitModal } from '@/components/OutfitModal';
-import { useState } from 'react';
 
 export const OutfitGallery = () => {
   const { outfits, loading, deleteOutfit } = useOutfits();
   const [selectedOutfit, setSelectedOutfit] = useState<Outfit | null>(null);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!scrollContainerRef.current) return;
+    
+    const swipeDistance = touchStart - touchEnd;
+    const minSwipeDistance = 50;
+
+    if (Math.abs(swipeDistance) > minSwipeDistance) {
+      const scrollAmount = 300;
+      if (swipeDistance > 0) {
+        scrollContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+      } else {
+        scrollContainerRef.current.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+      }
+    }
+  };
+
+  const scrollLeft = () => {
+    scrollContainerRef.current?.scrollBy({ left: -300, behavior: 'smooth' });
+  };
+
+  const scrollRight = () => {
+    scrollContainerRef.current?.scrollBy({ left: 300, behavior: 'smooth' });
+  };
 
   if (loading && outfits.length === 0) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex items-center justify-center p-8" role="status" aria-live="polite">
+        <Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" />
+        <span className="sr-only">Loading outfits...</span>
       </div>
     );
   }
 
   if (outfits.length === 0) {
     return (
-      <div className="text-center p-8">
+      <div className="text-center p-8" role="status">
         <p className="text-muted-foreground">No outfits generated yet. Create your first outfit!</p>
       </div>
     );
@@ -29,7 +65,8 @@ export const OutfitGallery = () => {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Desktop Grid View */}
+      <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6">
         {outfits.map((outfit) => (
           <OutfitCard 
             key={outfit.id} 
@@ -38,6 +75,51 @@ export const OutfitGallery = () => {
             onClick={() => setSelectedOutfit(outfit)}
           />
         ))}
+      </div>
+
+      {/* Mobile Swipeable View */}
+      <div className="md:hidden">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={scrollLeft}
+            aria-label="Scroll left"
+            className="shrink-0"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          <div 
+            ref={scrollContainerRef}
+            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory hide-scrollbar flex-1"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            role="list"
+            aria-label="Swipeable outfit gallery"
+          >
+            {outfits.map((outfit) => (
+              <div key={outfit.id} className="snap-center shrink-0 w-80">
+                <OutfitCard 
+                  outfit={outfit} 
+                  onDelete={() => deleteOutfit(outfit.id)}
+                  onClick={() => setSelectedOutfit(outfit)}
+                />
+              </div>
+            ))}
+          </div>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={scrollRight}
+            aria-label="Scroll right"
+            className="shrink-0"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       
       <OutfitModal
@@ -56,6 +138,8 @@ interface OutfitCardProps {
 }
 
 const OutfitCard = ({ outfit, onDelete, onClick }: OutfitCardProps) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -65,14 +149,31 @@ const OutfitCard = ({ outfit, onDelete, onClick }: OutfitCardProps) => {
   };
 
   return (
-    <Card className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow" onClick={onClick}>
+    <Card 
+      className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow touch-manipulation" 
+      onClick={onClick}
+      role="article"
+      aria-label={`${outfit.title} outfit`}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
       {/* Generated Image */}
       {outfit.generated_image_url && (
         <div className="aspect-square relative">
+          {!imageLoaded && (
+            <div className="absolute inset-0 bg-muted animate-pulse" aria-hidden="true" />
+          )}
           <img
             src={outfit.generated_image_url}
-            alt={outfit.title}
-            className="w-full h-full object-cover"
+            alt={`${outfit.title} - ${outfit.prompt}`}
+            className={`w-full h-full object-cover transition-opacity ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+            loading="lazy"
+            onLoad={() => setImageLoaded(true)}
           />
           <div className="absolute top-2 right-2">
             <AlertDialog>
@@ -82,8 +183,9 @@ const OutfitCard = ({ outfit, onDelete, onClick }: OutfitCardProps) => {
                   size="icon" 
                   className="h-8 w-8"
                   onClick={(e) => e.stopPropagation()}
+                  aria-label="Delete outfit"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -106,8 +208,8 @@ const OutfitCard = ({ outfit, onDelete, onClick }: OutfitCardProps) => {
       <CardHeader className="pb-3">
         <CardTitle className="text-lg">{outfit.title}</CardTitle>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="h-4 w-4" />
-          {formatDate(outfit.created_at)}
+          <Calendar className="h-4 w-4" aria-hidden="true" />
+          <time dateTime={outfit.created_at}>{formatDate(outfit.created_at)}</time>
         </div>
       </CardHeader>
 

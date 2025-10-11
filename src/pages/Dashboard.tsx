@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ClothesUpload } from '@/components/ClothesUpload';
 import { ClothesGallery } from '@/components/ClothesGallery';
+import { ClipFromWeb } from '@/components/ClipFromWeb';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Dashboard = () => {
@@ -14,9 +15,10 @@ const Dashboard = () => {
         </div>
         
         <Tabs defaultValue="gallery" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
             <TabsTrigger value="gallery">My Clothes</TabsTrigger>
             <TabsTrigger value="upload">Upload New</TabsTrigger>
+            <TabsTrigger value="clip">Clip from Web</TabsTrigger>
           </TabsList>
           
           <TabsContent value="gallery" className="mt-6">
@@ -36,6 +38,12 @@ const Dashboard = () => {
           <TabsContent value="upload" className="mt-6">
             <div className="flex justify-center">
               <ClothesUpload />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="clip" className="mt-6">
+            <div className="flex justify-center">
+              <ClipFromWeb />
             </div>
           </TabsContent>
         </Tabs>

@@ -27,42 +27,36 @@ export const ClipFromWeb = () => {
 
   const handleFetchMetadata = async () => {
     if (!url.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please enter a URL',
-        variant: 'destructive'
-      });
+      toast({ title: 'Error', description: 'Please enter a URL', variant: 'destructive' });
       return;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-url-metadata', {
-        body: { url }
-      });
+      const { data, error } = await supabase.functions.invoke('fetch-url-metadata', { body: { url } });
 
-      if (error) throw error;
-
-      if (!data.image) {
-        throw new Error('No product image found - try a product page with images');
+      if (error) {
+        console.error('Edge function error:', error);
+        toast({ title: 'Error', description: 'Could not fetch this URL', variant: 'destructive' });
+        return;
       }
 
-      setPreview({
-        ...data,
-        category: data.category || 'tops'
-      });
+      if (!data?.success) {
+        toast({ title: 'Invalid URL', description: data?.error || 'Try a direct product page', variant: 'destructive' });
+        return;
+      }
 
-      toast({
-        title: 'Product found!',
-        description: 'Review the details and save to your wardrobe'
-      });
+      const meta = data.data;
+      if (!meta?.image) {
+        toast({ title: 'No image found', description: 'Try a product page with images', variant: 'destructive' });
+        return;
+      }
+
+      setPreview({ ...meta, category: meta.category || 'tops' });
+      toast({ title: 'Product found!', description: 'Review the details and save to your wardrobe' });
     } catch (error: any) {
       console.error('Error fetching metadata:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Invalid URL - try a product page',
-        variant: 'destructive'
-      });
+      toast({ title: 'Error', description: error.message || 'Invalid URL - try a product page', variant: 'destructive' });
     } finally {
       setLoading(false);
     }

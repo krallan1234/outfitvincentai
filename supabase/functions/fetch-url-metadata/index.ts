@@ -1,9 +1,106 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
+
+function extractMetadataFromHtml(html: string, baseUrl: URL) {
+  const get = (re: RegExp) => {
+    const m = html.match(re);
+    return m ? m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'") : '';
+  };
+
+  const metadata: any = {
+    title: '',
+    description: '',
+    image: '',
+    price: '',
+    brand: '',
+    color: '',
+    category: ''
+  };
+
+  metadata.image =
+    get(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+    get(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) ||
+    get(/<meta[^>]*itemprop=["']image["'][^>]*content=["']([^"']+)["']/i) ||
+    '';
+
+  metadata.title =
+    get(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+    get(/<meta[^>]*name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i) ||
+    get(/<title[^>]*>([^<]+)<\/title>/i) || '';
+
+  metadata.description =
+    get(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
+    get(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) || '';
+
+  if (metadata.image && !metadata.image.startsWith('http')) {
+    metadata.image = new URL(metadata.image, baseUrl.origin).href;
+  }
+
+  const pricePatterns = [
+    /"price":\s*"?(\d+[.,]?\d*)"?/i,
+    /[\$€£]\s*(\d+[.,]?\d*)/,
+    /(\d+[.,]?\d*)\s*[\$€£]/,
+    /<meta[^>]*property=["']product:price:amount["'][^>]*content=["']([^"']+)["']/i
+  ];
+  for (const p of pricePatterns) {
+    const m = html.match(p);
+    if (m && m[1]) { metadata.price = m[1]; break; }
+  }
+
+  metadata.brand =
+    get(/<meta[^>]*property=["']og:brand["'][^>]*content=["']([^"']+)["']/i) ||
+    get(/<meta[^>]*property=["']product:brand["'][^>]*content=["']([^"']+)["']/i) ||
+    get(/"brand":\s*\{\s*"name":\s*"([^"]+)"/i) ||
+    get(/"brand":\s*"([^"]+)"/i) || '';
+
+  const text = (metadata.title + ' ' + metadata.description).toLowerCase();
+  const categories: Record<string, string[]> = {
+    tops: ['shirt','t-shirt','tee','blouse','top','sweater','hoodie','sweatshirt','tröja','topp'],
+    bottoms: ['pants','jeans','trousers','shorts','skirt','byxor','kjol'],
+    dresses: ['dress','gown','klänning'],
+    outerwear: ['jacket','coat','blazer','cardigan','jacka','kappa'],
+    shoes: ['shoes','sneakers','boots','sandals','heels','skor','stövlar'],
+    accessories: ['bag','hat','scarf','belt','watch','jewelry','necklace','bracelet','ring','väska','halsband','armband']
+  };
+  for (const [cat, kws] of Object.entries(categories)) {
+    if (kws.some(k => text.includes(k))) { metadata.category = cat; break; }
+  }
+
+  const colors = ['black','white','red','blue','green','yellow','pink','purple','brown','gray','grey','beige','navy','orange',
+                  'svart','vit','röd','blå','grön','gul','rosa','lila','brun','grå','beige'];
+  for (const c of colors) { if (text.includes(c)) { metadata.color = c; break; } }
+
+  return metadata;
+}
+
+async function fallbackLinkPreview(url: string) {
+  const key = Deno.env.get('LINK_PREVIEW_API_KEY');
+  if (!key) return { ok: false as const, error: 'Missing LINK_PREVIEW_API_KEY secret' };
+  try {
+    const r = await fetch(`https://api.linkpreview.net/?key=${key}&q=${encodeURIComponent(url)}`);
+    if (!r.ok) return { ok: false as const, error: `LinkPreview error ${r.status}` };
+    const j = await r.json(); // { title, description, image, url }
+    const base = new URL(j.url || url);
+    const meta = {
+      title: j.title || '',
+      description: j.description || '',
+      image: j.image || '',
+      price: '',
+      brand: base.hostname.split('.')[0] || '',
+      color: '',
+      category: ''
+    };
+    const enriched = extractMetadataFromHtml(`<title>${meta.title}</title><meta name="description" content="${meta.description}">`, base);
+    return { ok: true as const, data: { ...meta, color: enriched.color, category: enriched.category } };
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : 'LinkPreview failed' };
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,171 +109,59 @@ serve(async (req) => {
 
   try {
     const { url } = await req.json();
-    
     if (!url) {
-      throw new Error('URL is required');
+      return new Response(JSON.stringify({ success: false, error: 'URL is required' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
     console.log('Fetching metadata for URL:', url);
 
-    // Validate URL
-    let parsedUrl;
-    try {
-      parsedUrl = new URL(url);
-    } catch {
-      throw new Error('Invalid URL format');
+    let parsedUrl: URL;
+    try { parsedUrl = new URL(url); } catch {
+      return new Response(JSON.stringify({ success: false, error: 'Invalid URL format' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
-    // Fetch the page with better headers to avoid blocking
-    let response;
+    // Primary attempt: direct fetch (may fail with 403 on some retailers)
     try {
-      response = await fetch(url, {
+      const response = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.5',
-          'Accept-Encoding': 'gzip, deflate, br',
           'DNT': '1',
-          'Connection': 'keep-alive',
           'Upgrade-Insecure-Requests': '1'
         },
         redirect: 'follow'
       });
-    } catch (fetchError) {
-      console.error('Fetch error:', fetchError);
-      throw new Error('Unable to access this URL. The website may be blocking automated access.');
-    }
 
-    if (!response.ok) {
-      console.error('Response not OK:', response.status, response.statusText);
-      throw new Error(`Website returned error ${response.status}. Try a different product page.`);
-    }
-
-    const html = await response.text();
-    console.log('Successfully fetched HTML, length:', html.length);
-
-    // Extract metadata using regex and meta tags
-    const metadata: any = {
-      url,
-      title: '',
-      description: '',
-      image: '',
-      price: '',
-      brand: '',
-      color: ''
-    };
-
-    // Extract Open Graph and meta tags - more comprehensive patterns
-    const extractMetaContent = (pattern: RegExp) => {
-      const match = html.match(pattern);
-      return match ? match[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'") : '';
-    };
-
-    // Try multiple patterns for each field
-    metadata.image = 
-      extractMetaContent(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-      extractMetaContent(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) ||
-      extractMetaContent(/<meta[^>]*itemprop=["']image["'][^>]*content=["']([^"']+)["']/i) ||
-      '';
-
-    metadata.title = 
-      extractMetaContent(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
-      extractMetaContent(/<meta[^>]*name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i) ||
-      extractMetaContent(/<title[^>]*>([^<]+)<\/title>/i) ||
-      '';
-
-    metadata.description = 
-      extractMetaContent(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
-      extractMetaContent(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) ||
-      '';
-
-    // Make image URL absolute if it's relative
-    if (metadata.image && !metadata.image.startsWith('http')) {
-      metadata.image = new URL(metadata.image, parsedUrl.origin).href;
-    }
-
-    // Try to extract price - multiple patterns
-    const pricePatterns = [
-      /"price":\s*"?(\d+[.,]?\d*)"?/i,
-      /[\$€£]\s*(\d+[.,]?\d*)/,
-      /(\d+[.,]?\d*)\s*[\$€£]/,
-      /<meta[^>]*property=["']product:price:amount["'][^>]*content=["']([^"']+)["']/i
-    ];
-
-    for (const pattern of pricePatterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) {
-        metadata.price = match[1];
-        break;
+      if (response.ok) {
+        const html = await response.text();
+        const metadata = extractMetadataFromHtml(html, parsedUrl);
+        if (!metadata.image) {
+          // Try LinkPreview if direct fetch lacks image
+          const fb = await fallbackLinkPreview(url);
+          if (fb.ok && fb.data.image) {
+            return new Response(JSON.stringify({ success: true, data: fb.data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+          }
+        }
+        return new Response(JSON.stringify({ success: true, data: { ...metadata, url } }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      } else {
+        console.error('Direct fetch not OK:', response.status, response.statusText);
+        const fb = await fallbackLinkPreview(url);
+        if (fb.ok) {
+          return new Response(JSON.stringify({ success: true, data: fb.data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        }
+        return new Response(JSON.stringify({ success: false, error: `Website returned ${response.status}`, suggestion: 'Try a direct product page URL' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
-    }
-
-    // Try to extract brand from common patterns
-    metadata.brand = 
-      extractMetaContent(/<meta[^>]*property=["']og:brand["'][^>]*content=["']([^"']+)["']/i) ||
-      extractMetaContent(/<meta[^>]*property=["']product:brand["'][^>]*content=["']([^"']+)["']/i) ||
-      extractMetaContent(/"brand":\s*{\s*"name":\s*"([^"]+)"/i) ||
-      extractMetaContent(/"brand":\s*"([^"]+)"/i) ||
-      parsedUrl.hostname.split('.')[0]; // Fallback to domain name
-
-    // Auto-detect category based on title and description
-    const text = (metadata.title + ' ' + metadata.description).toLowerCase();
-    const categories: { [key: string]: string[] } = {
-      'tops': ['shirt', 't-shirt', 'tee', 'blouse', 'top', 'sweater', 'hoodie', 'sweatshirt', 'tröja', 'topp'],
-      'bottoms': ['pants', 'jeans', 'trousers', 'shorts', 'skirt', 'byxor', 'kjol'],
-      'dresses': ['dress', 'gown', 'klänning'],
-      'outerwear': ['jacket', 'coat', 'blazer', 'cardigan', 'jacka', 'kappa'],
-      'shoes': ['shoes', 'sneakers', 'boots', 'sandals', 'heels', 'skor', 'stövlar'],
-      'accessories': ['bag', 'hat', 'scarf', 'belt', 'watch', 'jewelry', 'necklace', 'bracelet', 'ring', 'väska', 'halsband', 'armband']
-    };
-
-    let detectedCategory = '';
-    for (const [category, keywords] of Object.entries(categories)) {
-      if (keywords.some(keyword => text.includes(keyword))) {
-        detectedCategory = category;
-        break;
+    } catch (err) {
+      console.error('Direct fetch error:', err);
+      const fb = await fallbackLinkPreview(url);
+      if (fb.ok) {
+        return new Response(JSON.stringify({ success: true, data: fb.data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
+      return new Response(JSON.stringify({ success: false, error: 'Unable to access this URL', suggestion: 'Retailer may block bots – try another link' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
-    metadata.category = detectedCategory || 'tops'; // Default to tops if nothing detected
-
-    // Try to detect color
-    const colors = ['black', 'white', 'red', 'blue', 'green', 'yellow', 'pink', 'purple', 'brown', 'gray', 'grey', 'beige', 'navy', 'orange', 
-                    'svart', 'vit', 'röd', 'blå', 'grön', 'gul', 'rosa', 'lila', 'brun', 'grå', 'beige'];
-    for (const color of colors) {
-      if (text.includes(color)) {
-        metadata.color = color;
-        break;
-      }
-    }
-
-    console.log('Extracted metadata:', JSON.stringify(metadata, null, 2));
-
-    // Validate that we got at least an image
-    if (!metadata.image) {
-      console.warn('No image found in metadata');
-      throw new Error('No product image found. Please try a different product page.');
-    }
-
-    return new Response(
-      JSON.stringify(metadata),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
-    );
-
   } catch (error) {
-    console.error('Error fetching metadata:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch metadata';
-    return new Response(
-      JSON.stringify({ 
-        error: errorMessage,
-        suggestion: 'Try a direct product page URL (not a search or category page)'
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
-      }
-    );
+    console.error('Unexpected error:', error);
+    return new Response(JSON.stringify({ success: false, error: 'Failed to fetch metadata' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
   }
 });

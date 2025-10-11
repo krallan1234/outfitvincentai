@@ -37,26 +37,54 @@ export const ClipFromWeb = () => {
 
       if (error) {
         console.error('Edge function error:', error);
-        toast({ title: 'Error', description: 'Could not fetch this URL', variant: 'destructive' });
+        toast({ 
+          title: 'Connection Error', 
+          description: 'Could not reach the scraper service. Try again in a moment.', 
+          variant: 'destructive' 
+        });
         return;
       }
 
       if (!data?.success) {
-        toast({ title: 'Invalid URL', description: data?.error || 'Try a direct product page', variant: 'destructive' });
+        const errorMsg = data?.error || 'Could not fetch this URL';
+        
+        // Specific handling for 403 errors
+        if (errorMsg.includes('403')) {
+          toast({ 
+            title: 'Website Blocked Access', 
+            description: 'This retailer blocks automated requests. Try H&M, ASOS, or upload directly instead.', 
+            variant: 'destructive',
+            duration: 5000
+          });
+        } else {
+          toast({ 
+            title: 'Could Not Load Product', 
+            description: data?.suggestion || 'Try a direct product page URL', 
+            variant: 'destructive' 
+          });
+        }
         return;
       }
 
       const meta = data.data;
       if (!meta?.image) {
-        toast({ title: 'No image found', description: 'Try a product page with images', variant: 'destructive' });
+        toast({ 
+          title: 'No Product Image', 
+          description: 'Could not find a product image. Try a different page or upload directly.', 
+          variant: 'destructive' 
+        });
         return;
       }
 
       setPreview({ ...meta, category: meta.category || 'tops' });
-      toast({ title: 'Product found!', description: 'Review the details and save to your wardrobe' });
+      toast({ title: 'Success!', description: 'Product loaded. Review and save to wardrobe.' });
     } catch (error: any) {
       console.error('Error fetching metadata:', error);
-      toast({ title: 'Error', description: error.message || 'Invalid URL - try a product page', variant: 'destructive' });
+      toast({ 
+        title: 'Error', 
+        description: 'Something went wrong. Try a different URL or upload the image directly.', 
+        variant: 'destructive' 
+      });
     } finally {
       setLoading(false);
     }
@@ -129,7 +157,7 @@ export const ClipFromWeb = () => {
             <Input
               id="product-url"
               type="url"
-              placeholder="https://www.example.com/product..."
+              placeholder="https://www2.hm.com/en_us/productpage..."
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               disabled={loading}
@@ -146,7 +174,7 @@ export const ClipFromWeb = () => {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Paste a product link from H&M, Zalando, or other retailers
+            Works best with H&M, ASOS, and similar sites. Some retailers (like Zara) may block automated requests.
           </p>
         </div>
 

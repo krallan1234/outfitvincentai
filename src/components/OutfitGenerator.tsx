@@ -409,17 +409,15 @@ export const OutfitGenerator = () => {
           </div>
 
           {/* Outfit Canvas - placed after selected items */}
-          {selectedItems.length > 0 && (
-            <OutfitCanvas
-              selectedItems={selectedItems}
-              mood={mood}
-              occasion={prompt}
-              onSaveOutfit={(canvasData) => {
-                console.log('Canvas outfit saved:', canvasData);
-                toast({ title: 'Canvas saved!', description: 'Your arrangement has been saved' });
-              }}
-            />
-          )}
+          <OutfitCanvas
+            selectedItems={selectedItems}
+            mood={mood}
+            occasion={prompt}
+            onSaveOutfit={(canvasData) => {
+              console.log('Canvas outfit saved:', canvasData);
+              toast({ title: 'Canvas saved!', description: 'Your arrangement has been saved' });
+            }}
+          />
 
           {/* Purchase Links */}
           <div className="space-y-3">

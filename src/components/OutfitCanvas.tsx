@@ -103,7 +103,8 @@ export const OutfitCanvas = ({ selectedItems, mood, occasion, onSaveOutfit }: Ou
       // Use FabricImage.fromURL with crossOrigin (v6 returns a Promise)
       FabricImage.fromURL(item.image_url, { crossOrigin: "anonymous" })
         .then((img) => {
-          if (!img) return;
+          const fabricNow = fabricRef.current;
+          if (!img || !fabricNow) return;
           const maxW = 140;
           const naturalW = (img.width as number) || maxW;
           const scale = maxW / naturalW;
@@ -120,9 +121,9 @@ export const OutfitCanvas = ({ selectedItems, mood, occasion, onSaveOutfit }: Ou
           });
           (img as any)._originSrc = item.image_url;
           (img as any)._meta = { category: item.category, color: item.color, brand: item.brand };
-          fabric.add(img);
-          fabric.setActiveObject(img);
-          fabric.requestRenderAll();
+          fabricNow.add(img);
+          fabricNow.setActiveObject(img);
+          fabricNow.requestRenderAll();
         })
         .catch((err) => {
           console.warn("Failed to load image", item.image_url, err);

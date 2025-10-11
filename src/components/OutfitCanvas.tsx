@@ -1,197 +1,176 @@
-import { useState, useRef, useEffect } from 'react';
-import { Stage, Layer, Image as KonvaImage, Transformer } from 'react-konva';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { Sparkles, Undo, Redo, Download, Grid3x3, Loader2 } from 'lucide-react';
-import Konva from 'konva';
+import { useEffect, useRef, useState } from "react";
+import { Canvas as FabricCanvas, Image as FabricImage } from "fabric";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Sparkles, Undo, Redo, Download, Grid3x3, Loader2 } from "lucide-react";
+
+interface WardrobeItem {
+  id: string;
+  image_url: string;
+  category?: string | null;
+  color?: string | null;
+  brand?: string | null;
+}
 
 interface OutfitCanvasProps {
-  selectedItems: any[];
+  selectedItems: WardrobeItem[];
   mood?: string;
   occasion?: string;
   onSaveOutfit?: (canvasData: any) => void;
 }
 
-interface CanvasItem {
-  id: string;
-  imageUrl: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  image: HTMLImageElement | null;
-  rotation: number;
-  category?: string;
-  color?: string;
-  brand?: string;
-}
-
-const GRID_SIZE = 20;
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
+const GRID_SIZE = 20;
 
 export const OutfitCanvas = ({ selectedItems, mood, occasion, onSaveOutfit }: OutfitCanvasProps) => {
-  const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const canvasElRef = useRef<HTMLCanvasElement | null>(null);
+  const fabricRef = useRef<FabricCanvas | null>(null);
   const [snapToGrid, setSnapToGrid] = useState(true);
-  const [history, setHistory] = useState<CanvasItem[][]>([]);
-  const [historyStep, setHistoryStep] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [aiSuggestions, setAiSuggestions] = useState('');
-  const stageRef = useRef<Konva.Stage>(null);
+  const [aiSuggestions, setAiSuggestions] = useState("");
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyStep, setHistoryStep] = useState(-1);
   const { toast } = useToast();
 
-  // Load images when selected items change
+  // Init Fabric canvas
   useEffect(() => {
-    selectedItems.forEach((item, index) => {
-      if (!canvasItems.find(ci => ci.id === item.id)) {
-        const img = new window.Image();
-        img.crossOrigin = 'anonymous';
-        img.src = item.image_url;
-        img.onload = () => {
-          const newItem: CanvasItem = {
-            id: item.id,
-            imageUrl: item.image_url,
-            x: 100 + index * 120,
-            y: 100,
-            width: 100,
-            height: 100,
-            image: img,
-            rotation: 0,
-            category: item.category,
-            color: item.color,
-            brand: item.brand
-          };
-          setCanvasItems(prev => {
-            const updated = [...prev, newItem];
-            saveToHistory(updated);
-            return updated;
+    if (!canvasElRef.current) return;
+
+    const fabric = new FabricCanvas(canvasElRef.current, {
+      width: CANVAS_WIDTH,
+      height: CANVAS_HEIGHT,
+      backgroundColor: "transparent",
+      selection: true,
+      preserveObjectStacking: true,
+    });
+
+    // Snap to grid on move
+    fabric.on("object:moving", (e: any) => {
+      if (!snapToGrid || !e.target) return;
+      const t = e.target;
+      t.left = Math.round((t.left || 0) / GRID_SIZE) * GRID_SIZE;
+      t.top = Math.round((t.top || 0) / GRID_SIZE) * GRID_SIZE;
+    });
+
+    // Record history on modifications
+    const record = () => {
+      const json = JSON.stringify(fabric.toJSON());
+      const next = history.slice(0, historyStep + 1).concat(json);
+      setHistory(next);
+      setHistoryStep(next.length - 1);
+    };
+
+    fabric.on("object:modified", record);
+    fabric.on("object:added", record);
+
+    fabricRef.current = fabric;
+
+    return () => {
+      fabric.dispose();
+      fabricRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load selected wardrobe items as images onto the canvas
+  useEffect(() => {
+    const fabric = fabricRef.current;
+    if (!fabric) return;
+
+    // Prevent duplicates by tracking existing image URLs
+    const existingUrls = new Set<string>();
+    fabric.getObjects().forEach((obj: any) => {
+      if (obj.type === "image" && obj._originSrc) existingUrls.add(obj._originSrc);
+    });
+
+    selectedItems.forEach((item, idx) => {
+      if (!item.image_url || existingUrls.has(item.image_url)) return;
+
+      // Use FabricImage.fromURL with crossOrigin (v6 returns a Promise)
+      FabricImage.fromURL(item.image_url, { crossOrigin: "anonymous" })
+        .then((img) => {
+          if (!img) return;
+          const maxW = 140;
+          const naturalW = (img.width as number) || maxW;
+          const scale = maxW / naturalW;
+          img.set({
+            left: 60 + idx * 160,
+            top: 80,
+            scaleX: scale,
+            scaleY: scale,
+            hasControls: true,
+            hasBorders: true,
+            cornerStyle: "circle",
+            cornerColor: "#888",
+            transparentCorners: false,
           });
-        };
-      }
+          (img as any)._originSrc = item.image_url;
+          (img as any)._meta = { category: item.category, color: item.color, brand: item.brand };
+          fabric.add(img);
+          fabric.setActiveObject(img);
+          fabric.requestRenderAll();
+        })
+        .catch((err) => {
+          console.warn("Failed to load image", item.image_url, err);
+        });
     });
   }, [selectedItems]);
 
-  const saveToHistory = (items: CanvasItem[]) => {
-    const newHistory = history.slice(0, historyStep + 1);
-    newHistory.push(JSON.parse(JSON.stringify(items)));
-    setHistory(newHistory);
-    setHistoryStep(newHistory.length - 1);
-  };
-
   const undo = () => {
-    if (historyStep > 0) {
-      setHistoryStep(historyStep - 1);
-      setCanvasItems(JSON.parse(JSON.stringify(history[historyStep - 1])));
-    }
+    const fabric = fabricRef.current;
+    if (!fabric || historyStep <= 0) return;
+    const prevStep = historyStep - 1;
+    fabric.loadFromJSON(JSON.parse(history[prevStep]), () => fabric.requestRenderAll());
+    setHistoryStep(prevStep);
   };
 
   const redo = () => {
-    if (historyStep < history.length - 1) {
-      setHistoryStep(historyStep + 1);
-      setCanvasItems(JSON.parse(JSON.stringify(history[historyStep + 1])));
-    }
+    const fabric = fabricRef.current;
+    if (!fabric || historyStep >= history.length - 1) return;
+    const nextStep = historyStep + 1;
+    fabric.loadFromJSON(JSON.parse(history[nextStep]), () => fabric.requestRenderAll());
+    setHistoryStep(nextStep);
   };
 
-  const handleDragEnd = (id: string, e: any) => {
-    const items = canvasItems.map(item => {
-      if (item.id === id) {
-        let x = e.target.x();
-        let y = e.target.y();
-        
-        if (snapToGrid) {
-          x = Math.round(x / GRID_SIZE) * GRID_SIZE;
-          y = Math.round(y / GRID_SIZE) * GRID_SIZE;
-        }
-        
-        return { ...item, x, y };
-      }
-      return item;
-    });
-    setCanvasItems(items);
-    saveToHistory(items);
-  };
-
-  const handleTransformEnd = (id: string, node: any) => {
-    const items = canvasItems.map(item => {
-      if (item.id === id) {
-        return {
-          ...item,
-          x: node.x(),
-          y: node.y(),
-          width: node.width() * node.scaleX(),
-          height: node.height() * node.scaleY(),
-          rotation: node.rotation()
-        };
-      }
-      return item;
-    });
-    setCanvasItems(items);
-    saveToHistory(items);
-    node.scaleX(1);
-    node.scaleY(1);
+  const exportAsImage = () => {
+    const fabric = fabricRef.current;
+    if (!fabric) return;
+    const dataUrl = fabric.toDataURL({ format: "png", multiplier: 2 });
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `outfit-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast({ title: "Exported", description: "Outfit saved as image" });
   };
 
   const generateAISuggestions = async () => {
-    if (canvasItems.length === 0) {
-      toast({ title: 'No items', description: 'Add items to canvas first', variant: 'destructive' });
+    const fabric = fabricRef.current;
+    if (!fabric) return;
+    if (fabric.getObjects().length === 0) {
+      toast({ title: "No items", description: "Add items to canvas first", variant: "destructive" });
       return;
     }
 
     setIsGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('canvas-ai-suggestions', {
-        body: {
-          items: canvasItems.map(item => ({
-            category: item.category,
-            color: item.color,
-            brand: item.brand
-          })),
-          mood,
-          occasion
-        }
+      // Build items meta from objects
+      const items = fabric.getObjects().map((obj: any) => obj._meta || {});
+      const { data, error } = await supabase.functions.invoke("canvas-ai-suggestions", {
+        body: { items, mood, occasion },
       });
-
       if (error) throw error;
-
-      setAiSuggestions(data.suggestions);
-      toast({ title: 'AI Suggestions Ready!', description: 'Check the suggestions below' });
-    } catch (error: any) {
-      console.error('AI suggestions error:', error);
-      toast({ 
-        title: 'Error', 
-        description: error.message || 'Failed to generate suggestions', 
-        variant: 'destructive' 
-      });
+      setAiSuggestions(data.suggestions || "");
+      toast({ title: "AI Suggestions Ready", description: "See tips below" });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Error", description: e.message || "Failed to generate", variant: "destructive" });
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  const exportAsImage = () => {
-    if (!stageRef.current) return;
-
-    const uri = stageRef.current.toDataURL({ pixelRatio: 2 });
-    const link = document.createElement('a');
-    link.download = `outfit-${Date.now()}.png`;
-    link.href = uri;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast({ title: 'Exported!', description: 'Outfit saved as image' });
-  };
-
-  const saveOutfit = () => {
-    if (onSaveOutfit) {
-      onSaveOutfit({
-        items: canvasItems,
-        mood,
-        occasion,
-        suggestions: aiSuggestions
-      });
     }
   };
 
@@ -202,145 +181,67 @@ export const OutfitCanvas = ({ selectedItems, mood, occasion, onSaveOutfit }: Ou
           <Grid3x3 className="h-5 w-5" />
           Outfit Canvas
         </CardTitle>
-        <CardDescription>
-          Drag items onto canvas to create your outfit arrangement
-        </CardDescription>
+        <CardDescription>Drag items to arrange; resize/rotate with handles</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={undo}
-            disabled={historyStep === 0}
-          >
-            <Undo className="h-4 w-4 mr-1" />
-            Undo
+          <Button variant="outline" size="sm" onClick={undo} disabled={historyStep <= 0}>
+            <Undo className="h-4 w-4 mr-1" /> Undo
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={redo}
-            disabled={historyStep === history.length - 1}
+            disabled={historyStep < 0 || historyStep >= history.length - 1}
           >
-            <Redo className="h-4 w-4 mr-1" />
-            Redo
+            <Redo className="h-4 w-4 mr-1" /> Redo
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSnapToGrid(!snapToGrid)}
-          >
-            <Grid3x3 className="h-4 w-4 mr-1" />
-            {snapToGrid ? 'Grid On' : 'Grid Off'}
+          <Button variant="outline" size="sm" onClick={() => setSnapToGrid((v) => !v)}>
+            <Grid3x3 className="h-4 w-4 mr-1" /> {snapToGrid ? "Grid On" : "Grid Off"}
           </Button>
           <Button
             variant="default"
             size="sm"
             onClick={generateAISuggestions}
-            disabled={isGenerating || canvasItems.length === 0}
+            disabled={isGenerating}
           >
-            {isGenerating ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-1" />
-            )}
+            {isGenerating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
             AI Suggestions
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={exportAsImage}
-            disabled={canvasItems.length === 0}
-          >
-            <Download className="h-4 w-4 mr-1" />
-            Export
+          <Button variant="outline" size="sm" onClick={exportAsImage}>
+            <Download className="h-4 w-4 mr-1" /> Export
           </Button>
         </div>
 
-        <div className="border rounded-lg overflow-hidden bg-white">
-          <Stage
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
-            ref={stageRef}
-            onMouseDown={(e) => {
-              if (e.target === e.target.getStage()) {
-                setSelectedId(null);
-              }
-            }}
-            onTouchStart={(e) => {
-              if (e.target === e.target.getStage()) {
-                setSelectedId(null);
-              }
-            }}
-          >
-            <Layer>
-              {canvasItems.map((item) => (
-                <ImageNode
-                  key={item.id}
-                  item={item}
-                  isSelected={item.id === selectedId}
-                  onSelect={() => setSelectedId(item.id)}
-                  onDragEnd={(e) => handleDragEnd(item.id, e)}
-                  onTransformEnd={(node) => handleTransformEnd(item.id, node)}
-                />
-              ))}
-            </Layer>
-          </Stage>
+        {/* Canvas with CSS grid overlay for snap visualization */}
+        <div
+          className="relative border rounded-lg overflow-hidden"
+          style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+        >
+          {snapToGrid && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-30"
+              style={{
+                backgroundImage:
+                  `linear-gradient(to right, hsl(var(--muted-foreground)/0.35) 1px, transparent 1px),` +
+                  `linear-gradient(to bottom, hsl(var(--muted-foreground)/0.35) 1px, transparent 1px)`,
+                backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+              }}
+            />
+          )}
+          <canvas ref={canvasElRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />
         </div>
 
         {aiSuggestions && (
           <div className="p-4 bg-muted rounded-lg">
             <h4 className="font-semibold mb-2 flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              AI Styling Suggestions
+              <Sparkles className="h-4 w-4" /> AI Styling Suggestions
             </h4>
             <p className="text-sm whitespace-pre-wrap">{aiSuggestions}</p>
           </div>
         )}
       </CardContent>
     </Card>
-  );
-};
-
-const ImageNode = ({ item, isSelected, onSelect, onDragEnd, onTransformEnd }: any) => {
-  const shapeRef = useRef<any>();
-  const trRef = useRef<any>();
-
-  useEffect(() => {
-    if (isSelected && trRef.current && shapeRef.current) {
-      trRef.current.nodes([shapeRef.current]);
-      trRef.current.getLayer().batchDraw();
-    }
-  }, [isSelected]);
-
-  return (
-    <>
-      <KonvaImage
-        image={item.image}
-        x={item.x}
-        y={item.y}
-        width={item.width}
-        height={item.height}
-        rotation={item.rotation}
-        draggable
-        onClick={onSelect}
-        onTap={onSelect}
-        ref={shapeRef}
-        onDragEnd={onDragEnd}
-        onTransformEnd={() => onTransformEnd(shapeRef.current)}
-      />
-      {isSelected && (
-        <Transformer
-          ref={trRef}
-          boundBoxFunc={(oldBox, newBox) => {
-            if (newBox.width < 5 || newBox.height < 5) {
-              return oldBox;
-            }
-            return newBox;
-          }}
-        />
-      )}
-    </>
   );
 };

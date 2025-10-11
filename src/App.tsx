@@ -12,6 +12,7 @@ import CommunityPage from "./pages/CommunityPage";
 import ProfilePage from "./pages/ProfilePage";
 import PolicyPage from "./pages/PolicyPage";
 import AuthPage from "./pages/AuthPage";
+import PlannerPage from "./pages/PlannerPage";
 import PinterestCallback from "./pages/PinterestCallback";
 import NotFound from "./pages/NotFound";
 
@@ -65,6 +66,11 @@ const App = () => (
             <Route path="/profile" element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/planner" element={
+              <ProtectedRoute>
+                <PlannerPage />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

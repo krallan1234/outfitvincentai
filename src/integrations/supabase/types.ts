@@ -162,6 +162,53 @@ export type Database = {
           },
         ]
       }
+      outfit_schedules: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_worn: boolean | null
+          notes: string | null
+          occasion: string | null
+          outfit_id: string | null
+          scheduled_date: string
+          updated_at: string | null
+          user_id: string
+          worn_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_worn?: boolean | null
+          notes?: string | null
+          occasion?: string | null
+          outfit_id?: string | null
+          scheduled_date: string
+          updated_at?: string | null
+          user_id: string
+          worn_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_worn?: boolean | null
+          notes?: string | null
+          occasion?: string | null
+          outfit_id?: string | null
+          scheduled_date?: string
+          updated_at?: string | null
+          user_id?: string
+          worn_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outfit_schedules_outfit_id_fkey"
+            columns: ["outfit_id"]
+            isOneToOne: false
+            referencedRelation: "outfits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outfits: {
         Row: {
           ai_analysis: Json | null
@@ -209,6 +256,48 @@ export type Database = {
           recommended_clothes?: Json | null
           title?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      packing_lists: {
+        Row: {
+          ai_suggestions: string | null
+          created_at: string | null
+          destination: string | null
+          end_date: string
+          id: string
+          items: Json | null
+          occasion: string | null
+          start_date: string
+          trip_name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_suggestions?: string | null
+          created_at?: string | null
+          destination?: string | null
+          end_date: string
+          id?: string
+          items?: Json | null
+          occasion?: string | null
+          start_date: string
+          trip_name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_suggestions?: string | null
+          created_at?: string | null
+          destination?: string | null
+          end_date?: string
+          id?: string
+          items?: Json | null
+          occasion?: string | null
+          start_date?: string
+          trip_name?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []

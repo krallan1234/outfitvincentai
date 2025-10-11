@@ -37,7 +37,7 @@ export const OutfitCanvas = ({ selectedItems, mood, occasion, onSaveOutfit }: Ou
 
   // Init Fabric canvas
   useEffect(() => {
-    if (!canvasElRef.current) return;
+    if (!canvasElRef.current || fabricRef.current) return;
 
     const fabric = new FabricCanvas(canvasElRef.current, {
       width: CANVAS_WIDTH,
@@ -55,25 +55,36 @@ export const OutfitCanvas = ({ selectedItems, mood, occasion, onSaveOutfit }: Ou
       t.top = Math.round((t.top || 0) / GRID_SIZE) * GRID_SIZE;
     });
 
-    // Record history on modifications
-    const record = () => {
-      const json = JSON.stringify(fabric.toJSON());
-      const next = history.slice(0, historyStep + 1).concat(json);
-      setHistory(next);
-      setHistoryStep(next.length - 1);
-    };
-
-    fabric.on("object:modified", record);
-    fabric.on("object:added", record);
-
     fabricRef.current = fabric;
 
     return () => {
       fabric.dispose();
       fabricRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [snapToGrid]);
+
+  // Record history when objects change
+  useEffect(() => {
+    const fabric = fabricRef.current;
+    if (!fabric) return;
+
+    const record = () => {
+      const json = JSON.stringify(fabric.toJSON());
+      setHistory(prev => {
+        const newHistory = prev.slice(0, historyStep + 1).concat(json);
+        setHistoryStep(newHistory.length - 1);
+        return newHistory;
+      });
+    };
+
+    fabric.on("object:modified", record);
+    fabric.on("object:added", record);
+
+    return () => {
+      fabric.off("object:modified", record);
+      fabric.off("object:added", record);
+    };
+  }, [historyStep]);
 
   // Load selected wardrobe items as images onto the canvas
   useEffect(() => {
@@ -213,24 +224,25 @@ export const OutfitCanvas = ({ selectedItems, mood, occasion, onSaveOutfit }: Ou
           </Button>
         </div>
 
-        {/* Canvas with CSS grid overlay for snap visualization */}
+        {/* Canvas wrapper - add key to force remount on major changes */}
         <div
-          className="relative border rounded-lg overflow-hidden"
+          key="canvas-wrapper"
+          className="relative border rounded-lg overflow-hidden bg-white"
           style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
         >
           {snapToGrid && (
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-30"
+              className="pointer-events-none absolute inset-0 opacity-20"
               style={{
                 backgroundImage:
-                  `linear-gradient(to right, hsl(var(--muted-foreground)/0.35) 1px, transparent 1px),` +
-                  `linear-gradient(to bottom, hsl(var(--muted-foreground)/0.35) 1px, transparent 1px)`,
+                  `linear-gradient(to right, #ccc 1px, transparent 1px),` +
+                  `linear-gradient(to bottom, #ccc 1px, transparent 1px)`,
                 backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
               }}
             />
           )}
-          <canvas ref={canvasElRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />
+          <canvas ref={canvasElRef} />
         </div>
 
         {aiSuggestions && (

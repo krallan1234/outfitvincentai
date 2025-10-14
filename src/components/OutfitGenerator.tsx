@@ -21,6 +21,7 @@ import { AdvancedMoodSelector } from './AdvancedMoodSelector';
 import { OnboardingTooltips } from './OnboardingTooltips';
 import { ErrorModal, useErrorModal } from './ErrorModal';
 import { OutfitCanvas } from './OutfitCanvas';
+import { OutfitModal } from './OutfitModal';
 import { ClothingItem } from '@/hooks/useClothes';
 import { supabase } from '@/integrations/supabase/client';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -62,6 +63,7 @@ export const OutfitGenerator = () => {
   const [userLocation, setUserLocation] = useState('');
   const [showPreferences, setShowPreferences] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showOutfitModal, setShowOutfitModal] = useState(false);
   
   const { generateOutfit, loading } = useOutfits();
   const { connectedBoard, getConnectedBoard } = usePinterestBoard();
@@ -215,6 +217,11 @@ export const OutfitGenerator = () => {
         userPreferences || undefined
       );
       setGeneratedOutfit(result);
+      
+      // Show the outfit modal immediately after generation
+      if (result) {
+        setShowOutfitModal(true);
+      }
     } catch (error) {
       // Error is handled in the hook
     } finally {
@@ -259,6 +266,16 @@ export const OutfitGenerator = () => {
           isOpen={errorState.isOpen}
           onClose={closeError}
           error={errorState.error}
+        />
+      )}
+
+      {/* Outfit Preview Modal */}
+      {generatedOutfit && (
+        <OutfitModal
+          outfit={generatedOutfit.outfit}
+          isOpen={showOutfitModal}
+          onClose={() => setShowOutfitModal(false)}
+          showLikeButton={false}
         />
       )}
 

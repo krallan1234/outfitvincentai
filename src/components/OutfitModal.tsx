@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Heart, ExternalLink, ShoppingBag, MessageCircle } from 'lucide-react';
+import { Calendar, Heart, ExternalLink, ShoppingBag, MessageCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -93,21 +93,23 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto card-elegant border-primary/20 animate-fade-in">
         <DialogHeader>
-          <DialogTitle className="text-xl">{outfit.title}</DialogTitle>
+          <DialogTitle className="text-2xl font-serif bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            {outfit.title}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Outfit Details */}
-          <div className="space-y-3">
+          <div className="space-y-3 p-4 bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl border border-primary/10">
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
+                <Calendar className="h-4 w-4 text-primary" />
                 {formatDate(outfit.created_at)}
               </div>
               {outfit.mood && (
-                <Badge variant="secondary" className="capitalize">
+                <Badge variant="secondary" className="capitalize bg-primary/10 text-primary border-primary/20">
                   {outfit.mood}
                 </Badge>
               )}
@@ -132,12 +134,12 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
               )}
             </div>
 
-            <p className="text-sm font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-foreground/80 italic">
               "{outfit.prompt}"
             </p>
 
             {outfit.description && (
-              <p className="text-sm">
+              <p className="text-sm text-foreground/90 leading-relaxed">
                 {outfit.description}
               </p>
             )}
@@ -145,11 +147,14 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
           {/* Outfit Visual */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Outfit Visualization</h3>
+            <h3 className="text-lg font-semibold font-serif flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-accent" />
+              Outfit Visualization
+            </h3>
             
             {/* Generated Image */}
             {outfit.generated_image_url && (
-              <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+              <div className="aspect-video bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 hover:scale-[1.02] transition-transform duration-300">
                 <img
                   src={outfit.generated_image_url}
                   alt={outfit.title}
@@ -164,15 +169,15 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : clothesImages.length > 0 ? (
-              <div>
-                <h4 className="text-md font-medium mb-3">Outfit Items</h4>
+              <div className="animate-fade-in">
+                <h4 className="text-md font-semibold mb-4 font-serif">Outfit Items</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {clothesImages.map((item, index) => (
                     <div 
                       key={item.id || index} 
                       className={cn(
-                        "bg-muted rounded-lg overflow-hidden transition-all",
-                        item.is_selected && "ring-2 ring-primary shadow-lg"
+                        "bg-muted/50 rounded-xl overflow-hidden transition-all hover:scale-105 hover:shadow-lg border border-primary/10",
+                        item.is_selected && "ring-2 ring-primary shadow-lg bg-primary/5"
                       )}
                     >
                       <div className="aspect-square relative">
@@ -212,8 +217,11 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
           {/* AI Analysis */}
           {outfit.ai_analysis && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Style Analysis</h3>
+            <div className="space-y-4 p-4 bg-gradient-to-br from-accent/5 to-primary/5 rounded-xl border border-accent/10">
+              <h3 className="text-lg font-semibold font-serif flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-accent" />
+                Style Analysis
+              </h3>
               
               {outfit.ai_analysis.occasion && (
                 <div>
@@ -251,14 +259,14 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
           {/* Where to Buy Section */}
           {outfit.purchase_links && outfit.purchase_links.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <ShoppingBag className="h-5 w-5" />
+            <div className="space-y-4 p-4 bg-gradient-to-br from-primary/5 to-accent/5 rounded-xl border border-primary/10">
+              <h3 className="text-lg font-semibold font-serif flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5 text-primary" />
                 Where to Buy
               </h3>
               <div className="grid gap-3">
                 {outfit.purchase_links.map((link: any, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div key={index} className="flex items-center justify-between p-4 border border-primary/10 rounded-xl hover:bg-primary/5 hover:border-primary/20 transition-all hover:scale-[1.02]">
                     <div className="flex-1">
                       <p className="font-medium">{link.store_name}</p>
                       {link.price && (

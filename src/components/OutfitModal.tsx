@@ -93,9 +93,9 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] w-[90vw] overflow-y-auto card-elegant border-primary/20 animate-slide-in-right sm:animate-fade-in p-4 sm:p-6">
+      <DialogContent className="max-w-4xl max-h-[90vh] w-[95vw] xs:w-[90vw] overflow-y-auto card-elegant border-primary/20 animate-slide-in-right sm:animate-fade-in p-3 xs:p-4 sm:p-6">
         <DialogHeader className="space-y-2">
-          <DialogTitle className="text-xl sm:text-2xl font-serif bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent leading-tight">
+          <DialogTitle className="text-lg xs:text-xl sm:text-2xl font-serif bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent leading-tight">
             {outfit.title}
           </DialogTitle>
         </DialogHeader>

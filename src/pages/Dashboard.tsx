@@ -22,12 +22,12 @@ const Dashboard = () => {
       </div>
       
       <div className="relative z-10 bg-gradient-to-b from-background/95 via-muted/10 to-background/95 min-h-screen">
-        <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          <div className="mb-6 sm:mb-8 text-center animate-fade-in">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold font-serif mb-2 sm:mb-3">
+        <div className="container mx-auto px-3 xs:px-4 sm:px-6 py-4 xs:py-6 sm:py-8">
+          <div className="mb-4 xs:mb-6 sm:mb-8 text-center animate-fade-in">
+            <h1 className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl font-bold font-serif mb-2 sm:mb-3">
               My Wardrobe
             </h1>
-            <p className="text-muted-foreground text-base sm:text-lg">Upload and manage your clothing items with ease</p>
+            <p className="text-muted-foreground text-sm xs:text-base sm:text-lg px-2">Upload and manage your clothing items with ease</p>
           </div>
 
           <FashionQuote />

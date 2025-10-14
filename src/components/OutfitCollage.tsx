@@ -42,6 +42,22 @@ export const OutfitCollage = ({ items, title, colorScheme, outfitId, onImageGene
     };
   }, [items]);
 
+  const loadImageWithRetry = async (url: string, retries = 3): Promise<FabricImage> => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const img = await FabricImage.fromURL(url, {
+          crossOrigin: 'anonymous'
+        });
+        return img;
+      } catch (error) {
+        console.warn(`Image load attempt ${i + 1} failed:`, error);
+        if (i === retries - 1) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
+    }
+    throw new Error('Failed to load image after retries');
+  };
+
   const generateCollage = async (canvas: FabricCanvas) => {
     setIsGenerating(true);
     try {
@@ -81,19 +97,22 @@ export const OutfitCollage = ({ items, title, colorScheme, outfitId, onImageGene
       // Load and position clothing images - need to get signed URLs first
       const imagePromises = items.map(async (item, index) => {
         try {
-          // Get signed URL for private storage
+          // Get signed URL for private storage with extended expiry
           const { data: signedUrlData, error: signedUrlError } = await supabase.storage
             .from('clothes')
-            .createSignedUrl(item.image_url, 3600);
+            .createSignedUrl(item.image_url, 7200); // 2 hours
 
           if (signedUrlError) {
             console.error('Failed to get signed URL:', signedUrlError);
             throw signedUrlError;
           }
 
-          const img = await FabricImage.fromURL(signedUrlData.signedUrl, {
-            crossOrigin: 'anonymous'
-          });
+          if (!signedUrlData?.signedUrl) {
+            throw new Error('No signed URL returned');
+          }
+
+          // Load image with retry logic
+          const img = await loadImageWithRetry(signedUrlData.signedUrl);
 
           const row = Math.floor(index / itemsPerRow);
           const col = index % itemsPerRow;
@@ -127,9 +146,14 @@ export const OutfitCollage = ({ items, title, colorScheme, outfitId, onImageGene
           console.error(`Failed to load image for ${item.category}:`, error);
           
           // Create placeholder rectangle if image fails to load
+          const row = Math.floor(index / itemsPerRow);
+          const col = index % itemsPerRow;
+          const x = startX + col * (itemSize + padding);
+          const y = startY + row * (itemSize + padding);
+          
           const placeholder = new Rect({
-            left: startX + (index % itemsPerRow) * (itemSize + padding),
-            top: startY + Math.floor(index / itemsPerRow) * (itemSize + padding),
+            left: x,
+            top: y,
             width: itemSize,
             height: itemSize,
             fill: '#e5e7eb',
@@ -138,8 +162,8 @@ export const OutfitCollage = ({ items, title, colorScheme, outfitId, onImageGene
           });
 
           const placeholderText = new Text(item.category, {
-            left: placeholder.left! + itemSize / 2,
-            top: placeholder.top! + itemSize / 2,
+            left: x + itemSize / 2,
+            top: y + itemSize / 2,
             fontSize: 12,
             fill: '#6b7280',
             textAlign: 'center',

@@ -73,15 +73,15 @@ export const AppNavigation = () => {
   return (
     <>
       {/* Mobile Navigation */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="container flex h-full items-center justify-between px-4">
-          <div className="flex items-center gap-3">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 h-14 xs:h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="container flex h-full items-center justify-between px-3 xs:px-4">
+          <div className="flex items-center gap-2 xs:gap-3">
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="touch-manipulation"
+                  className="touch-manipulation min-w-[44px] min-h-[44px]"
                   aria-label="Open navigation menu"
                   aria-expanded={isOpen}
                 >
@@ -138,20 +138,20 @@ export const AppNavigation = () => {
               </SheetContent>
             </Sheet>
             
-            <NavLink to="/" className="flex items-center gap-2 font-bold text-lg">
-              <Sparkles className="h-5 w-5 text-primary" />
+            <NavLink to="/" className="flex items-center gap-1.5 xs:gap-2 font-bold text-base xs:text-lg">
+              <Sparkles className="h-4 w-4 xs:h-5 xs:w-5 text-primary" />
               OOTD
             </NavLink>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 xs:gap-2">
             <ThemeToggle />
             {isAuthenticated ? (
-              <Button variant="ghost" size="icon" aria-label="Sign out" onClick={handleSignOut}>
+              <Button variant="ghost" size="icon" aria-label="Sign out" onClick={handleSignOut} className="min-w-[44px] min-h-[44px]">
                 <LogOut className="h-5 w-5" />
               </Button>
             ) : (
-              <Button variant="ghost" size="icon" aria-label="Sign in" onClick={() => navigate('/auth')}>
+              <Button variant="ghost" size="icon" aria-label="Sign in" onClick={() => navigate('/auth')} className="min-w-[44px] min-h-[44px]">
                 <LogIn className="h-5 w-5" />
               </Button>
             )}

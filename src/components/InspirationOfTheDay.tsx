@@ -4,7 +4,7 @@ import { Sparkles } from 'lucide-react';
 
 const inspirationImages = [
   {
-    url: '/images/beige-brown-ensemble.jpg',
+    url: '/images/beige-brown-ensemble.jpg?v=3',
     caption: 'Timeless Naturals'
   },
   {

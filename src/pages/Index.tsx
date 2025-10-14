@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, Upload, Users, User, Zap, Heart, Calendar } from "lucide-react";
 import { FashionQuote } from '@/components/FashionQuote';
 import { WavyDivider } from '@/components/WavyDivider';
+import heroImage from '@/assets/hero-brown-dress.jpg';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -51,7 +52,7 @@ const Index = () => {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img 
-            src="/images/hero-brown-dress.jpg" 
+            src={heroImage} 
             alt="Elegant brown dress with beige coat outfit inspiration"
             className="w-full h-full object-cover animate-scale-in"
             loading="eager"

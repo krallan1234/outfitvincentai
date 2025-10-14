@@ -21,9 +21,19 @@ export const useSignedUrl = (bucket: string, path: string | null, expiresIn: num
         setLoading(true);
         setError(null);
         
+        // Extract storage path from full URL if needed (backward compatibility)
+        const storagePath = extractStoragePath(path);
+        
+        // If it's already a full public URL, use it directly (for old images)
+        if (path.startsWith('http') && path.includes('/storage/v1/object/public/')) {
+          setSignedUrl(path);
+          setLoading(false);
+          return;
+        }
+        
         const { data, error: signError } = await supabase.storage
           .from(bucket)
-          .createSignedUrl(path, expiresIn);
+          .createSignedUrl(storagePath, expiresIn);
 
         if (signError) throw signError;
         setSignedUrl(data.signedUrl);

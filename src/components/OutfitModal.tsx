@@ -93,72 +93,75 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto card-elegant border-primary/20 animate-fade-in">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-serif bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+      <DialogContent className="max-w-4xl max-h-[90vh] w-[90vw] overflow-y-auto card-elegant border-primary/20 animate-slide-in-right sm:animate-fade-in p-4 sm:p-6">
+        <DialogHeader className="space-y-2">
+          <DialogTitle className="text-xl sm:text-2xl font-serif bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent leading-tight">
             {outfit.title}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Outfit Details */}
-          <div className="space-y-3 p-4 bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl border border-primary/10">
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="space-y-3 p-3 sm:p-4 bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl border border-primary/10">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-primary" />
                 {formatDate(outfit.created_at)}
               </div>
-              {outfit.mood && (
-                <Badge variant="secondary" className="capitalize bg-primary/10 text-primary border-primary/20">
-                  {outfit.mood}
-                </Badge>
-              )}
-              {showLikeButton && onLike && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onLike(outfit.id)}
-                  className={cn(
-                    "ml-auto flex items-center gap-2",
-                    outfit.is_liked && "text-red-500"
-                  )}
-                >
-                  <Heart 
+              <div className="flex items-center gap-2">
+                {outfit.mood && (
+                  <Badge variant="secondary" className="capitalize bg-primary/10 text-primary border-primary/20">
+                    {outfit.mood}
+                  </Badge>
+                )}
+                {showLikeButton && onLike && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onLike(outfit.id)}
                     className={cn(
-                      "h-4 w-4",
-                      outfit.is_liked && "fill-current"
-                    )} 
-                  />
-                  <span>{outfit.likes_count || 0}</span>
-                </Button>
-              )}
+                      "flex items-center gap-2 min-w-[44px] min-h-[44px] p-3",
+                      outfit.is_liked && "text-red-500"
+                    )}
+                  >
+                    <Heart 
+                      className={cn(
+                        "h-5 w-5",
+                        outfit.is_liked && "fill-current"
+                      )} 
+                    />
+                    <span className="text-base">{outfit.likes_count || 0}</span>
+                  </Button>
+                )}
+              </div>
             </div>
 
-            <p className="text-sm font-medium text-foreground/80 italic">
+            <p className="text-sm sm:text-base font-medium text-foreground/80 italic leading-relaxed">
               "{outfit.prompt}"
             </p>
 
             {outfit.description && (
-              <p className="text-sm text-foreground/90 leading-relaxed">
+              <p className="text-sm sm:text-base text-foreground/90 leading-relaxed">
                 {outfit.description}
               </p>
             )}
           </div>
 
           {/* Outfit Visual */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold font-serif flex items-center gap-2">
+          <div className="space-y-3 sm:space-y-4">
+            <h3 className="text-base sm:text-lg font-semibold font-serif flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-accent" />
               Outfit Visualization
             </h3>
             
             {/* Generated Image */}
             {outfit.generated_image_url && (
-              <div className="aspect-video bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 hover:scale-[1.02] transition-transform duration-300">
+              <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 active:scale-[0.98] sm:hover:scale-[1.02] transition-transform duration-300">
                 <img
                   src={outfit.generated_image_url}
                   alt={outfit.title}
-                  className="w-full h-full object-cover"
+                  className="w-full max-h-[50vh] sm:max-h-none object-contain sm:object-cover"
+                  loading="lazy"
                 />
               </div>
             )}
@@ -170,13 +173,13 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
               </div>
             ) : clothesImages.length > 0 ? (
               <div className="animate-fade-in">
-                <h4 className="text-md font-semibold mb-4 font-serif">Outfit Items</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <h4 className="text-sm sm:text-md font-semibold mb-3 sm:mb-4 font-serif">Outfit Items</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                   {clothesImages.map((item, index) => (
                     <div 
                       key={item.id || index} 
                       className={cn(
-                        "bg-muted/50 rounded-xl overflow-hidden transition-all hover:scale-105 hover:shadow-lg border border-primary/10",
+                        "bg-muted/50 rounded-xl overflow-hidden transition-all active:scale-95 sm:hover:scale-105 hover:shadow-lg border border-primary/10 touch-manipulation",
                         item.is_selected && "ring-2 ring-primary shadow-lg bg-primary/5"
                       )}
                     >
@@ -188,24 +191,24 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                             loading="lazy"
                           />
                           {item.is_selected && (
-                            <div className="absolute top-2 right-2">
-                              <Badge className="bg-primary text-primary-foreground">
+                            <div className="absolute top-1 right-1 sm:top-2 sm:right-2">
+                              <Badge className="bg-primary text-primary-foreground text-xs">
                                 Base Item
                               </Badge>
                             </div>
                           )}
                       </div>
-                      <div className="p-2">
-                        <p className="text-xs font-medium capitalize">{item.category || 'Item'}</p>
+                      <div className="p-2 sm:p-3">
+                        <p className="text-xs sm:text-sm font-medium capitalize">{item.category || 'Item'}</p>
                         <p className="text-xs text-muted-foreground capitalize">{item.color || 'Unknown'}</p>
                         {item.style && (
                           <p className="text-xs text-muted-foreground capitalize">{item.style}</p>
                         )}
                         {item.item_name && (
-                          <p className="text-xs text-muted-foreground">{item.item_name}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-1">{item.item_name}</p>
                         )}
                         {item.is_selected && item.reasoning && (
-                          <p className="text-xs text-primary mt-1 italic">{item.reasoning}</p>
+                          <p className="text-xs text-primary mt-1 italic line-clamp-2">{item.reasoning}</p>
                         )}
                       </div>
                     </div>
@@ -217,39 +220,39 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
           {/* AI Analysis */}
           {outfit.ai_analysis && (
-            <div className="space-y-4 p-4 bg-gradient-to-br from-accent/5 to-primary/5 rounded-xl border border-accent/10">
-              <h3 className="text-lg font-semibold font-serif flex items-center gap-2">
+            <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 bg-gradient-to-br from-accent/5 to-primary/5 rounded-xl border border-accent/10">
+              <h3 className="text-base sm:text-lg font-semibold font-serif flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-accent" />
                 Style Analysis
               </h3>
               
               {outfit.ai_analysis.occasion && (
-                <div>
+                <div className="text-sm sm:text-base">
                   <span className="font-medium">Perfect for: </span>
                   <span className="text-muted-foreground">{outfit.ai_analysis.occasion}</span>
                 </div>
               )}
 
               {outfit.ai_analysis.styling_tips?.length > 0 && (
-                <div>
+                <div className="text-sm sm:text-base">
                   <span className="font-medium">Styling Tips:</span>
                   <ul className="list-disc list-inside mt-1 space-y-1">
                     {outfit.ai_analysis.styling_tips.map((tip: string, index: number) => (
-                      <li key={index} className="text-sm text-muted-foreground">{tip}</li>
+                      <li key={index} className="text-sm sm:text-base text-muted-foreground leading-relaxed">{tip}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
               {outfit.ai_analysis.color_harmony && (
-                <div>
+                <div className="text-sm sm:text-base">
                   <span className="font-medium">Color Harmony: </span>
                   <span className="text-muted-foreground">{outfit.ai_analysis.color_harmony}</span>
                 </div>
               )}
 
               {outfit.ai_analysis.style_analysis && (
-                <div>
+                <div className="text-sm sm:text-base">
                   <span className="font-medium">Style: </span>
                   <span className="text-muted-foreground">{outfit.ai_analysis.style_analysis}</span>
                 </div>
@@ -259,16 +262,16 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
           {/* Where to Buy Section */}
           {outfit.purchase_links && outfit.purchase_links.length > 0 && (
-            <div className="space-y-4 p-4 bg-gradient-to-br from-primary/5 to-accent/5 rounded-xl border border-primary/10">
-              <h3 className="text-lg font-semibold font-serif flex items-center gap-2">
+            <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 bg-gradient-to-br from-primary/5 to-accent/5 rounded-xl border border-primary/10">
+              <h3 className="text-base sm:text-lg font-semibold font-serif flex items-center gap-2">
                 <ShoppingBag className="h-5 w-5 text-primary" />
                 Where to Buy
               </h3>
               <div className="grid gap-3">
                 {outfit.purchase_links.map((link: any, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-4 border border-primary/10 rounded-xl hover:bg-primary/5 hover:border-primary/20 transition-all hover:scale-[1.02]">
+                  <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border border-primary/10 rounded-xl active:bg-primary/5 sm:hover:bg-primary/5 sm:hover:border-primary/20 transition-all active:scale-[0.98] sm:hover:scale-[1.02] touch-manipulation">
                     <div className="flex-1">
-                      <p className="font-medium">{link.store_name}</p>
+                      <p className="font-medium text-sm sm:text-base">{link.store_name}</p>
                       {link.price && (
                         <p className="text-sm text-muted-foreground">{link.price}</p>
                       )}
@@ -278,8 +281,9 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                         variant="outline"
                         size="sm"
                         asChild
+                        className="min-h-[44px] min-w-[120px] text-sm sm:text-base"
                       >
-                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 justify-center">
                           Visit Store
                           <ExternalLink className="h-4 w-4" />
                         </a>

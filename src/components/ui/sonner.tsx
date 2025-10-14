@@ -1,14 +1,13 @@
-import { useTheme } from "next-themes";
 import { Toaster as Sonner, toast } from "sonner";
 
+// Keep Sonner simple and avoid next-themes to prevent early hook/dispatcher issues
+// We'll default to system theme; users can still toggle via CSS (e.g., .dark on html)
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
-
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={"system"}
       className="toaster group"
       toastOptions={{
         classNames: {

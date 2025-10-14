@@ -140,27 +140,6 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-16 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {[
-              { value: "10K+", label: "Active Users" },
-              { value: "50K+", label: "Outfits Created" },
-              { value: "100K+", label: "Items Uploaded" },
-              { value: "4.9", label: "Average Rating" }
-            ].map((stat, index) => (
-              <div key={index} className="animate-scale-in" style={{ animationDelay: `${index * 100}ms` }}>
-                <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-2">
-                  {stat.value}
-                </div>
-                <div className="text-sm text-muted-foreground">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* CTA Section */}
       {!isAuthenticated && (
         <section className="py-20 sm:py-24">

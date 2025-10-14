@@ -387,7 +387,7 @@ function PackingListDialog({ onClose }: any) {
       <DialogHeader>
         <DialogTitle>Create Packing List</DialogTitle>
         <DialogDescription>
-          Generate AI-powered packing suggestions for your trip
+          Generate smart packing suggestions for your trip
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4">

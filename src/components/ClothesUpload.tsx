@@ -188,7 +188,7 @@ export const ClothesUpload = () => {
       <CardHeader>
         <CardTitle>Upload Clothing Item</CardTitle>
         <CardDescription>
-          Upload a photo of your clothing item ({clothes.length}/100 items used). Google Gemini AI will detect the color automatically, but you'll need to manually tag category and style.
+          Upload a photo of your clothing item ({clothes.length}/100 items used). Color detection is automatic, but you'll need to manually tag category and style.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -286,14 +286,14 @@ export const ClothesUpload = () => {
             </Select>
           </div>
 
-          {/* Color - Auto-detected by AI */}
+          {/* Color - Auto-detected */}
           <div className="space-y-2">
-            <Label htmlFor="color">Color (AI will auto-detect)</Label>
+            <Label htmlFor="color">Color (Auto-detected)</Label>
             <Input
               id="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
-              placeholder="Leave empty for AI color detection"
+              placeholder="Leave empty for automatic color detection"
             />
           </div>
 

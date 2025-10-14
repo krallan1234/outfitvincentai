@@ -185,7 +185,7 @@ const CommunityPage = () => {
             Community Outfits
           </h1>
           <p className="text-muted-foreground">
-            Discover and like outfits from other fashion enthusiasts. Our AI recommendation system learns from your preferences and community trends.
+            Discover and like outfits from other fashion enthusiasts. Our recommendation system learns from your preferences and community trends.
           </p>
         </div>
 

@@ -328,7 +328,7 @@ export const OutfitGenerator = () => {
             Generate Your Perfect Outfit
           </CardTitle>
           <CardDescription>
-            Describe what you're looking for or select a mood. Google Gemini AI will analyze your wardrobe{weather ? ', current weather,' : ''} and Pinterest trends to create the perfect outfit.
+            Describe what you're looking for or select a mood. We'll analyze your wardrobe{weather ? ', current weather,' : ''} and Pinterest trends to create the perfect outfit.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

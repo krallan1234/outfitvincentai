@@ -11,7 +11,7 @@ const Index = () => {
     {
       icon: Upload,
       title: "Upload Your Wardrobe",
-      description: "Snap photos of your clothes and let our AI organize them beautifully",
+      description: "Snap photos of your clothes and organize them beautifully",
       action: () => navigate('/dashboard'),
       buttonText: "Manage Wardrobe",
       color: "from-blue-500 to-cyan-500"
@@ -50,15 +50,15 @@ const Index = () => {
           <div className="text-center max-w-4xl mx-auto animate-fade-in-up">
             <div className="inline-flex items-center justify-center p-2 mb-6 rounded-full bg-primary/10 border border-primary/20">
               <Sparkles className="h-6 w-6 text-primary mr-2" />
-              <span className="text-sm font-medium text-primary">Your AI-Powered Fashion Assistant</span>
+              <span className="text-sm font-medium text-primary">Your Personal Fashion Assistant</span>
             </div>
             
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-r from-foreground via-primary to-accent bg-clip-text text-transparent">
-              Your AI-Powered Outfit Of The Day Assistant
+              Your Personal Outfit Of The Day Assistant
             </h1>
             
             <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
-              Transform your wardrobe into endless outfit possibilities. Upload your clothes, get personalized suggestions, and discover your perfect style with cutting-edge AI.
+              Transform your wardrobe into endless outfit possibilities. Upload your clothes, get personalized suggestions, and discover your perfect style.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -107,7 +107,7 @@ const Index = () => {
           <div className="text-center mb-16 animate-fade-in">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">Everything You Need for Perfect Outfits</h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              From wardrobe management to AI-powered styling, we've got all the tools to elevate your fashion game.
+              From wardrobe management to personalized styling, we've got all the tools to elevate your fashion game.
             </p>
           </div>
           
@@ -172,7 +172,7 @@ const Index = () => {
                 <Heart className="h-12 w-12 mx-auto mb-6 text-accent" />
                 <h2 className="text-3xl sm:text-4xl font-bold mb-4">Ready to Transform Your Style?</h2>
                 <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-                  Join thousands of users who have already discovered their perfect style with AI assistance. Start your fashion journey today.
+                  Join thousands of users who have already discovered their perfect style. Start your fashion journey today.
                 </p>
                 <Button 
                   onClick={() => navigate('/auth')} 

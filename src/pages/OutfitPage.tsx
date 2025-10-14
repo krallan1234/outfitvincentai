@@ -37,7 +37,7 @@ const OutfitPage = () => {
                   Your Generated Outfits
                 </CardTitle>
                 <CardDescription className="text-base">
-                  Browse all your AI-generated outfit combinations
+                  Browse all your outfit combinations
                 </CardDescription>
               </CardHeader>
               <CardContent>

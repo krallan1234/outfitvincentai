@@ -11,7 +11,7 @@ export const AppFooter = () => {
           </div>
           
           <p className="text-sm text-muted-foreground text-center">
-            Powered by Gemini AI & Pinterest · Built with ❤️ for fashion enthusiasts
+            Built with ❤️ for fashion enthusiasts
           </p>
           
           <div className="flex items-center gap-4 text-sm text-muted-foreground">

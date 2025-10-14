@@ -69,7 +69,6 @@ export const OutfitGenerator = () => {
   const { toast } = useToast();
   const { weather } = useWeather(userLocation);
   const { errorState, showError, closeError } = useErrorModal();
-  usePWA(); // Initialize PWA support
 
   useEffect(() => {
     const loadBoard = async () => {

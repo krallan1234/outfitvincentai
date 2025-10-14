@@ -17,8 +17,8 @@ const Index = () => {
     },
     {
       icon: Sparkles,
-      title: "AI Outfit Generation",
-      description: "Get personalized outfit suggestions powered by AI",
+      title: "Daily Outfit Generation",
+      description: "Get personalized outfit suggestions for every day",
       action: () => navigate('/outfits'),
       buttonText: "Generate Outfits"
     },

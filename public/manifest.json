@@ -1,7 +1,7 @@
 {
-  "name": "AI Outfit Generator",
-  "short_name": "Outfit AI",
-  "description": "Generate perfect outfits from your wardrobe using AI with weather-based suggestions, outfit planning, and community features",
+  "name": "OOTD - Outfit Of The Day",
+  "short_name": "OOTD",
+  "description": "Your daily outfit inspiration - Generate perfect outfits from your wardrobe with AI, weather suggestions, and community features",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

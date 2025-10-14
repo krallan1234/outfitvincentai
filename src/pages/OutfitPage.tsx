@@ -8,8 +8,8 @@ const OutfitPage = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">AI Outfit Generator</h1>
-          <p className="text-muted-foreground">Create perfect outfits from your wardrobe using AI</p>
+          <h1 className="text-3xl font-bold">Outfit Generator</h1>
+          <p className="text-muted-foreground">Create perfect outfits from your wardrobe</p>
         </div>
         
         <Tabs defaultValue="generate" className="w-full">

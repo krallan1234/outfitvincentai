@@ -489,7 +489,7 @@ export const OutfitGenerator = () => {
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  Generate AI Outfit
+                  Generate Outfit
                 </>
               )}
             </Button>

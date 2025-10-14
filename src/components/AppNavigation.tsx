@@ -88,7 +88,7 @@ export const AppNavigation = () => {
           </SheetTrigger>
           <SheetContent side="left" className="w-72 p-0">
             <SheetHeader className="p-6 pb-4">
-              <SheetTitle className="text-left">Outfit AI</SheetTitle>
+              <SheetTitle className="text-left">OOTD</SheetTitle>
             </SheetHeader>
             
             <div className="flex flex-col h-full">
@@ -138,7 +138,7 @@ export const AppNavigation = () => {
           <div className="flex items-center gap-8">
             <NavLink to="/" className="flex items-center gap-2 font-bold text-xl">
               <Sparkles className="h-6 w-6 text-primary" />
-              Outfit AI
+              OOTD
             </NavLink>
             
             <nav className="flex items-center gap-2">

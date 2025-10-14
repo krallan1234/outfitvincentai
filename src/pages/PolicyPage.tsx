@@ -27,7 +27,7 @@ const PolicyPage = () => {
           <section>
             <h2 className="text-2xl font-semibold mb-4">1. Inledning</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Outfit AI ("vi", "oss", "vårt") respekterar din integritet och är engagerade i att skydda dina personuppgifter. 
+              OOTD ("vi", "oss", "vårt") respekterar din integritet och är engagerade i att skydda dina personuppgifter. 
               Denna integritetspolicy förklarar hur vi samlar in, använder och skyddar din information när du använder vår tjänst.
             </p>
           </section>

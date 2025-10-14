@@ -15,7 +15,7 @@ const ONBOARDING_STEPS: TooltipStep[] = [
   {
     id: 'welcome',
     target: 'quick-ideas',
-    title: 'Welcome to AI Outfit Generator!',
+    title: 'Welcome to OOTD!',
     description: 'Start here for quick outfit inspiration. Click any idea to auto-fill your prompt.',
     position: 'bottom'
   },

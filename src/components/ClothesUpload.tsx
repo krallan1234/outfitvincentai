@@ -8,16 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Upload, Loader2 } from 'lucide-react';
 import { useClothes } from '@/hooks/useClothes';
 import { useToast } from '@/hooks/use-toast';
-import { z } from 'zod';
-
-// Security: Input validation schema
-const clothingSchema = z.object({
-  category: z.string().min(1, 'Category is required').max(50, 'Category must be less than 50 characters'),
-  color: z.string().max(30, 'Color must be less than 30 characters').optional(),
-  style: z.string().min(1, 'Style is required').max(50, 'Style must be less than 50 characters'),
-  brand: z.string().max(100, 'Brand must be less than 100 characters').optional(),
-  description: z.string().max(500, 'Description must be less than 500 characters').optional()
-});
 
 const CATEGORIES = [
   // Tops
@@ -159,26 +149,7 @@ export const ClothesUpload = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return;
-
-    // Security: Validate inputs before submission
-    const validation = clothingSchema.safeParse({ 
-      category, 
-      color: color || undefined, 
-      style, 
-      brand: brand || undefined, 
-      description: description || undefined 
-    });
-    
-    if (!validation.success) {
-      const firstError = validation.error.errors[0];
-      toast({
-        title: "Validation Error",
-        description: firstError.message,
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!file || !category || !style) return;
 
     // Check for 100 image limit
     if (clothes.length >= 100) {
@@ -192,11 +163,11 @@ export const ClothesUpload = () => {
 
     try {
       await uploadClothing(file, {
-        category: validation.data.category,
-        color: validation.data.color,
-        style: validation.data.style,
-        brand: validation.data.brand,
-        description: validation.data.description,
+        category,
+        color: color || undefined,
+        style,
+        brand: brand || undefined,
+        description: description || undefined,
       });
 
       // Reset form

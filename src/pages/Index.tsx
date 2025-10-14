@@ -51,8 +51,8 @@ const Index = () => {
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img 
-            src="/images/hero-brown-dress.jpg" 
-            alt="Elegant brown dress with beige coat outfit inspiration"
+            src="/images/hero-wardrobe.jpg" 
+            alt="Elegant wardrobe styling inspiration with warm natural tones"
             className="w-full h-full object-cover animate-scale-in"
             loading="eager"
           />

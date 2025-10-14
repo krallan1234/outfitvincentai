@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 
 export const usePWA = () => {
   useEffect(() => {
+    if (import.meta.env.MODE !== 'production') return;
+
     // Register service worker
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
+      const onLoad = () => {
         navigator.serviceWorker
           .register('/sw.js')
           .then((registration) => {
@@ -13,24 +15,32 @@ export const usePWA = () => {
           .catch((error) => {
             console.log('SW registration failed: ', error);
           });
-      });
+      };
+      window.addEventListener('load', onLoad);
     }
 
     // Handle install prompt
     let deferredPrompt: any;
-    window.addEventListener('beforeinstallprompt', (e) => {
+    const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
+      // @ts-ignore
       deferredPrompt = e;
-      // You can show custom install button here
-    });
-
-    // Handle app installed
-    window.addEventListener('appinstalled', () => {
+    };
+    const handleInstalled = () => {
       console.log('PWA was installed');
-    });
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleInstalled);
+      window.removeEventListener('load', () => {});
+    };
   }, []);
 
   return {
-    isSupported: 'serviceWorker' in navigator,
+    isSupported: typeof navigator !== 'undefined' && 'serviceWorker' in navigator,
   };
 };

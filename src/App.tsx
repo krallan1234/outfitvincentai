@@ -4,7 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { usePWA } from "@/hooks/usePWA";
 import { AppLayout } from "@/components/AppLayout";
 import { SafeTooltipProvider } from "@/components/providers/SafeTooltipProvider";
 import Index from "./pages/Index";
@@ -39,7 +38,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
-  usePWA(); // Initialize PWA support
 
   return (
     <QueryClientProvider client={queryClient}>

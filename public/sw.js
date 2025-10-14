@@ -1,8 +1,7 @@
-// Service Worker for PWA offline support with safe updates
-const VERSION = 'v3-2025-10-14';
-const CACHE_STATIC = `outfit-ai-static-${VERSION}`;
-const CACHE_RUNTIME = `outfit-ai-runtime-${VERSION}`;
-const CACHE_IMAGES = `outfit-ai-images-${VERSION}`;
+// Service Worker for PWA offline support
+const CACHE_NAME = 'outfit-ai-v2';
+const RUNTIME_CACHE = 'outfit-ai-runtime-v2';
+const IMAGE_CACHE = 'outfit-ai-images-v2';
 
 const urlsToCache = [
   '/',
@@ -16,62 +15,33 @@ const urlsToCache = [
 const MAX_RUNTIME_CACHE = 50;
 const MAX_IMAGE_CACHE = 100;
 
+// Install event - cache static assets
 self.addEventListener('install', (event) => {
-  // Activate new SW immediately
-  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_STATIC).then((cache) => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(urlsToCache);
+    })
   );
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    (async () => {
-      const keys = await caches.keys();
-      await Promise.all(
-        keys.map((key) => {
-          if (![CACHE_STATIC, CACHE_RUNTIME, CACHE_IMAGES].includes(key)) {
-            return caches.delete(key);
-          }
-        })
-      );
-      await self.clients.claim();
-    })()
-  );
-});
-
+// Fetch event - Network first for API, Cache first for assets
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Skip non-GET requests
   if (request.method !== 'GET') return;
-
-  // Always network-first for navigations/HTML to avoid stale pages
-  const acceptsHTML = request.headers.get('accept')?.includes('text/html');
-  if (request.mode === 'navigate' || acceptsHTML) {
-    event.respondWith(
-      fetch(request, { cache: 'no-store' })
-        .then((response) => {
-          // Optionally cache the latest index.html
-          const copy = response.clone();
-          caches.open(CACHE_STATIC).then((cache) => cache.put(url.pathname === '/' ? '/' : request, copy));
-          return response;
-        })
-        .catch(() => caches.match(request).then((res) => res || caches.match('/index.html')))
-    );
-    return;
-  }
 
   // API requests - Network first with cache fallback
   if (url.pathname.includes('/functions/') || url.pathname.includes('/rest/')) {
     event.respondWith(
       fetch(request)
-        .then((response) => {
+        .then(response => {
           if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_RUNTIME).then((cache) => {
-              cache.put(request, clone);
-              trimCache(CACHE_RUNTIME, MAX_RUNTIME_CACHE);
+            const responseClone = response.clone();
+            caches.open(RUNTIME_CACHE).then(cache => {
+              cache.put(request, responseClone);
+              trimCache(RUNTIME_CACHE, MAX_RUNTIME_CACHE);
             });
           }
           return response;
@@ -81,39 +51,40 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Images - Network first to surface updates immediately
-  if (request.destination === 'image' || url.pathname.startsWith('/images/')) {
+  // Images - Cache first with network fallback
+  if (request.destination === 'image') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_IMAGES).then((cache) => {
-              cache.put(request, clone);
-              trimCache(CACHE_IMAGES, MAX_IMAGE_CACHE);
+      caches.match(request).then(cachedResponse => {
+        if (cachedResponse) return cachedResponse;
+
+        return fetch(request).then(response => {
+          if (response.ok) {
+            const responseClone = response.clone();
+            caches.open(IMAGE_CACHE).then(cache => {
+              cache.put(request, responseClone);
+              trimCache(IMAGE_CACHE, MAX_IMAGE_CACHE);
             });
           }
           return response;
-        })
-        .catch(() => caches.match(request))
+        });
+      })
     );
     return;
   }
 
-  // Other static assets - Cache first with network fallback
+  // Other requests - Cache first
   event.respondWith(
-    caches.match(request).then((cached) => {
-      return (
-        cached ||
-        fetch(request).then((response) => {
-          if (response && response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_STATIC).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-      );
-    })
+    caches.match(request).then(cachedResponse => {
+      return cachedResponse || fetch(request).then(response => {
+        if (response.ok) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, responseClone);
+          });
+        }
+        return response;
+      });
+    }).catch(() => caches.match('/'))
   );
 });
 
@@ -127,10 +98,32 @@ async function trimCache(cacheName, maxItems) {
   }
 }
 
-// Optional background sync placeholder
+// Activate event - clean up old caches
+self.addEventListener('activate', (event) => {
+  const validCaches = [CACHE_NAME, RUNTIME_CACHE, IMAGE_CACHE];
+  
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (!validCaches.includes(cacheName)) {
+            console.log('Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
+});
+
+// Background sync for offline outfit generation
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-outfits') {
-    event.waitUntil((async () => console.log('Syncing outfits...'))());
+    event.waitUntil(syncOutfits());
   }
 });
 
+async function syncOutfits() {
+  // Handle background sync for saved outfits
+  console.log('Syncing outfits...');
+}

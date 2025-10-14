@@ -21,19 +21,9 @@ export const useSignedUrl = (bucket: string, path: string | null, expiresIn: num
         setLoading(true);
         setError(null);
         
-        // Extract storage path from full URL if needed (backward compatibility)
-        const storagePath = extractStoragePath(path);
-        
-        // If it's already a full public URL, use it directly (for old images)
-        if (path.startsWith('http') && path.includes('/storage/v1/object/public/')) {
-          setSignedUrl(path);
-          setLoading(false);
-          return;
-        }
-        
         const { data, error: signError } = await supabase.storage
           .from(bucket)
-          .createSignedUrl(storagePath, expiresIn);
+          .createSignedUrl(path, expiresIn);
 
         if (signError) throw signError;
         setSignedUrl(data.signedUrl);
@@ -48,7 +38,7 @@ export const useSignedUrl = (bucket: string, path: string | null, expiresIn: num
     getSignedUrl();
 
     // Refresh URL before it expires (90% of expiry time)
-    const refreshInterval = setInterval(getSignedUrl, expiresIn * 0.9 * 1000);
+    const refreshInterval = setInterval(getSignedUrl, expiresIn * 900);
 
     return () => clearInterval(refreshInterval);
   }, [bucket, path, expiresIn]);
@@ -101,8 +91,8 @@ export const useSignedUrls = (bucket: string, paths: string[], expiresIn: number
 
     getSignedUrls();
 
-    // Refresh URLs before they expire (90% of expiry time)
-    const refreshInterval = setInterval(getSignedUrls, expiresIn * 0.9 * 1000);
+    // Refresh URLs before they expire
+    const refreshInterval = setInterval(getSignedUrls, expiresIn * 900);
 
     return () => clearInterval(refreshInterval);
   }, [bucket, paths.join(','), expiresIn]);

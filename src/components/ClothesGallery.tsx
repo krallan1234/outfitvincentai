@@ -154,22 +154,8 @@ interface ClothingCardProps {
 
 const ClothingCard = ({ item, onDelete, selectionMode, isSelected, onSelect }: ClothingCardProps) => {
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  
   // Security: Use signed URL for private storage bucket
-  const { signedUrl, loading: urlLoading, error: urlError } = useSignedUrl('clothes', item.image_url);
-
-  // Log errors for debugging
-  useEffect(() => {
-    if (urlError) {
-      console.error('Signed URL error for item:', item.id, item.image_url, urlError);
-    }
-  }, [urlError, item.id, item.image_url]);
-
-  const handleImageError = () => {
-    console.error('Image failed to load:', item.image_url);
-    setImageError(true);
-  };
+  const { signedUrl, loading: urlLoading } = useSignedUrl('clothes', item.image_url);
 
   return (
     <Card 
@@ -178,28 +164,18 @@ const ClothingCard = ({ item, onDelete, selectionMode, isSelected, onSelect }: C
       aria-label={`${item.category} clothing item${isSelected ? ', selected' : ''}`}
     >
       <div className="aspect-square relative" onClick={selectionMode ? onSelect : undefined}>
-        {(!imageLoaded || urlLoading) && !imageError && !urlError && (
-          <div className="absolute inset-0 bg-muted animate-pulse flex items-center justify-center" aria-hidden="true">
-            <span className="text-muted-foreground text-sm">Loading...</span>
-          </div>
+        {(!imageLoaded || urlLoading) && (
+          <div className="absolute inset-0 bg-muted animate-pulse" aria-hidden="true" />
         )}
-        {imageError || urlError ? (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-muted text-muted-foreground p-4">
-            <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span className="text-xs text-center">Image unavailable</span>
-          </div>
-        ) : signedUrl ? (
+        {signedUrl && (
           <img
             src={signedUrl}
             alt={`${item.category}${item.color ? ` in ${item.color}` : ''}${item.description ? ` - ${item.description}` : ''}`}
             className={`w-full h-full object-cover transition-opacity ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
             loading="lazy"
             onLoad={() => setImageLoaded(true)}
-            onError={handleImageError}
           />
-        ) : null}
+        )}
         {selectionMode && isSelected && (
           <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
             <Badge className="bg-primary text-primary-foreground">Selected</Badge>

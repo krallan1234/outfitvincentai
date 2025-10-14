@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
-import { createHmac } from "https://deno.land/std@0.168.0/node/crypto.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,20 +8,6 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const ENCRYPTION_KEY = Deno.env.get('PINTEREST_TOKEN_ENCRYPTION_KEY')!;
-
-// Security: Encryption functions for Pinterest tokens
-function encryptToken(token: string): string {
-  const hmac = createHmac("sha256", ENCRYPTION_KEY);
-  hmac.update(token);
-  return hmac.digest("hex") + ":" + btoa(token);
-}
-
-function decryptToken(encrypted: string): string {
-  const parts = encrypted.split(":");
-  if (parts.length !== 2) throw new Error("Invalid encrypted token format");
-  return atob(parts[1]);
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -207,9 +192,6 @@ serve(async (req) => {
       });
     }
 
-    // Security: Encrypt access token before storing
-    const encryptedAccessToken = encryptToken(accessToken);
-    
     // Store board data in Supabase
     const { error: upsertError } = await supabase
       .from('pinterest_boards')
@@ -218,7 +200,7 @@ serve(async (req) => {
         board_id: boardId,
         board_name: boardName,
         board_url: boardUrl,
-        access_token: encryptedAccessToken,
+        access_token: accessToken,
         pins_data: pinsAnalysis,
         last_synced_at: new Date().toISOString(),
       }, {

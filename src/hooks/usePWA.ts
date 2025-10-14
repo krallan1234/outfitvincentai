@@ -1,28 +1,10 @@
 import { useEffect } from 'react';
 
 export const usePWA = () => {
-  // Service Worker handling
   useEffect(() => {
-    const isProd = import.meta.env.PROD;
-
+    // Register service worker
     if ('serviceWorker' in navigator) {
-      if (!isProd) {
-        // Development: ensure no SW caches stale bundles
-        navigator.serviceWorker
-          .getRegistrations()
-          .then((regs) => regs.forEach((reg) => reg.unregister().catch(() => {})));
-
-        if ('caches' in window) {
-          caches
-            .keys()
-            .then((keys) => keys.forEach((key) => caches.delete(key)))
-            .catch(() => {});
-        }
-        return;
-      }
-
-      // Production: register SW on load
-      const onLoad = () => {
+      const registerSW = () => {
         navigator.serviceWorker
           .register('/sw.js')
           .then((registration) => {
@@ -33,31 +15,37 @@ export const usePWA = () => {
           });
       };
 
-      window.addEventListener('load', onLoad);
-      return () => window.removeEventListener('load', onLoad);
+      // Check if window is already loaded
+      if (document.readyState === 'complete') {
+        registerSW();
+      } else {
+        window.addEventListener('load', registerSW, { once: true });
+      }
     }
-  }, []);
 
-  // PWA install events (non-critical)
-  useEffect(() => {
+    // Handle install prompt
     let deferredPrompt: any;
-    const beforeInstall = (e: Event) => {
+    const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
-      deferredPrompt = e as any;
+      deferredPrompt = e;
+      // You can show custom install button here
     };
 
-    const onInstalled = () => {
+    const handleAppInstalled = () => {
       console.log('PWA was installed');
     };
 
-    window.addEventListener('beforeinstallprompt', beforeInstall);
-    window.addEventListener('appinstalled', onInstalled);
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
 
+    // Cleanup
     return () => {
-      window.removeEventListener('beforeinstallprompt', beforeInstall);
-      window.removeEventListener('appinstalled', onInstalled);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
-  return { isSupported: 'serviceWorker' in navigator };
+  return {
+    isSupported: 'serviceWorker' in navigator,
+  };
 };

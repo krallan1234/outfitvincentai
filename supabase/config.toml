@@ -7,10 +7,10 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.weather]
-verify_jwt = false
+verify_jwt = true
 
 [functions.fetch-url-metadata]
-verify_jwt = false
+verify_jwt = true
 
 [functions.canvas-ai-suggestions]
 verify_jwt = true

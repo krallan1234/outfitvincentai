@@ -358,6 +358,7 @@ export type Database = {
           following_count: number
           id: string
           location: string | null
+          privacy_settings: Json | null
           style_preferences: Json | null
           updated_at: string
           user_id: string
@@ -372,6 +373,7 @@ export type Database = {
           following_count?: number
           id?: string
           location?: string | null
+          privacy_settings?: Json | null
           style_preferences?: Json | null
           updated_at?: string
           user_id: string
@@ -386,6 +388,7 @@ export type Database = {
           following_count?: number
           id?: string
           location?: string | null
+          privacy_settings?: Json | null
           style_preferences?: Json | null
           updated_at?: string
           user_id?: string

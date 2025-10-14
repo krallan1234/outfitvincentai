@@ -183,10 +183,10 @@ export const OutfitCollage = ({ items, title, colorScheme, outfitId, onImageGene
       const blob = await response.blob();
 
       // Upload to Supabase storage
-      const fileName = `outfit-${outfitId}-${Date.now()}.png`;
+      const fileName = `outfit-images/${outfitId}-${Date.now()}.png`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('clothes')
-        .upload(`outfit-images/${fileName}`, blob, {
+        .upload(fileName, blob, {
           contentType: 'image/png',
           upsert: true
         });
@@ -196,24 +196,20 @@ export const OutfitCollage = ({ items, title, colorScheme, outfitId, onImageGene
         return;
       }
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('clothes')
-        .getPublicUrl(`outfit-images/${fileName}`);
+      // Store the path (not public URL) for signed URL generation
+      const imagePath = fileName;
 
-      const imageUrl = urlData.publicUrl;
-
-      // Update outfit with generated image URL
+      // Update outfit with generated image path
       const { error: updateError } = await supabase
         .from('outfits')
-        .update({ generated_image_url: imageUrl })
+        .update({ generated_image_url: imagePath })
         .eq('id', outfitId);
 
       if (updateError) {
-        console.error('Error updating outfit with image URL:', updateError);
+        console.error('Error updating outfit with image path:', updateError);
       } else {
-        console.log('Outfit image saved successfully:', imageUrl);
-        onImageGenerated?.(imageUrl);
+        console.log('Outfit image saved successfully:', imagePath);
+        onImageGenerated?.(imagePath);
       }
     } catch (error) {
       console.error('Error saving generated image:', error);

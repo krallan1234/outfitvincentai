@@ -145,7 +145,18 @@ export const AppNavigation = () => {
             </NavLink>
           </div>
           
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            {isAuthenticated ? (
+              <Button variant="ghost" size="icon" aria-label="Sign out" onClick={handleSignOut}>
+                <LogOut className="h-5 w-5" />
+              </Button>
+            ) : (
+              <Button variant="ghost" size="icon" aria-label="Sign in" onClick={() => navigate('/auth')}>
+                <LogIn className="h-5 w-5" />
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 

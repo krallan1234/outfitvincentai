@@ -116,15 +116,27 @@ All colors MUST be HSL.
 /* Elegant Card Styles */
 @layer components {
   .card-elegant {
-    @apply bg-card shadow-[0_10px_30px_-10px_hsl(var(--primary)/0.2)] transition-all duration-300 hover:shadow-[0_20px_40px_-15px_hsl(var(--primary)/0.3)] hover:translate-y-[-2px];
+    @apply bg-card shadow-[0_10px_30px_-10px_hsl(var(--primary)/0.2)] transition-all duration-500 hover:shadow-[0_20px_40px_-15px_hsl(var(--primary)/0.3)] hover:translate-y-[-4px];
   }
   
   .btn-gradient {
-    @apply bg-gradient-to-r from-primary to-accent text-white font-medium transition-all duration-300 hover:shadow-lg hover:scale-105;
+    @apply bg-gradient-to-r from-primary to-accent text-white font-medium transition-all duration-500 hover:shadow-lg hover:scale-105 active:scale-95;
   }
   
   .glass-effect {
     @apply bg-white/80 dark:bg-card/80 backdrop-blur-md border border-white/20;
+  }
+
+  .homey-grid {
+    @apply grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
+  }
+
+  .homey-card {
+    @apply bg-card rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-border/50;
+  }
+
+  .warm-button {
+    @apply bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg active:scale-95;
   }
 }
 

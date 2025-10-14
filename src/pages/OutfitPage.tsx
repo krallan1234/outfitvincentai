@@ -3,6 +3,8 @@ import { OutfitGenerator } from '@/components/OutfitGenerator';
 import { OutfitGallery } from '@/components/OutfitGallery';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Images } from 'lucide-react';
+import { FashionQuote } from '@/components/FashionQuote';
+import { WavyDivider } from '@/components/WavyDivider';
 
 const OutfitPage = () => {
   return (

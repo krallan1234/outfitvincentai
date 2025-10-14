@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, Upload, Users, User, Zap, Heart, Calendar } from "lucide-react";
+import { FashionQuote } from '@/components/FashionQuote';
+import { WavyDivider } from '@/components/WavyDivider';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -44,40 +46,37 @@ const Index = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Hero Section with Background Image */}
-      <section className="relative min-h-[650px] flex items-center justify-center overflow-hidden">
+      {/* Hero Section with Full-Width Image */}
+      <section className="relative min-h-[700px] flex items-center justify-center overflow-hidden">
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <img 
             src="/images/hero-brown-dress.jpg" 
             alt="Elegant brown dress with beige coat outfit inspiration"
-            className="w-full h-full object-cover opacity-30"
+            className="w-full h-full object-cover animate-scale-in"
             loading="eager"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/70 to-background"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/60 to-background"></div>
         </div>
 
         <div className="container relative z-10 mx-auto px-4">
-          <div className="text-center max-w-4xl mx-auto animate-fade-in-up">
-            <div className="inline-flex items-center justify-center p-2 mb-6 rounded-full bg-primary/10 border border-primary/20">
-              <Sparkles className="h-6 w-6 text-primary mr-2" />
-              <span className="text-sm font-medium text-primary">Your Personal Fashion Assistant</span>
-            </div>
-            
-            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
-              Your Personal Outfit Of The Day Assistant
+          <div className="text-center max-w-4xl mx-auto space-y-8 animate-fade-in-up">
+            <h1 className="text-5xl sm:text-6xl lg:text-8xl font-bold tracking-tight drop-shadow-2xl font-serif">
+              Transform Your Wardrobe with OOTD
             </h1>
             
-            <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
-              Transform your wardrobe into endless outfit possibilities. Upload your clothes, get personalized suggestions, and discover your perfect style.
+            <FashionQuote />
+            
+            <p className="text-xl sm:text-2xl text-foreground/90 max-w-2xl mx-auto leading-relaxed drop-shadow-lg">
+              Your personal styling companion for every day. Build your wardrobe, create stunning outfits, and discover your unique style.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               {isAuthenticated ? (
                 <Button 
                   onClick={() => navigate('/dashboard')} 
                   size="lg" 
-                  className="text-lg px-8 btn-gradient shadow-lg hover:shadow-xl"
+                  className="warm-button text-lg shadow-2xl"
                 >
                   <Upload className="mr-2 h-5 w-5" />
                   Start Building Your Wardrobe
@@ -86,35 +85,23 @@ const Index = () => {
                 <Button 
                   onClick={() => navigate('/auth')} 
                   size="lg" 
-                  className="text-lg px-8 btn-gradient shadow-lg hover:shadow-xl"
+                  className="warm-button text-lg shadow-2xl"
                 >
-                  <Zap className="mr-2 h-5 w-5" />
                   Get Started Free
                 </Button>
               )}
-              <Button 
-                onClick={() => navigate('/community')} 
-                variant="outline" 
-                size="lg" 
-                className="text-lg px-8 border-2 hover:bg-muted/50"
-              >
-                <Users className="mr-2 h-5 w-5" />
-                Explore Community
-              </Button>
             </div>
           </div>
         </div>
-        
-        {/* Decorative Elements */}
-        <div className="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-20 sm:py-24">
-        <div className="container mx-auto px-4">
+      <WavyDivider />
+
+      {/* Rest of content */}
+      <div className="bg-gradient-to-b from-background via-muted/30 to-background">
+        {/* Features Section */}
+        <section className="py-20 sm:py-24">
+          <div className="container mx-auto px-4">
           <div className="text-center mb-16 animate-fade-in">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">Everything You Need for Perfect Outfits</h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
@@ -204,6 +191,7 @@ const Index = () => {
           </div>
         </section>
       )}
+      </div>
     </div>
   );
 };

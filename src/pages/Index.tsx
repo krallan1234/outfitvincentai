@@ -43,17 +43,28 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-muted/30 to-background">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden py-20 sm:py-32">
-        <div className="container mx-auto px-4">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Hero Section with Background Image */}
+      <section className="relative min-h-[650px] flex items-center justify-center overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="/images/hero-brown-dress.jpg" 
+            alt="Elegant brown dress with beige coat outfit inspiration"
+            className="w-full h-full object-cover opacity-30"
+            loading="eager"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/70 to-background"></div>
+        </div>
+
+        <div className="container relative z-10 mx-auto px-4">
           <div className="text-center max-w-4xl mx-auto animate-fade-in-up">
             <div className="inline-flex items-center justify-center p-2 mb-6 rounded-full bg-primary/10 border border-primary/20">
               <Sparkles className="h-6 w-6 text-primary mr-2" />
               <span className="text-sm font-medium text-primary">Your Personal Fashion Assistant</span>
             </div>
             
-            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-r from-foreground via-primary to-accent bg-clip-text text-transparent">
+            <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
               Your Personal Outfit Of The Day Assistant
             </h1>
             

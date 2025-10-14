@@ -7,14 +7,25 @@ import { Sparkles } from 'lucide-react';
 
 const Dashboard = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-muted/20 to-background">
-      <div className="container mx-auto px-4 py-8 animate-fade-in">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent mb-2">
-            My Wardrobe
-          </h1>
-          <p className="text-muted-foreground text-lg">Upload and manage your clothing items with ease</p>
-        </div>
+    <div className="min-h-screen relative">
+      {/* Subtle background image */}
+      <div className="fixed inset-0 z-0 opacity-5">
+        <img 
+          src="/images/dashboard-background.jpg" 
+          alt="Fashion background"
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+      </div>
+      
+      <div className="relative z-10 bg-gradient-to-b from-background/95 via-muted/10 to-background/95">
+        <div className="container mx-auto px-4 py-8 animate-fade-in">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent mb-2">
+              My Wardrobe
+            </h1>
+            <p className="text-muted-foreground text-lg">Upload and manage your clothing items with ease</p>
+          </div>
         
         <Tabs defaultValue="gallery" className="w-full">
           <TabsList className="grid w-full grid-cols-3 max-w-2xl mb-8 p-1 bg-muted/50 rounded-xl">
@@ -59,6 +70,7 @@ const Dashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+    </div>
     </div>
   );
 };

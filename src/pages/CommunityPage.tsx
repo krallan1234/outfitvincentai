@@ -178,16 +178,27 @@ const CommunityPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Users className="h-8 w-8" />
-            Community Outfits
-          </h1>
-          <p className="text-muted-foreground">
-            Discover and like outfits from other fashion enthusiasts. Our recommendation system learns from your preferences and community trends.
-          </p>
+      {/* Hero Image Section */}
+      <div className="relative h-80 overflow-hidden mb-8">
+        <img 
+          src="/images/brown-jumpsuit.jpg" 
+          alt="Trendy brown jumpsuit fashion inspiration"
+          className="w-full h-full object-cover"
+          loading="eager"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/75 to-background"></div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center space-y-3">
+            <h1 className="text-5xl font-bold font-serif drop-shadow-lg">Community Outfits</h1>
+            <p className="text-xl drop-shadow-md text-foreground/90">Discover styles from fashion enthusiasts</p>
+          </div>
         </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8">
+        <p className="text-muted-foreground mb-8 text-center max-w-2xl mx-auto">
+          Discover and like outfits from other fashion enthusiasts. Our recommendation system learns from your preferences and community trends.
+        </p>
 
         {/* Community Stats */}
         <div className="mb-8">

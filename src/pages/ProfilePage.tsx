@@ -233,7 +233,15 @@ const ProfilePage = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center p-8">
+                  <div className="text-center p-8 space-y-4">
+                    <div className="max-w-xs mx-auto rounded-lg overflow-hidden shadow-md">
+                      <img 
+                        src="/images/brown-jumpsuit.jpg" 
+                        alt="Explore community outfit inspiration"
+                        className="w-full h-48 object-cover"
+                        loading="lazy"
+                      />
+                    </div>
                     <p className="text-muted-foreground">
                       No liked outfits yet. Explore the community to discover inspiring looks!
                     </p>

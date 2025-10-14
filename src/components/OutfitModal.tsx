@@ -93,14 +93,14 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] w-[95vw] xs:w-[90vw] overflow-y-auto card-elegant border-primary/20 animate-slide-in-right sm:animate-fade-in p-3 xs:p-4 sm:p-6">
-        <DialogHeader className="space-y-2">
+      <DialogContent className="max-w-4xl max-h-[90vh] w-[95vw] xs:w-[90vw] card-elegant border-primary/20 animate-slide-in-right sm:animate-fade-in p-3 xs:p-4 sm:p-6 flex flex-col">
+        <DialogHeader className="space-y-2 flex-shrink-0">
           <DialogTitle className="text-lg xs:text-xl sm:text-2xl font-serif bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent leading-tight">
             {outfit.title}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-4 sm:space-y-6 overflow-y-auto overscroll-contain -mx-3 xs:-mx-4 sm:-mx-6 px-3 xs:px-4 sm:px-6 flex-1">
           {/* Outfit Details */}
           <div className="space-y-3 p-3 sm:p-4 bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl border border-primary/10">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">

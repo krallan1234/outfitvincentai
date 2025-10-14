@@ -12,7 +12,6 @@ import { usePinterestBoard } from '@/hooks/usePinterestBoard';
 import { useToast } from '@/hooks/use-toast';
 import { useWeather } from '@/hooks/useWeather';
 import { usePWA } from '@/hooks/usePWA';
-import { OutfitCollage } from './OutfitCollage';
 import { PinterestBoardSelector } from './PinterestBoardSelector';
 import { ClothesGallery } from './ClothesGallery';
 import { ProfilePreferences } from './ProfilePreferences';
@@ -540,124 +539,6 @@ export const OutfitGenerator = () => {
         </CardContent>
       </Card>
 
-      {/* Generated Outfit Display */}
-      {generatedOutfit && (
-        <Card className="w-full max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>{generatedOutfit.outfit.title}</CardTitle>
-            <CardDescription>
-              {generatedOutfit.outfit.prompt} {generatedOutfit.outfit.mood && `• ${generatedOutfit.outfit.mood} mood`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Outfit Collage */}
-            {generatedOutfit.outfit.ai_analysis?.outfit_visualization && (
-              <div className="flex justify-center">
-                <OutfitCollage
-                  items={generatedOutfit.outfit.ai_analysis.outfit_visualization.items}
-                  title={generatedOutfit.outfit.title}
-                  colorScheme={generatedOutfit.outfit.ai_analysis.color_harmony || 'Harmonious colors'}
-                  outfitId={generatedOutfit.outfit.id}
-                  onImageGenerated={(imageUrl) => {
-                    // Update the local state with the new image URL
-                    setGeneratedOutfit(prev => ({
-                      ...prev,
-                      outfit: { ...prev.outfit, generated_image_url: imageUrl }
-                    }));
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Description */}
-            {generatedOutfit.outfit.description && (
-              <div>
-                <h4 className="font-semibold mb-2">AI Style Analysis</h4>
-                <p className="text-muted-foreground">{generatedOutfit.outfit.description}</p>
-              </div>
-            )}
-
-            {/* Color Harmony */}
-            {generatedOutfit.outfit.ai_analysis?.color_harmony && (
-              <div>
-                <h4 className="font-semibold mb-2 flex items-center gap-2">
-                  <Palette className="h-4 w-4" />
-                  Color Harmony
-                </h4>
-                <p className="text-muted-foreground">{generatedOutfit.outfit.ai_analysis.color_harmony}</p>
-              </div>
-            )}
-
-            {/* Pinterest Trends */}
-            {generatedOutfit.outfit.ai_analysis?.pinterest_trends?.length > 0 && (
-              <div>
-                <h4 className="font-semibold mb-2 flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  Pinterest Inspiration
-                </h4>
-                <div className="space-y-2">
-                  {generatedOutfit.outfit.ai_analysis.pinterest_trends.map((trend: any, index: number) => (
-                    <div key={index} className="text-sm text-muted-foreground p-2 bg-muted/50 rounded">
-                      • {trend.description || 'Trending style inspiration'}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Recommended Clothes */}
-            {generatedOutfit.recommendedClothes && generatedOutfit.recommendedClothes.length > 0 && (
-              <div>
-                <h4 className="font-semibold mb-3">Your Wardrobe Items</h4>
-                <div className="grid gap-3">
-                  {generatedOutfit.recommendedClothes.map((item: any) => (
-                    <div key={item.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <img
-                        src={item.image_url}
-                        alt={item.category}
-                        className="w-16 h-16 object-cover rounded"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium capitalize">{item.category}</span>
-                          <Badge variant="secondary">{item.color}</Badge>
-                          <Badge variant="outline">{item.style}</Badge>
-                        </div>
-                        {item.brand && (
-                          <p className="text-xs text-muted-foreground">{item.brand}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Styling Tips */}
-            {generatedOutfit.outfit.ai_analysis?.styling_tips && (
-              <div>
-                <h4 className="font-semibold mb-2">Styling Tips</h4>
-                <ul className="space-y-2">
-                  {generatedOutfit.outfit.ai_analysis.styling_tips.map((tip: string, index: number) => (
-                    <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
-                      <span className="text-primary mt-1">•</span>
-                      {tip}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Occasion */}
-            {generatedOutfit.outfit.ai_analysis?.occasion && (
-              <div>
-                <h4 className="font-semibold mb-2">Perfect For</h4>
-                <p className="text-muted-foreground">{generatedOutfit.outfit.ai_analysis.occasion}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };

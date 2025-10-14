@@ -16,7 +16,7 @@ const Index = () => {
       description: "Snap photos of your clothes and organize them beautifully",
       action: () => navigate('/dashboard'),
       buttonText: "Manage Wardrobe",
-      color: "from-primary to-primary/70"
+      color: "from-blue-500 to-cyan-500"
     },
     {
       icon: Sparkles,
@@ -24,7 +24,7 @@ const Index = () => {
       description: "Get personalized outfit suggestions tailored to your style and mood",
       action: () => navigate('/outfits'),
       buttonText: "Generate Outfits",
-      color: "from-accent to-accent/70"
+      color: "from-purple-500 to-pink-500"
     },
     {
       icon: Calendar,
@@ -32,7 +32,7 @@ const Index = () => {
       description: "Schedule outfits and create packing lists for any occasion",
       action: () => navigate('/planner'),
       buttonText: "Plan Outfits",
-      color: "from-primary/80 to-accent/80"
+      color: "from-green-500 to-emerald-500"
     },
     {
       icon: Users,
@@ -40,7 +40,7 @@ const Index = () => {
       description: "Browse and like outfits shared by fashion enthusiasts worldwide",
       action: () => navigate('/community'),
       buttonText: "Explore Community",
-      color: "from-accent/90 to-primary/90"
+      color: "from-orange-500 to-red-500"
     }
   ];
 

@@ -20,7 +20,6 @@ import { OutfitHistory } from './OutfitHistory';
 import { AdvancedMoodSelector } from './AdvancedMoodSelector';
 import { OnboardingTooltips } from './OnboardingTooltips';
 import { ErrorModal, useErrorModal } from './ErrorModal';
-import { OutfitCanvas } from './OutfitCanvas';
 import { OutfitModal } from './OutfitModal';
 import { ClothingItem } from '@/hooks/useClothes';
 import { supabase } from '@/integrations/supabase/client';
@@ -424,17 +423,6 @@ export const OutfitGenerator = () => {
               </p>
             )}
           </div>
-
-          {/* Outfit Canvas - placed after selected items */}
-          <OutfitCanvas
-            selectedItems={selectedItems}
-            mood={mood}
-            occasion={prompt}
-            onSaveOutfit={(canvasData) => {
-              console.log('Canvas outfit saved:', canvasData);
-              toast({ title: 'Canvas saved!', description: 'Your arrangement has been saved' });
-            }}
-          />
 
           {/* Purchase Links */}
           <div className="space-y-3">

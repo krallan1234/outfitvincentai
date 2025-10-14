@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { Sparkles, Upload, Users, User, Zap, Heart, Calendar } from "lucide-react";
+import { Sparkles, Upload, Users, Zap, Heart } from "lucide-react";
 import { FashionQuote } from '@/components/FashionQuote';
 import { WavyDivider } from '@/components/WavyDivider';
 
@@ -25,14 +25,6 @@ const Index = () => {
       action: () => navigate('/outfits'),
       buttonText: "Generate Outfits",
       color: "from-accent to-accent/70"
-    },
-    {
-      icon: Calendar,
-      title: "Smart Planning",
-      description: "Schedule outfits and create packing lists for any occasion",
-      action: () => navigate('/planner'),
-      buttonText: "Plan Outfits",
-      color: "from-primary/80 to-accent/80"
     },
     {
       icon: Users,

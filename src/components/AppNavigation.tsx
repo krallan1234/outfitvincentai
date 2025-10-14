@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Home, LayoutGrid, Sparkles, Users, User, LogOut, LogIn, CalendarDays } from 'lucide-react';
+import { Menu, Home, LayoutGrid, Sparkles, Users, User, LogOut, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,7 +11,6 @@ const navigationItems = [
   { name: 'Home', href: '/', icon: Home, public: true },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutGrid, public: false },
   { name: 'Outfits', href: '/outfits', icon: Sparkles, public: false },
-  { name: 'Planner', href: '/planner', icon: CalendarDays, public: false },
   { name: 'Community', href: '/community', icon: Users, public: false },
   { name: 'Profile', href: '/profile', icon: User, public: false },
 ];

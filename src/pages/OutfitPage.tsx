@@ -10,34 +10,6 @@ const OutfitPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-muted/20 to-background">
       <div className="container mx-auto px-4 py-8 animate-fade-in">
-        {/* Inspirational Carousel */}
-        <div className="mb-8 overflow-hidden rounded-2xl shadow-elegant">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-            <div className="aspect-[4/5] relative group">
-              <img 
-                src="/images/beige-cream-ensemble.jpg" 
-                alt="Beige and cream outfit inspiration"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                loading="lazy"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
-                <p className="text-white font-serif text-xl">Timeless Elegance</p>
-              </div>
-            </div>
-            <div className="aspect-[4/5] relative group">
-              <img 
-                src="/images/mens-brown-outfit.jpg" 
-                alt="Brown and beige men's outfit inspiration"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                loading="lazy"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
-                <p className="text-white font-serif text-xl">Modern Sophistication</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent mb-2">
             Outfit Generator

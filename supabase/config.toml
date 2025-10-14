@@ -10,7 +10,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.fetch-url-metadata]
-verify_jwt = true
+verify_jwt = false
 
 [functions.canvas-ai-suggestions]
 verify_jwt = true

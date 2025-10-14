@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Loader2, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 interface ClothesGalleryProps {
   selectionMode?: boolean;
@@ -154,8 +153,6 @@ interface ClothingCardProps {
 
 const ClothingCard = ({ item, onDelete, selectionMode, isSelected, onSelect }: ClothingCardProps) => {
   const [imageLoaded, setImageLoaded] = useState(false);
-  // Security: Use signed URL for private storage bucket
-  const { signedUrl, loading: urlLoading } = useSignedUrl('clothes', item.image_url);
 
   return (
     <Card 
@@ -164,18 +161,16 @@ const ClothingCard = ({ item, onDelete, selectionMode, isSelected, onSelect }: C
       aria-label={`${item.category} clothing item${isSelected ? ', selected' : ''}`}
     >
       <div className="aspect-square relative" onClick={selectionMode ? onSelect : undefined}>
-        {(!imageLoaded || urlLoading) && (
+        {!imageLoaded && (
           <div className="absolute inset-0 bg-muted animate-pulse" aria-hidden="true" />
         )}
-        {signedUrl && (
-          <img
-            src={signedUrl}
-            alt={`${item.category}${item.color ? ` in ${item.color}` : ''}${item.description ? ` - ${item.description}` : ''}`}
-            className={`w-full h-full object-cover transition-opacity ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-            loading="lazy"
-            onLoad={() => setImageLoaded(true)}
-          />
-        )}
+        <img
+          src={item.image_url}
+          alt={`${item.category}${item.color ? ` in ${item.color}` : ''}${item.description ? ` - ${item.description}` : ''}`}
+          className={`w-full h-full object-cover transition-opacity ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          loading="lazy"
+          onLoad={() => setImageLoaded(true)}
+        />
         {selectionMode && isSelected && (
           <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
             <Badge className="bg-primary text-primary-foreground">Selected</Badge>

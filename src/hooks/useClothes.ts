@@ -112,10 +112,12 @@ export const useClothes = () => {
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      // Store the path instead of public URL for signed URL generation
-      const storagePath = fileName;
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('clothes')
+        .getPublicUrl(fileName);
 
-      // Save to database with storage path (not public URL)
+      // Save to database with manual metadata and AI-detected color
       const finalMetadata = {
         ...metadata,
         color: metadata.color || aiDetectedColor || 'unknown',
@@ -125,7 +127,7 @@ export const useClothes = () => {
         .from('clothes')
         .insert({
           user_id: user.id,
-          image_url: storagePath, // Store path for signed URL generation
+          image_url: publicUrl,
           ...finalMetadata,
           ai_detected_metadata: aiDetectedColor ? { color: aiDetectedColor } : null,
         })

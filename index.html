@@ -27,6 +27,33 @@
 
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        try {
+          var FLAG = 'sw-cleared-once';
+          var host = location.hostname;
+          var isDevHost = host === 'localhost' || host === '127.0.0.1' || /\.lovableproject\.com$/.test(host);
+          if ('serviceWorker' in navigator && isDevHost) {
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              if (!regs || regs.length === 0) return;
+              if (sessionStorage.getItem(FLAG)) return;
+              sessionStorage.setItem(FLAG, '1');
+              Promise.all(regs.map(function (r) { return r.unregister().catch(function () {}); }))
+                .then(function () {
+                  if ('caches' in window) {
+                    // @ts-ignore - browser global
+                    caches.keys().then(function (keys) {
+                      return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                    }).finally(function () { location.reload(); });
+                  } else {
+                    location.reload();
+                  }
+                });
+            });
+          }
+        } catch (e) { /* noop */ }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

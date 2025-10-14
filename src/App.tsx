@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { usePWA } from "@/hooks/usePWA";
 import { AppLayout } from "@/components/AppLayout";
+import { SafeTooltipProvider } from "@/components/providers/SafeTooltipProvider";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import OutfitPage from "./pages/OutfitPage";
@@ -43,7 +44,7 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <TooltipProvider>
+        <SafeTooltipProvider>
           <Toaster />
           <Sonner />
           <AppLayout>
@@ -81,7 +82,7 @@ const App = () => {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AppLayout>
-        </TooltipProvider>
+        </SafeTooltipProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );

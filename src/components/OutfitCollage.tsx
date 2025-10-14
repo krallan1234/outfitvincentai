@@ -78,10 +78,20 @@ export const OutfitCollage = ({ items, title, colorScheme, outfitId, onImageGene
       const totalWidth = (itemSize + padding) * itemsPerRow - padding;
       const startX = (canvas.width! - totalWidth) / 2;
 
-      // Load and position clothing images
+      // Load and position clothing images - need to get signed URLs first
       const imagePromises = items.map(async (item, index) => {
         try {
-          const img = await FabricImage.fromURL(item.image_url, {
+          // Get signed URL for private storage
+          const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+            .from('clothes')
+            .createSignedUrl(item.image_url, 3600);
+
+          if (signedUrlError) {
+            console.error('Failed to get signed URL:', signedUrlError);
+            throw signedUrlError;
+          }
+
+          const img = await FabricImage.fromURL(signedUrlData.signedUrl, {
             crossOrigin: 'anonymous'
           });
 

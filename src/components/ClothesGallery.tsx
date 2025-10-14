@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { ClothingItem, useClothes } from '@/hooks/useClothes';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Loader2, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
+import useEmblaCarousel from 'embla-carousel-react';
 
 interface ClothesGalleryProps {
   selectionMode?: boolean;
@@ -23,43 +24,37 @@ export const ClothesGallery = ({
   multiSelect = false 
 }: ClothesGalleryProps) => {
   const { clothes, loading, deleteClothing } = useClothes();
-  const [touchStart, setTouchStart] = useState(0);
-  const [touchEnd, setTouchEnd] = useState(0);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Embla carousel for better mobile experience
+  const [emblaRef, emblaApi] = useEmblaCarousel({ 
+    align: 'start',
+    dragFree: true,
+    containScroll: 'trimSnaps'
+  });
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.targetTouches[0].clientX);
-  };
+  const scrollPrev = useCallback(() => {
+    if (emblaApi) emblaApi.scrollPrev();
+  }, [emblaApi]);
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
-  };
+  const scrollNext = useCallback(() => {
+    if (emblaApi) emblaApi.scrollNext();
+  }, [emblaApi]);
 
-  const handleTouchEnd = () => {
-    if (!scrollContainerRef.current) return;
-    
-    const swipeDistance = touchStart - touchEnd;
-    const minSwipeDistance = 50;
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(false);
 
-    if (Math.abs(swipeDistance) > minSwipeDistance) {
-      const scrollAmount = 300;
-      if (swipeDistance > 0) {
-        // Swipe left
-        scrollContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-      } else {
-        // Swipe right
-        scrollContainerRef.current.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
-      }
-    }
-  };
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setCanScrollPrev(emblaApi.canScrollPrev());
+    setCanScrollNext(emblaApi.canScrollNext());
+  }, [emblaApi]);
 
-  const scrollLeft = () => {
-    scrollContainerRef.current?.scrollBy({ left: -300, behavior: 'smooth' });
-  };
-
-  const scrollRight = () => {
-    scrollContainerRef.current?.scrollBy({ left: 300, behavior: 'smooth' });
-  };
+  useEffect(() => {
+    if (!emblaApi) return;
+    onSelect();
+    emblaApi.on('select', onSelect);
+    emblaApi.on('reInit', onSelect);
+  }, [emblaApi, onSelect]);
 
   if (loading && clothes.length === 0) {
     return (
@@ -79,9 +74,9 @@ export const ClothesGallery = ({
   }
 
   return (
-    <div className="relative" role="region" aria-label="Clothing gallery">
-      {/* Desktop Grid View */}
-      <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div className="relative w-full" role="region" aria-label="Clothing gallery">
+      {/* Desktop Grid View - 4 columns on large screens */}
+      <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-4 gap-4">
         {clothes.map((item) => (
           <ClothingCard 
             key={item.id} 
@@ -94,49 +89,45 @@ export const ClothesGallery = ({
         ))}
       </div>
 
-      {/* Mobile Swipeable View */}
+      {/* Mobile Carousel View - smooth horizontal scrolling with 2 items visible */}
       <div className="md:hidden">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="icon"
-            onClick={scrollLeft}
+            onClick={scrollPrev}
+            disabled={!canScrollPrev}
             aria-label="Scroll left"
-            className="shrink-0"
+            className="shrink-0 h-10 w-10 disabled:opacity-30"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-5 w-5" />
           </Button>
           
-          <div 
-            ref={scrollContainerRef}
-            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory hide-scrollbar flex-1"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            role="list"
-            aria-label="Swipeable clothing items"
-          >
-            {clothes.map((item) => (
-              <div key={item.id} className="snap-center shrink-0 w-64">
-                <ClothingCard 
-                  item={item} 
-                  onDelete={() => deleteClothing(item.id)}
-                  selectionMode={selectionMode}
-                  isSelected={multiSelect ? selectedItemIds.includes(item.id) : selectedItemId === item.id}
-                  onSelect={() => onSelectItem?.(item)}
-                />
-              </div>
-            ))}
+          <div className="overflow-hidden flex-1" ref={emblaRef}>
+            <div className="flex gap-3" role="list" aria-label="Swipeable clothing items">
+              {clothes.map((item) => (
+                <div key={item.id} className="flex-[0_0_calc(50%-6px)] min-w-0">
+                  <ClothingCard 
+                    item={item} 
+                    onDelete={() => deleteClothing(item.id)}
+                    selectionMode={selectionMode}
+                    isSelected={multiSelect ? selectedItemIds.includes(item.id) : selectedItemId === item.id}
+                    onSelect={() => onSelectItem?.(item)}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
           <Button
             variant="outline"
             size="icon"
-            onClick={scrollRight}
+            onClick={scrollNext}
+            disabled={!canScrollNext}
             aria-label="Scroll right"
-            className="shrink-0"
+            className="shrink-0 h-10 w-10 disabled:opacity-30"
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
       </div>
@@ -173,11 +164,11 @@ const ClothingCard = ({ item, onDelete, selectionMode, isSelected, onSelect }: C
 
   return (
     <Card 
-      className={`overflow-hidden transition-all ${isSelected ? 'ring-2 ring-primary shadow-lg' : ''} ${selectionMode ? 'cursor-pointer hover:shadow-md' : ''}`}
+      className={`overflow-hidden transition-all hover:shadow-lg ${isSelected ? 'ring-2 ring-primary shadow-xl scale-[1.02]' : ''} ${selectionMode ? 'cursor-pointer hover:scale-[1.02]' : ''}`}
       role="article"
       aria-label={`${item.category} clothing item${isSelected ? ', selected' : ''}`}
     >
-      <div className="aspect-square relative" onClick={selectionMode ? onSelect : undefined}>
+      <div className="aspect-square relative bg-muted" onClick={selectionMode ? onSelect : undefined}>
         {(!imageLoaded || urlLoading) && !imageError && !urlError && (
           <div className="absolute inset-0 bg-muted animate-pulse flex items-center justify-center" aria-hidden="true">
             <span className="text-muted-foreground text-sm">Loading...</span>
@@ -201,8 +192,11 @@ const ClothingCard = ({ item, onDelete, selectionMode, isSelected, onSelect }: C
           />
         ) : null}
         {selectionMode && isSelected && (
-          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-            <Badge className="bg-primary text-primary-foreground">Selected</Badge>
+          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center backdrop-blur-[2px]">
+            <Badge className="bg-primary text-primary-foreground shadow-lg">
+              <Sparkles className="h-3 w-3 mr-1" />
+              Selected
+            </Badge>
           </div>
         )}
         <div className="absolute top-2 right-2 flex gap-2">

@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const geminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
+const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
 const pinterestApiKey = Deno.env.get('PINTEREST_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -30,8 +30,8 @@ serve(async (req) => {
       });
     }
 
-    if (!geminiApiKey) {
-      console.error('Gemini API key not configured');
+    if (!lovableApiKey) {
+      console.error('Lovable AI key not configured');
       return new Response(JSON.stringify({ 
         error: 'AI service is not configured. Please contact support.' 
       }), {
@@ -493,56 +493,49 @@ serve(async (req) => {
       const outfitPrompt = generateOutfitPrompt(attemptCount, shouldIncludeAccessory);
 
       try {
-        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${geminiApiKey}`, {
+        const geminiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
           headers: {
+            'Authorization': `Bearer ${lovableApiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: outfitPrompt
-              }]
+            model: 'google/gemini-2.5-flash',
+            messages: [{
+              role: 'user',
+              content: outfitPrompt
             }],
-            generationConfig: {
-              maxOutputTokens: 8000,
-              temperature: 0.8,
-              topP: 0.95,
-              topK: 40
-            }
+            max_tokens: 8000,
+            temperature: 0.8
           }),
         });
 
         if (!geminiResponse.ok) {
           const errorData = await geminiResponse.text();
-          console.error('Gemini API error:', geminiResponse.status, errorData);
+          console.error('Lovable AI error:', geminiResponse.status, errorData);
           
-          if (geminiResponse.status === 503) {
-            console.log('Gemini API overloaded (503), will retry if attempts remain...');
-            if (attemptCount < maxAttempts) {
-              continue; // Retry with backoff
-            }
-            console.error('Gemini API overloaded after all retries');
-            return new Response(JSON.stringify({ 
-              error: 'AI service is currently busy. Please try again in a few moments.' 
-            }), {
-              status: 200,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          } else if (geminiResponse.status === 429) {
+          if (geminiResponse.status === 429) {
             console.log('Rate limit exceeded (429), will retry if attempts remain...');
             if (attemptCount < maxAttempts) {
               continue; // Retry with backoff
             }
             console.error('Rate limit exceeded after all retries');
             return new Response(JSON.stringify({ 
-              error: 'Too many outfit requests. Please wait a moment and try again.' 
+              error: 'Rate limit reached. Please wait a moment and try again.' 
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          } else if (geminiResponse.status === 402) {
+            console.error('Lovable AI payment required');
+            return new Response(JSON.stringify({ 
+              error: 'AI service credits exhausted. Please contact support.' 
             }), {
               status: 200,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
           } else if (geminiResponse.status === 401) {
-            console.error('Gemini API authentication failed');
+            console.error('Lovable AI authentication failed');
             return new Response(JSON.stringify({ 
               error: 'AI service configuration issue. Please contact support.' 
             }), {
@@ -550,9 +543,12 @@ serve(async (req) => {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
           } else {
-            console.error(`Gemini API error: ${geminiResponse.status}`);
+            console.error(`Lovable AI error: ${geminiResponse.status}`);
+            if (attemptCount < maxAttempts) {
+              continue; // Retry for other errors
+            }
             return new Response(JSON.stringify({ 
-              error: `AI service error. Please try again later.` 
+              error: `AI service temporarily unavailable. Please try again.` 
             }), {
               status: 200,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -561,11 +557,11 @@ serve(async (req) => {
         }
 
         const geminiData = await geminiResponse.json();
-        console.log('Gemini API request successful');
+        console.log('Lovable AI request successful');
         
-        // Handle Gemini 2.5 Pro response structure
-        if (!geminiData.candidates || geminiData.candidates.length === 0) {
-          console.error('No candidates in Gemini response:', geminiData);
+        // Handle OpenAI-compatible response structure
+        if (!geminiData.choices || geminiData.choices.length === 0) {
+          console.error('No choices in AI response:', geminiData);
           if (attemptCount < maxAttempts) {
             continue; // Retry
           }
@@ -577,20 +573,18 @@ serve(async (req) => {
           });
         }
         
-        const candidate = geminiData.candidates[0];
+        const choice = geminiData.choices[0];
         
-        // Check for MAX_TOKENS finish reason
-        if (candidate.finishReason === 'MAX_TOKENS') {
-          console.error('Gemini hit MAX_TOKENS limit. Response was truncated.');
-          console.error('Usage metadata:', geminiData.usageMetadata);
+        // Check for token limit
+        if (choice.finish_reason === 'length') {
+          console.error('AI hit token limit. Response was truncated.');
           
-          // If we have partial content, try to use it
-          if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-            console.log('Attempting to use partial response despite MAX_TOKENS');
+          if (choice.message && choice.message.content) {
+            console.log('Attempting to use partial response despite token limit');
           } else {
-            console.error('No content available after MAX_TOKENS limit');
+            console.error('No content available after token limit');
             if (attemptCount < maxAttempts) {
-              console.log('Will retry with adjusted parameters...');
+              console.log('Will retry...');
               continue; // Retry
             }
             return new Response(JSON.stringify({ 
@@ -602,8 +596,8 @@ serve(async (req) => {
           }
         }
         
-        if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
-          console.error('Invalid candidate structure:', candidate);
+        if (!choice.message || !choice.message.content) {
+          console.error('Invalid choice structure:', choice);
           if (attemptCount < maxAttempts) {
             continue; // Retry
           }
@@ -615,10 +609,10 @@ serve(async (req) => {
           });
         }
         
-        const content = candidate.content.parts[0].text;
+        const content = choice.message.content;
         
         // Log raw response for debugging
-        console.log(`Gemini response received (attempt ${attemptCount})`);
+        console.log(`AI response received (attempt ${attemptCount})`);
         
         // Parse JSON from potentially markdown-wrapped response
         try {

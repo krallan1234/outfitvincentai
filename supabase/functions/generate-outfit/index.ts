@@ -21,11 +21,23 @@ serve(async (req) => {
     const { prompt, mood, userId, isPublic = true, pinterestBoardId, selectedItem, purchaseLinks, weatherData, userPreferences } = await req.json();
 
     if (!prompt || !userId) {
-      throw new Error('Prompt and userId are required');
+      console.error('Missing required parameters:', { prompt: !!prompt, userId: !!userId });
+      return new Response(JSON.stringify({ 
+        error: 'Prompt and user ID are required to generate an outfit.' 
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (!geminiApiKey) {
-      throw new Error('Google Gemini API key not configured');
+      console.error('Gemini API key not configured');
+      return new Response(JSON.stringify({ 
+        error: 'AI service is not configured. Please contact support.' 
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('Weather data:', weatherData ? `${weatherData.temperature}°C, ${weatherData.condition}` : 'Not provided');
@@ -41,11 +53,23 @@ serve(async (req) => {
       .eq('user_id', userId);
 
     if (clothesError) {
-      throw new Error(`Failed to fetch clothes: ${clothesError.message}`);
+      console.error('Failed to fetch clothes from database:', clothesError);
+      return new Response(JSON.stringify({ 
+        error: 'Could not load your wardrobe. Please try again.' 
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (!clothes || clothes.length === 0) {
-      throw new Error('No clothes found. Please upload some clothing items first.');
+      console.log('User has no clothes in wardrobe');
+      return new Response(JSON.stringify({ 
+        error: 'Please upload some clothing items to your wardrobe first.' 
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log(`Analyzing ${clothes.length} clothing items for outfit generation`);
@@ -498,17 +522,41 @@ serve(async (req) => {
             if (attemptCount < maxAttempts) {
               continue; // Retry with backoff
             }
-            throw new Error('Gemini API is currently overloaded. Please try again in a few moments.');
+            console.error('Gemini API overloaded after all retries');
+            return new Response(JSON.stringify({ 
+              error: 'AI service is currently busy. Please try again in a few moments.' 
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
           } else if (geminiResponse.status === 429) {
             console.log('Rate limit exceeded (429), will retry if attempts remain...');
             if (attemptCount < maxAttempts) {
               continue; // Retry with backoff
             }
-            throw new Error('Rate limit exceeded. Please try again in a few moments.');
+            console.error('Rate limit exceeded after all retries');
+            return new Response(JSON.stringify({ 
+              error: 'Too many outfit requests. Please wait a moment and try again.' 
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
           } else if (geminiResponse.status === 401) {
-            throw new Error('Gemini API authentication failed. Please contact support.');
+            console.error('Gemini API authentication failed');
+            return new Response(JSON.stringify({ 
+              error: 'AI service configuration issue. Please contact support.' 
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
           } else {
-            throw new Error(`Gemini API error (${geminiResponse.status}): Failed to generate outfit recommendation`);
+            console.error(`Gemini API error: ${geminiResponse.status}`);
+            return new Response(JSON.stringify({ 
+              error: `AI service error. Please try again later.` 
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
           }
         }
 
@@ -521,7 +569,12 @@ serve(async (req) => {
           if (attemptCount < maxAttempts) {
             continue; // Retry
           }
-          throw new Error('Gemini API returned no candidates. Please try again.');
+          return new Response(JSON.stringify({ 
+            error: 'AI service returned unexpected response. Please try again.' 
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
         
         const candidate = geminiData.candidates[0];
@@ -540,7 +593,12 @@ serve(async (req) => {
               console.log('Will retry with adjusted parameters...');
               continue; // Retry
             }
-            throw new Error('Gemini response was cut off due to token limit. Please try with a simpler prompt or fewer clothes.');
+            return new Response(JSON.stringify({ 
+              error: 'Your wardrobe is too large for this request. Please try with a simpler prompt.' 
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
           }
         }
         
@@ -549,7 +607,12 @@ serve(async (req) => {
           if (attemptCount < maxAttempts) {
             continue; // Retry
           }
-          throw new Error('Gemini API returned invalid response structure.');
+          return new Response(JSON.stringify({ 
+            error: 'AI service returned invalid response. Please try again.' 
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
         
         const content = candidate.content.parts[0].text;
@@ -584,7 +647,12 @@ serve(async (req) => {
             if (attemptCount < maxAttempts) {
               continue; // Retry with fix prompt
             } else {
-              throw new Error('Multiple attempts failed to generate valid outfit');
+              return new Response(JSON.stringify({ 
+                error: 'Could not generate a valid outfit. Please try again with a different prompt.' 
+              }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
             }
           }
 
@@ -602,7 +670,12 @@ serve(async (req) => {
               if (attemptCount < maxAttempts) {
                 continue; // Retry
               } else {
-                throw new Error('Could not generate outfit including all selected items');
+                return new Response(JSON.stringify({ 
+                  error: 'Could not create an outfit with your selected items. Try different items.' 
+                }), {
+                  status: 200,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                });
               }
             }
           }
@@ -619,7 +692,12 @@ serve(async (req) => {
             if (attemptCount < maxAttempts) {
               continue; // Retry
             } else {
-              throw new Error('Could not generate valid outfit with available clothes');
+              return new Response(JSON.stringify({ 
+                error: 'Could not create a complete outfit with available items. Try adding more clothes.' 
+              }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
             }
           }
 
@@ -642,14 +720,24 @@ serve(async (req) => {
           console.error('Content that failed to parse:', content);
           
           if (attemptCount >= maxAttempts) {
-            throw new Error('Invalid JSON response from AI after multiple attempts. Please try again.');
+            return new Response(JSON.stringify({ 
+              error: 'AI service returned unexpected format. Please try again.' 
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
           }
           // Continue to retry
         }
       } catch (fetchError) {
         console.error(`Network error on attempt ${attemptCount}:`, fetchError);
         if (attemptCount >= maxAttempts) {
-          throw new Error('Failed to connect to Gemini API after multiple attempts. Please check your connection and try again.');
+          return new Response(JSON.stringify({ 
+            error: 'Connection to AI service failed. Please check your internet and try again.' 
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
         // Continue to retry
       }
@@ -704,7 +792,13 @@ serve(async (req) => {
       .single();
 
     if (saveError) {
-      throw new Error(`Failed to save outfit: ${saveError.message}`);
+      console.error('Failed to save outfit to database:', saveError);
+      return new Response(JSON.stringify({ 
+        error: 'Outfit was generated but could not be saved. Please try again.' 
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('Outfit generated and saved successfully');
@@ -718,9 +812,14 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in generate-outfit function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    console.error('Unexpected error in generate-outfit function:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+    return new Response(JSON.stringify({ 
+      error: errorMessage.includes('Failed to') || errorMessage.includes('Could not') 
+        ? errorMessage 
+        : 'Failed to generate outfit. Please try again.' 
+    }), {
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

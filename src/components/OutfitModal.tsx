@@ -93,14 +93,14 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] w-[95vw] xs:w-[90vw] card-elegant border-primary/20 animate-slide-in-right sm:animate-fade-in p-3 xs:p-4 sm:p-6 flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] w-[95vw] xs:w-[90vw] card-elegant border-primary/20 animate-fade-in p-3 xs:p-4 sm:p-6 flex flex-col fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
         <DialogHeader className="space-y-2 flex-shrink-0">
           <DialogTitle className="text-lg xs:text-xl sm:text-2xl font-serif bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent leading-tight">
             {outfit.title}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 sm:space-y-6 overflow-y-auto overscroll-contain -mx-3 xs:-mx-4 sm:-mx-6 px-3 xs:px-4 sm:px-6 flex-1">
+        <div className="space-y-4 sm:space-y-6 overflow-y-auto overscroll-contain touch-pan-y scroll-smooth -mx-3 xs:-mx-4 sm:-mx-6 px-3 xs:px-4 sm:px-6 flex-1">
           {/* Outfit Details */}
           <div className="space-y-3 p-3 sm:p-4 bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl border border-primary/10">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
@@ -156,11 +156,11 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
             
             {/* Generated Image */}
             {outfit.generated_image_url && (
-              <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 active:scale-[0.98] sm:hover:scale-[1.02] transition-transform duration-300">
+              <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10">
                 <img
                   src={outfit.generated_image_url}
                   alt={outfit.title}
-                  className="w-full max-h-[50vh] sm:max-h-none object-contain sm:object-cover"
+                  className="w-full max-h-[50vh] sm:max-h-none object-contain sm:object-cover pointer-events-none select-none"
                   loading="lazy"
                 />
               </div>
@@ -179,7 +179,7 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                     <div 
                       key={item.id || index} 
                       className={cn(
-                        "bg-muted/50 rounded-xl overflow-hidden transition-all active:scale-95 sm:hover:scale-105 hover:shadow-lg border border-primary/10 touch-manipulation",
+                        "bg-muted/50 rounded-xl overflow-hidden border border-primary/10",
                         item.is_selected && "ring-2 ring-primary shadow-lg bg-primary/5"
                       )}
                     >
@@ -187,18 +187,18 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                           <img
                             src={item.image_url || item.image || item.url}
                             alt={`${item.category || item.type || 'Item'} - ${item.color || (item.colors?.[0]) || 'Unknown color'}`}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover pointer-events-none select-none"
                             loading="lazy"
                           />
                           {item.is_selected && (
-                            <div className="absolute top-1 right-1 sm:top-2 sm:right-2">
+                            <div className="absolute top-1 right-1 sm:top-2 sm:right-2 pointer-events-none">
                               <Badge className="bg-primary text-primary-foreground text-xs">
                                 Base Item
                               </Badge>
                             </div>
                           )}
                       </div>
-                      <div className="p-2 sm:p-3">
+                      <div className="p-2 sm:p-3 select-none">
                         <p className="text-xs sm:text-sm font-medium capitalize">{item.category || 'Item'}</p>
                         <p className="text-xs text-muted-foreground capitalize">{item.color || 'Unknown'}</p>
                         {item.style && (
@@ -269,7 +269,7 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
               </h3>
               <div className="grid gap-3">
                 {outfit.purchase_links.map((link: any, index: number) => (
-                  <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border border-primary/10 rounded-xl active:bg-primary/5 sm:hover:bg-primary/5 sm:hover:border-primary/20 transition-all active:scale-[0.98] sm:hover:scale-[1.02] touch-manipulation">
+                  <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 border border-primary/10 rounded-xl transition-colors sm:hover:bg-primary/5 sm:hover:border-primary/20">
                     <div className="flex-1">
                       <p className="font-medium text-sm sm:text-base">{link.store_name}</p>
                       {link.price && (

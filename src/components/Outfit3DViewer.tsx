@@ -1,9 +1,9 @@
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment, ContactShadows } from '@react-three/drei';
-import { Suspense, useRef, useState } from 'react';
+import { Suspense, useRef, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { Button } from './ui/button';
-import { RotateCw, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { RotateCw, ZoomIn, ZoomOut, RotateCcw, Loader2 } from 'lucide-react';
 
 interface Outfit3DViewerProps {
   imageUrl: string;
@@ -152,11 +152,39 @@ function MannequinModel({ outfitTexture }: { outfitTexture: THREE.Texture }) {
   );
 }
 
-function OutfitMesh({ imageUrl }: { imageUrl: string }) {
-  const textureLoader = new THREE.TextureLoader();
-  const texture = textureLoader.load(imageUrl);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
+function OutfitMesh({ imageUrl, onLoad }: { imageUrl: string; onLoad: () => void }) {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+  
+  useEffect(() => {
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.load(
+      imageUrl,
+      (loadedTexture) => {
+        loadedTexture.wrapS = THREE.RepeatWrapping;
+        loadedTexture.wrapT = THREE.RepeatWrapping;
+        setTexture(loadedTexture);
+        onLoad();
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading texture:', error);
+        // Create a default white texture as fallback
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#f0f0f0';
+          ctx.fillRect(0, 0, 512, 512);
+        }
+        const fallbackTexture = new THREE.CanvasTexture(canvas);
+        setTexture(fallbackTexture);
+        onLoad();
+      }
+    );
+  }, [imageUrl, onLoad]);
+  
+  if (!texture) return null;
   
   return <MannequinModel outfitTexture={texture} />;
 }
@@ -164,6 +192,7 @@ function OutfitMesh({ imageUrl }: { imageUrl: string }) {
 export const Outfit3DViewer = ({ imageUrl, title }: Outfit3DViewerProps) => {
   const controlsRef = useRef<any>(null);
   const [autoRotate, setAutoRotate] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   const handleReset = () => {
     if (controlsRef.current) {
@@ -202,7 +231,17 @@ export const Outfit3DViewer = ({ imageUrl, title }: Outfit3DViewerProps) => {
 
   return (
     <div className="relative w-full h-[500px] bg-gradient-to-b from-muted/30 to-background rounded-xl overflow-hidden border border-primary/10">
-      <Canvas shadows>
+      {/* Loading Indicator */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading 3D model...</p>
+          </div>
+        </div>
+      )}
+      
+      <Canvas shadows gl={{ antialias: true, alpha: true }}>
         <Suspense fallback={null}>
           <PerspectiveCamera makeDefault position={[0, 0.5, 5]} />
           
@@ -234,7 +273,7 @@ export const Outfit3DViewer = ({ imageUrl, title }: Outfit3DViewerProps) => {
           
           {/* 3D Outfit Model */}
           <group position={[0, 0.5, 0]}>
-            <OutfitMesh imageUrl={imageUrl} />
+            <OutfitMesh imageUrl={imageUrl} onLoad={() => setIsLoading(false)} />
           </group>
           
           {/* Ground shadow */}

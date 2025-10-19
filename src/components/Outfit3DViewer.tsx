@@ -4,7 +4,7 @@ import { Suspense, useRef, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { Button } from './ui/button';
 import { RotateCw, ZoomIn, ZoomOut, RotateCcw, Loader2 } from 'lucide-react';
-
+import { loadProcessedTexture } from '@/utils/threeTexture';
 interface Outfit3DViewerProps {
   imageUrl?: string;
   title: string;
@@ -158,32 +158,10 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
   const [bottomTex, setBottomTex] = useState<THREE.Texture | undefined>();
   const [outerTex, setOuterTex] = useState<THREE.Texture | undefined>();
 
-  const loader = new THREE.TextureLoader();
-  loader.crossOrigin = 'anonymous';
-
-  const load = (url: string) =>
-    new Promise<THREE.Texture>((resolve, reject) => {
-      console.log('Loading texture from:', url);
-      loader.load(
-        url,
-        (t) => {
-          // Configure texture for better wrapping and appearance
-          t.wrapS = THREE.RepeatWrapping;
-          t.wrapT = THREE.RepeatWrapping;
-          t.repeat.set(1, 1);
-          t.minFilter = THREE.LinearFilter;
-          t.magFilter = THREE.LinearFilter;
-          t.needsUpdate = true;
-          console.log('Texture loaded successfully:', url);
-          resolve(t);
-        },
-        undefined,
-        (err) => {
-          console.error('Failed to load texture:', url, err);
-          reject(err);
-        }
-      );
-    });
+  const load = (url: string) => {
+    console.log('Loading processed texture from:', url);
+    return loadProcessedTexture(url, { maxSize: 1024, mirrorX: true });
+  };
 
   const getItemUrl = (cats: string[]) => {
     const it = clothingItems?.find((i) => {
@@ -329,7 +307,7 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
         </div>
       )}
       
-      <Canvas shadows gl={{ antialias: true, alpha: true }}>
+      <Canvas dpr={[1, 1.5]} shadows gl={{ antialias: true, alpha: true, powerPreference: 'high-performance', preserveDrawingBuffer: false }}>
         <Suspense fallback={null}>
           <PerspectiveCamera makeDefault position={[0, 0.5, 5]} />
           
@@ -376,9 +354,14 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
           {/* Controls */}
           <OrbitControls
             ref={controlsRef}
-            enablePan={false}
+            enablePan={true}
             enableZoom={true}
             enableRotate={true}
+            enableDamping={true}
+            dampingFactor={0.05}
+            zoomSpeed={0.8}
+            rotateSpeed={0.8}
+            panSpeed={0.8}
             autoRotate={autoRotate}
             autoRotateSpeed={2}
             minDistance={2}

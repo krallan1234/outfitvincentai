@@ -14,6 +14,7 @@ import PolicyPage from "./pages/PolicyPage";
 import AuthPage from "./pages/AuthPage";
 import PinterestCallback from "./pages/PinterestCallback";
 import CalendarPage from "./pages/CalendarPage";
+import MessagesPage from "./pages/MessagesPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -73,6 +74,11 @@ const App = () => {
               <Route path="/calendar" element={
                 <ProtectedRoute>
                   <CalendarPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/messages" element={
+                <ProtectedRoute>
+                  <MessagesPage />
                 </ProtectedRoute>
               } />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -1,11 +1,14 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Heart, ExternalLink, ShoppingBag, MessageCircle, Sparkles, CalendarPlus } from 'lucide-react';
+import { Calendar, Heart, ExternalLink, ShoppingBag, MessageCircle, Sparkles, CalendarPlus, Box, ScanFace } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CommentsSection } from '@/components/CommentsSection';
 import { OutfitRemixButton } from '@/components/OutfitRemixButton';
+import { Outfit3DViewer } from '@/components/Outfit3DViewer';
+import { VirtualTryOn } from '@/components/VirtualTryOn';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 interface OutfitModalProps {
@@ -170,34 +173,68 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
           {/* Outfit Visual */}
           <div className="space-y-3 sm:space-y-4">
-            <h3 className="text-base sm:text-lg font-semibold font-serif flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-accent" />
-              Outfit Visualization
-            </h3>
-            
-            {/* Generated Image */}
-            {outfit.generated_image_url && (
-              <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 min-h-[200px] flex items-center justify-center">
-                <img
-                  src={outfit.generated_image_url}
-                  alt={outfit.title}
-                  className="w-full max-h-[50vh] sm:max-h-none object-contain sm:object-cover pointer-events-none select-none"
-                  loading="lazy"
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    target.style.display = 'none';
-                    const parent = target.parentElement;
-                    if (parent) {
-                      parent.innerHTML = `
-                        <div class="w-full h-full flex items-center justify-center text-muted-foreground">
-                          <span>Image preview unavailable</span>
-                        </div>
-                      `;
-                    }
-                  }}
-                />
-              </div>
-            )}
+            <Tabs defaultValue="2d" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="2d">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  2D Image
+                </TabsTrigger>
+                <TabsTrigger value="3d">
+                  <Box className="h-4 w-4 mr-2" />
+                  3D Preview
+                </TabsTrigger>
+                <TabsTrigger value="ar">
+                  <ScanFace className="h-4 w-4 mr-2" />
+                  Try On
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="2d" className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-semibold font-serif flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-accent" />
+                  Outfit Visualization
+                </h3>
+                
+                {/* Generated Image */}
+                {outfit.generated_image_url && (
+                  <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 min-h-[200px] flex items-center justify-center">
+                    <img
+                      src={outfit.generated_image_url}
+                      alt={outfit.title}
+                      className="w-full max-h-[50vh] sm:max-h-none object-contain sm:object-cover pointer-events-none select-none"
+                      loading="lazy"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          parent.innerHTML = `
+                            <div class="w-full h-full flex items-center justify-center text-muted-foreground">
+                              <span>Image preview unavailable</span>
+                            </div>
+                          `;
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="3d" className="space-y-3 sm:space-y-4">
+                {outfit.generated_image_url && (
+                  <Outfit3DViewer
+                    imageUrl={outfit.generated_image_url}
+                    title={outfit.title}
+                  />
+                )}
+              </TabsContent>
+              
+              <TabsContent value="ar" className="space-y-3 sm:space-y-4">
+                {outfit.generated_image_url && (
+                  <VirtualTryOn outfitImageUrl={outfit.generated_image_url} />
+                )}
+              </TabsContent>
+            </Tabs>
 
             {/* Clothes Grid */}
             {loading ? (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -49,7 +49,7 @@ export const AdvancedMoodSelector = ({ value, onChange }: AdvancedMoodSelectorPr
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('');
 
   // Parse existing value if it contains subcategory
-  useState(() => {
+  useEffect(() => {
     if (value && value.includes(' > ')) {
       const [cat, subcat] = value.split(' > ');
       setSelectedCategory(cat);
@@ -57,7 +57,7 @@ export const AdvancedMoodSelector = ({ value, onChange }: AdvancedMoodSelectorPr
     } else if (value) {
       setSelectedCategory(value);
     }
-  });
+  }, [value]);
 
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);

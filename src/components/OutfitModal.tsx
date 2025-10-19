@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Heart, ExternalLink, ShoppingBag, MessageCircle, Sparkles, CalendarPlus, Box, ScanFace } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -76,20 +76,28 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
     const owner = !!userId && outfit.user_id === userId;
 
-    // For owner's outfits, always fetch actual wardrobe items
-    if (owner && Array.isArray(outfit.recommended_clothes) && outfit.recommended_clothes.length > 0) {
-      fetchClothesImages();
-      return;
-    }
+    // Check if outfit_visualization has valid items with image URLs
+    const hasVisualizationImages = Array.isArray(outfit.ai_analysis?.outfit_visualization?.items) && 
+      outfit.ai_analysis.outfit_visualization.items.length > 0 &&
+      outfit.ai_analysis.outfit_visualization.items.some(item => item.image_url);
 
-    // For non-owner outfits, use AI visualization if available
-    if (Array.isArray(outfit.ai_analysis?.outfit_visualization?.items) && outfit.ai_analysis.outfit_visualization.items.length > 0) {
+    // Priority 1: Use visualization items if they have image URLs
+    if (hasVisualizationImages) {
+      console.log('Using outfit visualization items:', outfit.ai_analysis.outfit_visualization.items);
       setClothesImages(outfit.ai_analysis.outfit_visualization.items);
       setLoading(false);
       return;
     }
 
+    // Priority 2: For owner's outfits, fetch from database using IDs
+    if (owner && Array.isArray(outfit.recommended_clothes) && outfit.recommended_clothes.length > 0) {
+      console.log('Fetching clothes from database for owner, IDs:', outfit.recommended_clothes);
+      fetchClothesImages();
+      return;
+    }
+
     // Fallback: nothing to show
+    console.warn('No clothes images available for outfit');
     setClothesImages([]);
     setLoading(false);
   }, [isOpen, outfit, userId]);
@@ -148,6 +156,9 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
           <DialogTitle className="text-lg xs:text-xl sm:text-2xl font-serif bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent leading-tight">
             {outfit.title}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Outfit details including visualization, items, and styling information
+          </DialogDescription>
         </DialogHeader>
 
         <div 
@@ -302,14 +313,14 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                 <h4 className="text-sm sm:text-md font-semibold mb-3 sm:mb-4 font-serif">Outfit Items</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                   {clothesImages.map((item, index) => (
-                  <div 
+                   <div 
                       key={item.id || index} 
                       className={cn(
                         "bg-muted/50 rounded-xl overflow-hidden border border-primary/10 transition-none hover:shadow-md",
                         item.is_selected && "ring-2 ring-primary shadow-lg bg-primary/5"
                       )}
                     >
-                      <div className="aspect-square relative bg-muted/30">
+                      <div className="aspect-square relative bg-muted/30 flex items-center justify-center">
                           <img
                             src={item.image_url || item.image || item.url || PLACEHOLDER_IMAGE}
                             alt={`${item.category || item.type || 'Item'} - ${item.color || (item.colors?.[0]) || 'Unknown color'}`}
@@ -318,9 +329,14 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                             style={{
                               minHeight: '150px',
                             }}
+                            onLoad={(e) => {
+                              console.log('Image loaded successfully:', item.category, item.image_url || item.image || item.url);
+                            }}
                             onError={(e) => {
                               const target = e.currentTarget;
+                              console.error('Image failed to load:', item.category, item.image_url || item.image || item.url);
                               target.src = PLACEHOLDER_IMAGE;
+                              target.onerror = null; // Prevent infinite loop
                             }}
                           />
                           {item.is_selected && (

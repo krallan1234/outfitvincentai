@@ -6,13 +6,13 @@ import { Button } from './ui/button';
 import { RotateCw, ZoomIn, ZoomOut, RotateCcw, Loader2 } from 'lucide-react';
 
 interface Outfit3DViewerProps {
-  imageUrl: string;
+  imageUrl?: string;
   title: string;
   clothingItems?: any[];
 }
 
-function MannequinModel({ outfitTexture }: { outfitTexture: THREE.Texture }) {
-  // Create an improved mannequin with better proportions
+function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Texture; bottomTex?: THREE.Texture; outerwearTex?: THREE.Texture }) {
+  // Create an improved mannequin with better proportions and per-part textures
   return (
     <group>
       {/* Head */}
@@ -27,69 +27,61 @@ function MannequinModel({ outfitTexture }: { outfitTexture: THREE.Texture }) {
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
       
-      {/* Upper Torso with outfit texture */}
+      {/* Upper Torso - use outerwear if present, else top */}
       <mesh position={[0, 0.5, 0]} castShadow>
         <cylinderGeometry args={[0.45, 0.35, 1.2, 32]} />
         <meshStandardMaterial 
-          map={outfitTexture}
+          {...(outerwearTex || topTex ? { map: (outerwearTex ?? topTex)! } : { color: '#e8e8e8' })}
           metalness={0.1} 
           roughness={0.7}
         />
       </mesh>
       
-      {/* Lower Torso with outfit texture */}
+      {/* Lower Torso - use bottom */}
       <mesh position={[0, -0.5, 0]} castShadow>
         <cylinderGeometry args={[0.35, 0.4, 0.8, 32]} />
         <meshStandardMaterial 
-          map={outfitTexture}
+          {...(bottomTex ? { map: bottomTex } : { color: '#e8e8e8' })}
           metalness={0.1} 
           roughness={0.7}
         />
       </mesh>
       
-      {/* Left Shoulder */}
+      {/* Shoulders */}
       <mesh position={[-0.5, 0.8, 0]} castShadow>
         <sphereGeometry args={[0.2, 16, 16]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
-      
-      {/* Right Shoulder */}
       <mesh position={[0.5, 0.8, 0]} castShadow>
         <sphereGeometry args={[0.2, 16, 16]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
       
-      {/* Left Upper Arm */}
+      {/* Upper Arms */}
       <mesh position={[-0.65, 0.3, 0]} rotation={[0, 0, 0.2]} castShadow>
         <cylinderGeometry args={[0.14, 0.12, 0.9, 16]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
-      
-      {/* Right Upper Arm */}
       <mesh position={[0.65, 0.3, 0]} rotation={[0, 0, -0.2]} castShadow>
         <cylinderGeometry args={[0.14, 0.12, 0.9, 16]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
       
-      {/* Left Lower Arm */}
+      {/* Lower Arms */}
       <mesh position={[-0.78, -0.3, 0]} rotation={[0, 0, 0.1]} castShadow>
         <cylinderGeometry args={[0.12, 0.1, 0.8, 16]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
-      
-      {/* Right Lower Arm */}
       <mesh position={[0.78, -0.3, 0]} rotation={[0, 0, -0.1]} castShadow>
         <cylinderGeometry args={[0.12, 0.1, 0.8, 16]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
       
-      {/* Left Hand */}
+      {/* Hands */}
       <mesh position={[-0.82, -0.75, 0]} castShadow>
         <sphereGeometry args={[0.12, 16, 16]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
-      
-      {/* Right Hand */}
       <mesh position={[0.82, -0.75, 0]} castShadow>
         <sphereGeometry args={[0.12, 16, 16]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
@@ -99,51 +91,45 @@ function MannequinModel({ outfitTexture }: { outfitTexture: THREE.Texture }) {
       <mesh position={[0, -1.0, 0]} castShadow>
         <cylinderGeometry args={[0.4, 0.38, 0.4, 32]} />
         <meshStandardMaterial 
-          map={outfitTexture}
+          {...(bottomTex ? { map: bottomTex } : { color: '#e8e8e8' })}
           metalness={0.1} 
           roughness={0.7}
         />
       </mesh>
       
-      {/* Left Upper Leg */}
+      {/* Upper Legs */}
       <mesh position={[-0.2, -1.6, 0]} castShadow>
         <cylinderGeometry args={[0.18, 0.15, 1.0, 16]} />
         <meshStandardMaterial 
-          map={outfitTexture}
+          {...(bottomTex ? { map: bottomTex } : { color: '#e8e8e8' })}
           metalness={0.1} 
           roughness={0.7}
         />
       </mesh>
-      
-      {/* Right Upper Leg */}
       <mesh position={[0.2, -1.6, 0]} castShadow>
         <cylinderGeometry args={[0.18, 0.15, 1.0, 16]} />
         <meshStandardMaterial 
-          map={outfitTexture}
+          {...(bottomTex ? { map: bottomTex } : { color: '#e8e8e8' })}
           metalness={0.1} 
           roughness={0.7}
         />
       </mesh>
       
-      {/* Left Lower Leg */}
+      {/* Lower Legs */}
       <mesh position={[-0.2, -2.5, 0]} castShadow>
         <cylinderGeometry args={[0.15, 0.13, 0.8, 16]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
-      
-      {/* Right Lower Leg */}
       <mesh position={[0.2, -2.5, 0]} castShadow>
         <cylinderGeometry args={[0.15, 0.13, 0.8, 16]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
       
-      {/* Left Foot */}
+      {/* Feet */}
       <mesh position={[-0.2, -2.95, 0.1]} castShadow>
         <boxGeometry args={[0.15, 0.1, 0.3]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
-      
-      {/* Right Foot */}
       <mesh position={[0.2, -2.95, 0.1]} castShadow>
         <boxGeometry args={[0.15, 0.1, 0.3]} />
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
@@ -152,44 +138,81 @@ function MannequinModel({ outfitTexture }: { outfitTexture: THREE.Texture }) {
   );
 }
 
-function OutfitMesh({ imageUrl, onLoad }: { imageUrl: string; onLoad: () => void }) {
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
-  
+function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; clothingItems?: any[]; onLoad: () => void }) {
+  const [topTex, setTopTex] = useState<THREE.Texture | undefined>();
+  const [bottomTex, setBottomTex] = useState<THREE.Texture | undefined>();
+  const [outerTex, setOuterTex] = useState<THREE.Texture | undefined>();
+
+  const loader = new THREE.TextureLoader();
+  const load = (url: string) =>
+    new Promise<THREE.Texture>((resolve, reject) => {
+      loader.load(
+        url,
+        (t) => {
+          t.wrapS = THREE.RepeatWrapping;
+          t.wrapT = THREE.RepeatWrapping;
+          resolve(t);
+        },
+        undefined,
+        (err) => reject(err)
+      );
+    });
+
+  const getItemUrl = (cats: string[]) => {
+    const it = clothingItems?.find((i) => {
+      const mc = String(i.main_category || '').toLowerCase();
+      const c = String(i.category || '').toLowerCase();
+      return cats.includes(mc) || cats.includes(c);
+    });
+    return (it?.image_url || it?.image || it?.url) as string | undefined;
+  };
+
   useEffect(() => {
-    const textureLoader = new THREE.TextureLoader();
-    textureLoader.load(
-      imageUrl,
-      (loadedTexture) => {
-        loadedTexture.wrapS = THREE.RepeatWrapping;
-        loadedTexture.wrapT = THREE.RepeatWrapping;
-        setTexture(loadedTexture);
-        onLoad();
-      },
-      undefined,
-      (error) => {
-        console.error('Error loading texture:', error);
-        // Create a default white texture as fallback
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#f0f0f0';
-          ctx.fillRect(0, 0, 512, 512);
+    let cancelled = false;
+    const run = async () => {
+      try {
+        let tt: THREE.Texture | undefined;
+        let bt: THREE.Texture | undefined;
+        let ot: THREE.Texture | undefined;
+
+        if (clothingItems && clothingItems.length) {
+          const topUrl = getItemUrl(['top', 'shirt', 'tshirt', 'blouse', 'sweater']);
+          const bottomUrl = getItemUrl(['bottom', 'pants', 'trousers', 'skirt', 'shorts', 'jeans']);
+          const outerUrl = getItemUrl(['outerwear', 'jacket', 'coat', 'blazer', 'hoodie', 'cardigan']);
+          if (topUrl) tt = await load(topUrl);
+          if (bottomUrl) bt = await load(bottomUrl);
+          if (outerUrl) ot = await load(outerUrl);
         }
-        const fallbackTexture = new THREE.CanvasTexture(canvas);
-        setTexture(fallbackTexture);
-        onLoad();
+        
+        if (!tt && !bt && imageUrl) {
+          const one = await load(imageUrl);
+          tt = one;
+          bt = one;
+        }
+
+        if (!cancelled) {
+          setTopTex(tt);
+          setBottomTex(bt);
+          setOuterTex(ot);
+          onLoad();
+        }
+      } catch (e) {
+        console.error('Failed to load textures for 3D outfit:', e);
+        if (!cancelled) onLoad();
       }
-    );
-  }, [imageUrl, onLoad]);
-  
-  if (!texture) return null;
-  
-  return <MannequinModel outfitTexture={texture} />;
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUrl, clothingItems, onLoad]);
+
+  if (!topTex && !bottomTex) return null;
+
+  return <MannequinModel topTex={topTex} bottomTex={bottomTex} outerwearTex={outerTex} />;
 }
 
-export const Outfit3DViewer = ({ imageUrl, title }: Outfit3DViewerProps) => {
+export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewerProps) => {
   const controlsRef = useRef<any>(null);
   const [autoRotate, setAutoRotate] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -273,7 +296,7 @@ export const Outfit3DViewer = ({ imageUrl, title }: Outfit3DViewerProps) => {
           
           {/* 3D Outfit Model */}
           <group position={[0, 0.5, 0]}>
-            <OutfitMesh imageUrl={imageUrl} onLoad={() => setIsLoading(false)} />
+            <OutfitMesh imageUrl={imageUrl} clothingItems={clothingItems} onLoad={() => setIsLoading(false)} />
           </group>
           
           {/* Ground shadow */}

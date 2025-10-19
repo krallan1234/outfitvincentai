@@ -340,9 +340,10 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
               </TabsContent>
               
               <TabsContent value="3d" className="space-y-3 sm:space-y-4">
-                {outfit.generated_image_url && (
+                {(outfit.generated_image_url || clothesImages.length > 0) && (
                   <Outfit3DViewer
                     imageUrl={outfit.generated_image_url}
+                    clothingItems={clothesImages}
                     title={outfit.title}
                   />
                 )}

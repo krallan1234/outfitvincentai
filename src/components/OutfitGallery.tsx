@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Loader2, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { OutfitModal } from '@/components/OutfitModal';
+import { OutfitRemixButton } from '@/components/OutfitRemixButton';
 
 export const OutfitGallery = () => {
   const { outfits, loading, deleteOutfit } = useOutfits();
@@ -255,6 +256,11 @@ const OutfitCard = ({ outfit, onDelete, onClick }: OutfitCardProps) => {
             Uses {outfit.recommended_clothes.length} items from your wardrobe
           </div>
         )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
+          <OutfitRemixButton outfit={outfit} variant="outline" />
+        </div>
       </CardContent>
     </Card>
   );

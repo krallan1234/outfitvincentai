@@ -1,10 +1,11 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Heart, ExternalLink, ShoppingBag, MessageCircle, Sparkles } from 'lucide-react';
+import { Calendar, Heart, ExternalLink, ShoppingBag, MessageCircle, Sparkles, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CommentsSection } from '@/components/CommentsSection';
+import { OutfitRemixButton } from '@/components/OutfitRemixButton';
 import { cn } from '@/lib/utils';
 
 interface OutfitModalProps {
@@ -19,6 +20,8 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
   const [clothesImages, setClothesImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [showCalendarDialog, setShowCalendarDialog] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -144,6 +147,24 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
               <p className="text-sm sm:text-base text-foreground/90 leading-relaxed">
                 {outfit.description}
               </p>
+            )}
+
+            {/* Action Buttons */}
+            {userId && outfit.user_id === userId && (
+              <div className="flex gap-2 flex-wrap pt-2">
+                <OutfitRemixButton outfit={outfit} variant="outline" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Navigate to calendar page - assuming there's a way to do this
+                    window.location.href = '/calendar';
+                  }}
+                >
+                  <CalendarPlus className="w-4 h-4 mr-2" />
+                  Add to Calendar
+                </Button>
+              </div>
             )}
           </div>
 

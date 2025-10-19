@@ -76,16 +76,16 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
     const owner = !!userId && outfit.user_id === userId;
 
-    // For all outfits, prioritize outfit_visualization.items if available
-    if (Array.isArray(outfit.ai_analysis?.outfit_visualization?.items) && outfit.ai_analysis.outfit_visualization.items.length > 0) {
-      setClothesImages(outfit.ai_analysis.outfit_visualization.items);
-      setLoading(false);
+    // For owner's outfits, always fetch actual wardrobe items
+    if (owner && Array.isArray(outfit.recommended_clothes) && outfit.recommended_clothes.length > 0) {
+      fetchClothesImages();
       return;
     }
 
-    // Fallback for owner's outfits: fetch wardrobe items via IDs
-    if (owner && Array.isArray(outfit.recommended_clothes) && outfit.recommended_clothes.length > 0) {
-      fetchClothesImages();
+    // For non-owner outfits, use AI visualization if available
+    if (Array.isArray(outfit.ai_analysis?.outfit_visualization?.items) && outfit.ai_analysis.outfit_visualization.items.length > 0) {
+      setClothesImages(outfit.ai_analysis.outfit_visualization.items);
+      setLoading(false);
       return;
     }
 

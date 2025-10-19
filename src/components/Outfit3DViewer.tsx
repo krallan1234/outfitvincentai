@@ -31,12 +31,12 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
       <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.45, 0.35, 1.2, 32]} />
         <meshStandardMaterial 
-          {...(outerwearTex || topTex ? { 
+          {...((outerwearTex || topTex) ? { 
             map: (outerwearTex ?? topTex)!,
             side: THREE.DoubleSide
           } : { color: '#e8e8e8' })}
-          metalness={0.1} 
-          roughness={0.7}
+          metalness={0.2} 
+          roughness={0.6}
         />
       </mesh>
       
@@ -48,8 +48,8 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
             map: bottomTex,
             side: THREE.DoubleSide
           } : { color: '#e8e8e8' })}
-          metalness={0.1} 
-          roughness={0.7}
+          metalness={0.2} 
+          roughness={0.6}
         />
       </mesh>
       
@@ -101,8 +101,8 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
             map: bottomTex,
             side: THREE.DoubleSide
           } : { color: '#e8e8e8' })}
-          metalness={0.1} 
-          roughness={0.7}
+          metalness={0.2} 
+          roughness={0.6}
         />
       </mesh>
       
@@ -114,8 +114,8 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
             map: bottomTex,
             side: THREE.DoubleSide
           } : { color: '#e8e8e8' })}
-          metalness={0.1} 
-          roughness={0.7}
+          metalness={0.2} 
+          roughness={0.6}
         />
       </mesh>
       <mesh position={[0.2, -1.6, 0]} castShadow receiveShadow>
@@ -125,8 +125,8 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
             map: bottomTex,
             side: THREE.DoubleSide
           } : { color: '#e8e8e8' })}
-          metalness={0.1} 
-          roughness={0.7}
+          metalness={0.2} 
+          roughness={0.6}
         />
       </mesh>
       
@@ -159,32 +159,27 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
   const [outerTex, setOuterTex] = useState<THREE.Texture | undefined>();
 
   const loader = new THREE.TextureLoader();
-  
-  const getFullUrl = (url: string) => {
-    if (url.startsWith('http')) return url;
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    return `${supabaseUrl}/storage/v1/object/public/clothes/${url}`;
-  };
+  loader.crossOrigin = 'anonymous';
 
   const load = (url: string) =>
     new Promise<THREE.Texture>((resolve, reject) => {
-      const fullUrl = getFullUrl(url);
-      console.log('Loading texture from:', fullUrl);
+      console.log('Loading texture from:', url);
       loader.load(
-        fullUrl,
+        url,
         (t) => {
-          // Configure texture for better appearance
-          t.wrapS = THREE.ClampToEdgeWrapping;
-          t.wrapT = THREE.ClampToEdgeWrapping;
+          // Configure texture for better wrapping and appearance
+          t.wrapS = THREE.RepeatWrapping;
+          t.wrapT = THREE.RepeatWrapping;
+          t.repeat.set(1, 1);
           t.minFilter = THREE.LinearFilter;
           t.magFilter = THREE.LinearFilter;
           t.needsUpdate = true;
-          console.log('Texture loaded successfully:', fullUrl);
+          console.log('Texture loaded successfully:', url);
           resolve(t);
         },
         undefined,
         (err) => {
-          console.error('Failed to load texture:', fullUrl, err);
+          console.error('Failed to load texture:', url, err);
           reject(err);
         }
       );
@@ -194,9 +189,11 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
     const it = clothingItems?.find((i) => {
       const mc = String(i.main_category || '').toLowerCase();
       const c = String(i.category || '').toLowerCase();
-      return cats.includes(mc) || cats.includes(c);
+      return cats.some(cat => mc.includes(cat) || c.includes(cat));
     });
-    return (it?.image_url || it?.image || it?.url) as string | undefined;
+    const url = it?.image_url || it?.image || it?.url;
+    console.log('Found item for categories', cats, ':', { category: it?.category, main_category: it?.main_category, url });
+    return url as string | undefined;
   };
 
   useEffect(() => {
@@ -209,33 +206,38 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
 
         if (clothingItems && clothingItems.length) {
           console.log('Loading textures for clothing items:', clothingItems);
-          const topUrl = getItemUrl(['top', 'shirt', 'tshirt', 'blouse', 'sweater']);
+          const topUrl = getItemUrl(['top', 'shirt', 't-shirt', 'tshirt', 'blouse', 'sweater', 'sweatshirt']);
           const bottomUrl = getItemUrl(['bottom', 'pants', 'trousers', 'skirt', 'shorts', 'jeans']);
-          const outerUrl = getItemUrl(['outerwear', 'jacket', 'coat', 'blazer', 'hoodie', 'cardigan']);
+          const outerUrl = getItemUrl(['outerwear', 'outer', 'jacket', 'coat', 'blazer', 'hoodie', 'cardigan']);
           
           console.log('URLs found:', { topUrl, bottomUrl, outerUrl });
           
+          const loadPromises = [];
+          
           if (topUrl) {
-            try {
-              tt = await load(topUrl);
-            } catch (e) {
-              console.error('Failed to load top texture:', e);
-            }
+            loadPromises.push(
+              load(topUrl)
+                .then(tex => { tt = tex; })
+                .catch(e => console.error('Failed to load top texture:', e))
+            );
           }
           if (bottomUrl) {
-            try {
-              bt = await load(bottomUrl);
-            } catch (e) {
-              console.error('Failed to load bottom texture:', e);
-            }
+            loadPromises.push(
+              load(bottomUrl)
+                .then(tex => { bt = tex; })
+                .catch(e => console.error('Failed to load bottom texture:', e))
+            );
           }
           if (outerUrl) {
-            try {
-              ot = await load(outerUrl);
-            } catch (e) {
-              console.error('Failed to load outer texture:', e);
-            }
+            loadPromises.push(
+              load(outerUrl)
+                .then(tex => { ot = tex; })
+                .catch(e => console.error('Failed to load outer texture:', e))
+            );
           }
+          
+          // Wait for all textures to load
+          await Promise.all(loadPromises);
         }
         
         if (!tt && !bt && imageUrl) {
@@ -266,7 +268,12 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
     };
   }, [imageUrl, clothingItems, onLoad]);
 
-  // Show mannequin even with no textures
+  // Always show mannequin, even without textures
+  console.log('Rendering mannequin with textures:', { 
+    hasTop: !!topTex, 
+    hasBottom: !!bottomTex, 
+    hasOuter: !!outerTex 
+  });
   return <MannequinModel topTex={topTex} bottomTex={bottomTex} outerwearTex={outerTex} />;
 }
 

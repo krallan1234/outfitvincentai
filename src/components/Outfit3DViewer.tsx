@@ -28,20 +28,26 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
       </mesh>
       
       {/* Upper Torso - use outerwear if present, else top */}
-      <mesh position={[0, 0.5, 0]} castShadow>
+      <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.45, 0.35, 1.2, 32]} />
         <meshStandardMaterial 
-          {...(outerwearTex || topTex ? { map: (outerwearTex ?? topTex)! } : { color: '#e8e8e8' })}
+          {...(outerwearTex || topTex ? { 
+            map: (outerwearTex ?? topTex)!,
+            side: THREE.DoubleSide
+          } : { color: '#e8e8e8' })}
           metalness={0.1} 
           roughness={0.7}
         />
       </mesh>
       
       {/* Lower Torso - use bottom */}
-      <mesh position={[0, -0.5, 0]} castShadow>
+      <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.35, 0.4, 0.8, 32]} />
         <meshStandardMaterial 
-          {...(bottomTex ? { map: bottomTex } : { color: '#e8e8e8' })}
+          {...(bottomTex ? { 
+            map: bottomTex,
+            side: THREE.DoubleSide
+          } : { color: '#e8e8e8' })}
           metalness={0.1} 
           roughness={0.7}
         />
@@ -88,28 +94,37 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
       </mesh>
       
       {/* Hips */}
-      <mesh position={[0, -1.0, 0]} castShadow>
+      <mesh position={[0, -1.0, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.4, 0.38, 0.4, 32]} />
         <meshStandardMaterial 
-          {...(bottomTex ? { map: bottomTex } : { color: '#e8e8e8' })}
+          {...(bottomTex ? { 
+            map: bottomTex,
+            side: THREE.DoubleSide
+          } : { color: '#e8e8e8' })}
           metalness={0.1} 
           roughness={0.7}
         />
       </mesh>
       
       {/* Upper Legs */}
-      <mesh position={[-0.2, -1.6, 0]} castShadow>
+      <mesh position={[-0.2, -1.6, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.18, 0.15, 1.0, 16]} />
         <meshStandardMaterial 
-          {...(bottomTex ? { map: bottomTex } : { color: '#e8e8e8' })}
+          {...(bottomTex ? { 
+            map: bottomTex,
+            side: THREE.DoubleSide
+          } : { color: '#e8e8e8' })}
           metalness={0.1} 
           roughness={0.7}
         />
       </mesh>
-      <mesh position={[0.2, -1.6, 0]} castShadow>
+      <mesh position={[0.2, -1.6, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.18, 0.15, 1.0, 16]} />
         <meshStandardMaterial 
-          {...(bottomTex ? { map: bottomTex } : { color: '#e8e8e8' })}
+          {...(bottomTex ? { 
+            map: bottomTex,
+            side: THREE.DoubleSide
+          } : { color: '#e8e8e8' })}
           metalness={0.1} 
           roughness={0.7}
         />
@@ -144,17 +159,34 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
   const [outerTex, setOuterTex] = useState<THREE.Texture | undefined>();
 
   const loader = new THREE.TextureLoader();
+  
+  const getFullUrl = (url: string) => {
+    if (url.startsWith('http')) return url;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    return `${supabaseUrl}/storage/v1/object/public/clothes/${url}`;
+  };
+
   const load = (url: string) =>
     new Promise<THREE.Texture>((resolve, reject) => {
+      const fullUrl = getFullUrl(url);
+      console.log('Loading texture from:', fullUrl);
       loader.load(
-        url,
+        fullUrl,
         (t) => {
-          t.wrapS = THREE.RepeatWrapping;
-          t.wrapT = THREE.RepeatWrapping;
+          // Configure texture for better appearance
+          t.wrapS = THREE.ClampToEdgeWrapping;
+          t.wrapT = THREE.ClampToEdgeWrapping;
+          t.minFilter = THREE.LinearFilter;
+          t.magFilter = THREE.LinearFilter;
+          t.needsUpdate = true;
+          console.log('Texture loaded successfully:', fullUrl);
           resolve(t);
         },
         undefined,
-        (err) => reject(err)
+        (err) => {
+          console.error('Failed to load texture:', fullUrl, err);
+          reject(err);
+        }
       );
     });
 
@@ -176,21 +208,48 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
         let ot: THREE.Texture | undefined;
 
         if (clothingItems && clothingItems.length) {
+          console.log('Loading textures for clothing items:', clothingItems);
           const topUrl = getItemUrl(['top', 'shirt', 'tshirt', 'blouse', 'sweater']);
           const bottomUrl = getItemUrl(['bottom', 'pants', 'trousers', 'skirt', 'shorts', 'jeans']);
           const outerUrl = getItemUrl(['outerwear', 'jacket', 'coat', 'blazer', 'hoodie', 'cardigan']);
-          if (topUrl) tt = await load(topUrl);
-          if (bottomUrl) bt = await load(bottomUrl);
-          if (outerUrl) ot = await load(outerUrl);
+          
+          console.log('URLs found:', { topUrl, bottomUrl, outerUrl });
+          
+          if (topUrl) {
+            try {
+              tt = await load(topUrl);
+            } catch (e) {
+              console.error('Failed to load top texture:', e);
+            }
+          }
+          if (bottomUrl) {
+            try {
+              bt = await load(bottomUrl);
+            } catch (e) {
+              console.error('Failed to load bottom texture:', e);
+            }
+          }
+          if (outerUrl) {
+            try {
+              ot = await load(outerUrl);
+            } catch (e) {
+              console.error('Failed to load outer texture:', e);
+            }
+          }
         }
         
         if (!tt && !bt && imageUrl) {
-          const one = await load(imageUrl);
-          tt = one;
-          bt = one;
+          try {
+            const one = await load(imageUrl);
+            tt = one;
+            bt = one;
+          } catch (e) {
+            console.error('Failed to load fallback image:', e);
+          }
         }
 
         if (!cancelled) {
+          console.log('Setting textures:', { hasTop: !!tt, hasBottom: !!bt, hasOuter: !!ot });
           setTopTex(tt);
           setBottomTex(bt);
           setOuterTex(ot);
@@ -207,8 +266,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
     };
   }, [imageUrl, clothingItems, onLoad]);
 
-  if (!topTex && !bottomTex) return null;
-
+  // Show mannequin even with no textures
   return <MannequinModel topTex={topTex} bottomTex={bottomTex} outerwearTex={outerTex} />;
 }
 

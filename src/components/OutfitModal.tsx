@@ -11,6 +11,8 @@ import { VirtualTryOn } from '@/components/VirtualTryOn';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"%3E%3Crect fill="%23ddd" width="400" height="400"/%3E%3C/svg%3E';
+
 interface OutfitModalProps {
   outfit: any;
   isOpen: boolean;
@@ -42,6 +44,32 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
       }
     });
   }, []);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${window.scrollY}px`;
+    } else {
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !outfit) return;
@@ -99,14 +127,37 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose} modal>
-      <DialogContent className="max-w-4xl h-[90vh] w-[95vw] xs:w-[90vw] card-elegant border-primary/20 p-0 gap-0 flex flex-col">
-        <DialogHeader className="space-y-2 flex-shrink-0 px-3 xs:px-4 sm:px-6 pt-3 xs:pt-4 sm:pt-6 pb-3">
+      <DialogContent 
+        className="max-w-4xl h-[90vh] w-[95vw] xs:w-[90vw] card-elegant border-primary/20 p-0 gap-0 flex flex-col"
+        style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          touchAction: 'none',
+          WebkitOverflowScrolling: 'touch',
+        }}
+        onTouchMove={(e) => {
+          // Allow scrolling only inside the scrollable content area
+          if (!(e.target as HTMLElement).closest('[data-scroll-container]')) {
+            e.preventDefault();
+          }
+        }}
+      >
+        <DialogHeader className="space-y-2 flex-shrink-0 px-3 xs:px-4 sm:px-6 pt-3 xs:pt-4 sm:pt-6 pb-3 select-none">
           <DialogTitle className="text-lg xs:text-xl sm:text-2xl font-serif bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent leading-tight">
             {outfit.title}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 xs:px-4 sm:px-6 pb-3 xs:pb-4 sm:pb-6">
+        <div 
+          data-scroll-container
+          className="flex-1 overflow-y-auto overflow-x-hidden px-3 xs:px-4 sm:px-6 pb-3 xs:pb-4 sm:pb-6 overscroll-contain"
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            scrollBehavior: 'smooth',
+          }}
+        >
           <div className="space-y-4 sm:space-y-6">
           {/* Outfit Details */}
           <div className="space-y-3 p-3 sm:p-4 bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl border border-primary/10">
@@ -198,12 +249,16 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                 
                 {/* Generated Image */}
                 {outfit.generated_image_url && (
-                  <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 min-h-[200px] flex items-center justify-center">
+                  <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 aspect-[3/4] sm:aspect-video flex items-center justify-center">
                     <img
                       src={outfit.generated_image_url}
                       alt={outfit.title}
-                      className="w-full max-h-[50vh] sm:max-h-none object-contain sm:object-cover pointer-events-none select-none"
-                      loading="lazy"
+                      className="w-full h-full object-contain pointer-events-none select-none transition-none"
+                      loading="eager"
+                      style={{ 
+                        minHeight: '200px',
+                        maxHeight: '50vh',
+                      }}
                       onError={(e) => {
                         const target = e.currentTarget;
                         target.style.display = 'none';
@@ -247,30 +302,25 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                 <h4 className="text-sm sm:text-md font-semibold mb-3 sm:mb-4 font-serif">Outfit Items</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                   {clothesImages.map((item, index) => (
-                    <div 
+                  <div 
                       key={item.id || index} 
                       className={cn(
-                        "bg-muted/50 rounded-xl overflow-hidden border border-primary/10",
+                        "bg-muted/50 rounded-xl overflow-hidden border border-primary/10 transition-none hover:shadow-md",
                         item.is_selected && "ring-2 ring-primary shadow-lg bg-primary/5"
                       )}
                     >
                       <div className="aspect-square relative bg-muted/30">
                           <img
-                            src={item.image_url || item.image || item.url}
+                            src={item.image_url || item.image || item.url || PLACEHOLDER_IMAGE}
                             alt={`${item.category || item.type || 'Item'} - ${item.color || (item.colors?.[0]) || 'Unknown color'}`}
-                            className="w-full h-full object-cover pointer-events-none select-none"
-                            loading="lazy"
+                            className="w-full h-full object-cover pointer-events-none select-none transition-none"
+                            loading="eager"
+                            style={{
+                              minHeight: '150px',
+                            }}
                             onError={(e) => {
                               const target = e.currentTarget;
-                              target.style.display = 'none';
-                              const parent = target.parentElement;
-                              if (parent) {
-                                parent.innerHTML = `
-                                  <div class="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                                    <span>Image unavailable</span>
-                                  </div>
-                                `;
-                              }
+                              target.src = PLACEHOLDER_IMAGE;
                             }}
                           />
                           {item.is_selected && (
@@ -364,9 +414,15 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                         variant="outline"
                         size="sm"
                         asChild
-                        className="min-h-[44px] min-w-[120px] text-sm sm:text-base"
+                        className="min-h-[44px] min-w-[120px] text-sm sm:text-base active:scale-95 transition-transform"
                       >
-                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 justify-center">
+                        <a 
+                          href={link.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="flex items-center gap-2 justify-center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           Visit Store
                           <ExternalLink className="h-4 w-4" />
                         </a>

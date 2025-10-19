@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
  * Hook to get signed URLs for private storage buckets
  * Automatically refreshes URLs before they expire
  */
-export const useSignedUrl = (bucket: string, path: string | null, expiresIn: number = 3600) => {
+export const useSignedUrl = (bucket: string, path: string | null, expiresIn: number = 86400) => {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -59,7 +59,7 @@ export const useSignedUrl = (bucket: string, path: string | null, expiresIn: num
 /**
  * Batch version for multiple URLs
  */
-export const useSignedUrls = (bucket: string, paths: string[], expiresIn: number = 3600) => {
+export const useSignedUrls = (bucket: string, paths: string[], expiresIn: number = 86400) => {
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);

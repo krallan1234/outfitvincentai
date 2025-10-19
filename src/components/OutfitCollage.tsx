@@ -97,10 +97,10 @@ export const OutfitCollage = ({ items, title, colorScheme, outfitId, onImageGene
       // Load and position clothing images - need to get signed URLs first
       const imagePromises = items.map(async (item, index) => {
         try {
-          // Get signed URL for private storage with extended expiry
+          // Get signed URL for private storage with 24-hour expiry
           const { data: signedUrlData, error: signedUrlError } = await supabase.storage
             .from('clothes')
-            .createSignedUrl(item.image_url, 7200); // 2 hours
+            .createSignedUrl(item.image_url, 86400); // 24 hours
 
           if (signedUrlError) {
             console.error('Failed to get signed URL:', signedUrlError);

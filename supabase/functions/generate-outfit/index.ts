@@ -483,9 +483,9 @@ serve(async (req) => {
       attemptCount++;
       console.log(`Generating outfit (attempt ${attemptCount}/${maxAttempts})...`);
 
-      // Add exponential backoff delay for retries
+      // Add exponential backoff delay for retries (2s, 4s, 8s)
       if (attemptCount > 1) {
-        const delayMs = Math.min(1000 * Math.pow(2, attemptCount - 2), 8000); // 1s, 2s, 4s max
+        const delayMs = Math.pow(2, attemptCount) * 1000; // 2s, 4s, 8s
         console.log(`Waiting ${delayMs}ms before retry...`);
         await sleep(delayMs);
       }

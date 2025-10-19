@@ -156,12 +156,24 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
             
             {/* Generated Image */}
             {outfit.generated_image_url && (
-              <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10">
+              <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 min-h-[200px] flex items-center justify-center">
                 <img
                   src={outfit.generated_image_url}
                   alt={outfit.title}
                   className="w-full max-h-[50vh] sm:max-h-none object-contain sm:object-cover pointer-events-none select-none"
                   loading="lazy"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.innerHTML = `
+                        <div class="w-full h-full flex items-center justify-center text-muted-foreground">
+                          <span>Image preview unavailable</span>
+                        </div>
+                      `;
+                    }
+                  }}
                 />
               </div>
             )}
@@ -183,12 +195,24 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                         item.is_selected && "ring-2 ring-primary shadow-lg bg-primary/5"
                       )}
                     >
-                      <div className="aspect-square relative">
+                      <div className="aspect-square relative bg-muted/30">
                           <img
                             src={item.image_url || item.image || item.url}
                             alt={`${item.category || item.type || 'Item'} - ${item.color || (item.colors?.[0]) || 'Unknown color'}`}
                             className="w-full h-full object-cover pointer-events-none select-none"
                             loading="lazy"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                                    <span>Image unavailable</span>
+                                  </div>
+                                `;
+                              }
+                            }}
                           />
                           {item.is_selected && (
                             <div className="absolute top-1 right-1 sm:top-2 sm:right-2 pointer-events-none">

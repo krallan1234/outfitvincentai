@@ -6,9 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, Loader2, ImagePlus } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Upload, Loader2, ImagePlus, Sparkles } from 'lucide-react';
 import { useClothes } from '@/hooks/useClothes';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 
 // Security: Input validation schema
@@ -98,31 +100,40 @@ const STYLES = [
 ];
 
 export const ClothesUpload = () => {
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string>('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [category, setCategory] = useState('');
   const [color, setColor] = useState('');
   const [style, setStyle] = useState('');
   const [brand, setBrand] = useState('');
   const [description, setDescription] = useState('');
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [detectingStyle, setDetectingStyle] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingMultiple, setUploadingMultiple] = useState(false);
   
   const { uploadClothing, loading, clothes } = useClothes();
   const { toast } = useToast();
 
-  const processFile = (selectedFile: File) => {
-    setFile(selectedFile);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPreview(reader.result as string);
-    };
-    reader.readAsDataURL(selectedFile);
+  const processFiles = (selectedFiles: File[]) => {
+    setFiles(selectedFiles);
+    const newPreviews: string[] = [];
+    
+    selectedFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        newPreviews.push(reader.result as string);
+        if (newPreviews.length === selectedFiles.length) {
+          setPreviews(newPreviews);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      processFile(selectedFile);
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length > 0) {
+      processFiles(selectedFiles);
     }
   };
 
@@ -130,11 +141,12 @@ export const ClothesUpload = () => {
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.webp', '.heic']
     },
-    maxFiles: 1,
+    multiple: true,
+    maxFiles: 10,
     maxSize: 10 * 1024 * 1024, // 10MB
     onDrop: (acceptedFiles) => {
       if (acceptedFiles.length > 0) {
-        processFile(acceptedFiles[0]);
+        processFiles(acceptedFiles);
       }
     },
     onDropRejected: (fileRejections) => {
@@ -177,8 +189,8 @@ export const ClothesUpload = () => {
         canvas.toBlob((blob) => {
           if (blob) {
             const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
-            setFile(file);
-            setPreview(canvas.toDataURL());
+            setFiles([file]);
+            setPreviews([canvas.toDataURL()]);
           }
           stream.getTracks().forEach(track => track.stop());
         }, 'image/jpeg');
@@ -192,9 +204,61 @@ export const ClothesUpload = () => {
     }
   };
 
+  const detectStyle = async () => {
+    if (files.length === 0) {
+      toast({
+        title: 'No Image',
+        description: 'Please select an image first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setDetectingStyle(true);
+    try {
+      const file = files[0]; // Use first image for style detection
+      const reader = new FileReader();
+      
+      const imageBase64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]); // Remove data:image prefix
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke('detect-clothing-style', {
+        body: { imageBase64 },
+      });
+
+      if (error) throw error;
+
+      if (data?.style) {
+        setStyle(data.style);
+        toast({
+          title: 'Style Detected',
+          description: `AI suggests: ${data.style.charAt(0).toUpperCase() + data.style.slice(1)}`,
+        });
+      } else {
+        throw new Error('No style returned');
+      }
+    } catch (error) {
+      console.error('Style detection error:', error);
+      setStyle('casual'); // Fallback
+      toast({
+        title: 'Detection Failed',
+        description: 'Defaulting to "casual". You can change it manually.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDetectingStyle(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return;
+    if (files.length === 0) return;
 
     // Security: Validate inputs before submission
     const validation = clothingSchema.safeParse({ 
@@ -216,7 +280,8 @@ export const ClothesUpload = () => {
     }
 
     // Check for 100 image limit
-    if (clothes.length >= 100) {
+    const remainingSlots = 100 - clothes.length;
+    if (remainingSlots === 0) {
       toast({
         title: 'Upload Limit Reached',
         description: "You've reached the maximum of 100 clothes items. Delete some to add more.",
@@ -225,34 +290,87 @@ export const ClothesUpload = () => {
       return;
     }
 
-    try {
-      await uploadClothing(file, {
-        category: validation.data.category,
-        color: validation.data.color,
-        style: validation.data.style,
-        brand: validation.data.brand,
-        description: validation.data.description,
+    if (files.length > remainingSlots) {
+      toast({
+        title: 'Too Many Files',
+        description: `You can only upload ${remainingSlots} more items. Please select fewer files.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Handle multiple uploads
+    if (files.length > 1) {
+      setUploadingMultiple(true);
+      setUploadProgress(0);
+      
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < files.length; i++) {
+        try {
+          await uploadClothing(files[i], {
+            category: validation.data.category,
+            color: validation.data.color,
+            style: validation.data.style,
+            brand: validation.data.brand,
+            description: validation.data.description,
+          });
+          successCount++;
+        } catch (error) {
+          failCount++;
+        }
+        setUploadProgress(((i + 1) / files.length) * 100);
+      }
+
+      setUploadingMultiple(false);
+      
+      toast({
+        title: 'Upload Complete',
+        description: `${successCount} of ${files.length} items uploaded successfully${failCount > 0 ? `, ${failCount} failed` : ''}.`,
+        variant: failCount > 0 ? 'destructive' : 'default',
       });
 
       // Reset form
-      setFile(null);
-      setPreview('');
+      setFiles([]);
+      setPreviews([]);
       setCategory('');
       setColor('');
       setStyle('');
       setBrand('');
       setDescription('');
-    } catch (error) {
-      // Error is handled in the hook
+      setUploadProgress(0);
+    } else {
+      // Single upload
+      try {
+        await uploadClothing(files[0], {
+          category: validation.data.category,
+          color: validation.data.color,
+          style: validation.data.style,
+          brand: validation.data.brand,
+          description: validation.data.description,
+        });
+
+        // Reset form
+        setFiles([]);
+        setPreviews([]);
+        setCategory('');
+        setColor('');
+        setStyle('');
+        setBrand('');
+        setDescription('');
+      } catch (error) {
+        // Error is handled in the hook
+      }
     }
   };
 
   return (
     <Card className="w-full max-w-2xl">
       <CardHeader>
-        <CardTitle>Upload Clothing Item</CardTitle>
+        <CardTitle>Upload Clothing Items</CardTitle>
         <CardDescription>
-          Upload a photo of your clothing item ({clothes.length}/100 items used). Color detection is automatic, but you'll need to manually tag category and style.
+          Upload photos of your clothing items ({clothes.length}/100 items used). Select multiple files to upload in batch. AI can detect style automatically.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -266,27 +384,35 @@ export const ClothesUpload = () => {
                 isDragActive 
                   ? 'border-primary bg-primary/5' 
                   : 'border-muted-foreground/25 hover:border-muted-foreground/40'
-              } ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              } ${loading || uploadingMultiple ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
-              {preview ? (
+              {previews.length > 0 ? (
                 <div className="space-y-4">
-                  <img
-                    src={preview}
-                    alt="Preview of clothing item"
-                    className="mx-auto max-h-64 rounded-lg object-cover"
-                    loading="lazy"
-                  />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {previews.map((preview, idx) => (
+                      <img
+                        key={idx}
+                        src={preview}
+                        alt={`Preview ${idx + 1} of clothing item`}
+                        className="w-full h-32 rounded-lg object-cover"
+                        loading="eager"
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {files.length} file{files.length > 1 ? 's' : ''} selected
+                  </p>
                   <Button 
                     type="button" 
                     variant="outline" 
                     onClick={(e) => {
                       e.stopPropagation();
-                      setFile(null);
-                      setPreview('');
+                      setFiles([]);
+                      setPreviews([]);
                     }}
-                    aria-label="Change photo"
+                    aria-label="Change photos"
                   >
-                    Change Photo
+                    Change Photos
                   </Button>
                 </div>
               ) : (
@@ -301,10 +427,10 @@ export const ClothesUpload = () => {
                       <Upload className="mx-auto h-12 w-12 text-muted-foreground" aria-hidden="true" />
                       <div className="space-y-2">
                         <p className="text-base font-medium">
-                          Drag & drop your photo here
+                          Drag & drop your photos here
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          or click to browse (max 10MB)
+                          or click to browse (max 10MB each, up to 10 files)
                         </p>
                       </div>
                     </>
@@ -346,12 +472,34 @@ export const ClothesUpload = () => {
             </Select>
           </div>
 
-          {/* Style Selection - Required */}
+          {/* Style Selection with AI Detection */}
           <div className="space-y-2">
-            <Label htmlFor="style">Style *</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="style">Style *</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={detectStyle}
+                disabled={files.length === 0 || detectingStyle || loading || uploadingMultiple}
+                className="text-xs"
+              >
+                {detectingStyle ? (
+                  <>
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    Detecting...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    Detect with AI
+                  </>
+                )}
+              </Button>
+            </div>
             <Select value={style} onValueChange={setStyle}>
               <SelectTrigger>
-                <SelectValue placeholder="Select style" />
+                <SelectValue placeholder="Select style or use AI detection" />
               </SelectTrigger>
               <SelectContent>
                 {STYLES.map((styleOption) => (
@@ -395,18 +543,36 @@ export const ClothesUpload = () => {
             />
           </div>
 
+          {/* Progress Bar for Multi-Upload */}
+          {uploadingMultiple && (
+            <div className="space-y-2">
+              <Label>Upload Progress</Label>
+              <Progress value={uploadProgress} className="w-full" />
+              <p className="text-sm text-muted-foreground text-center">
+                {Math.round(uploadProgress)}% complete
+              </p>
+            </div>
+          )}
+
           <Button 
             type="submit" 
             className="w-full" 
-            disabled={!file || !category || !style || loading || clothes.length >= 100}
+            disabled={files.length === 0 || !category || !style || loading || uploadingMultiple || clothes.length >= 100}
           >
-            {loading ? (
+            {uploadingMultiple ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Uploading {files.length} Items...
+              </>
+            ) : loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Uploading & Detecting Color...
               </>
             ) : clothes.length >= 100 ? (
               'Max 100 items reached'
+            ) : files.length > 1 ? (
+              `Upload ${files.length} Items`
             ) : (
               'Upload Clothing Item'
             )}

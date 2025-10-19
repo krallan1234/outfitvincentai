@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.generate-packing-list]
 verify_jwt = true
+
+[functions.detect-clothing-style]
+verify_jwt = true

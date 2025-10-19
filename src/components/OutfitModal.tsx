@@ -13,6 +13,60 @@ import { cn } from '@/lib/utils';
 
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"%3E%3Crect fill="%23ddd" width="400" height="400"/%3E%3C/svg%3E';
 
+// Helpers to ensure valid, loadable image URLs from Supabase
+const SUPABASE_URL = 'https://bichfpvapfibrpplrtcr.supabase.co';
+const PUBLIC_PREFIX = `${SUPABASE_URL}/storage/v1/object/public/`;
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function normalizeImageUrl(u?: string): string | undefined {
+  if (!u) return undefined;
+  if (u.startsWith('http')) return u;
+  if (u.startsWith('/')) return `${SUPABASE_URL}${u}`;
+  if (u.startsWith('storage/v1/object/public/')) return `${SUPABASE_URL}/${u}`;
+  // Assume path under clothes bucket when only key is provided
+  return `${PUBLIC_PREFIX}${u.startsWith('clothes/') ? u : `clothes/${u}`}`;
+}
+
+async function toSignedUrlIfNeeded(url: string): Promise<string> {
+  try {
+    const resp = await fetch(url, { method: 'HEAD' });
+    if (resp.ok) return url;
+  } catch { /* ignore and try signed */ }
+
+  try {
+    const path = url.includes('/object/public/clothes/')
+      ? url.split('/object/public/clothes/')[1]
+      : url.replace(PUBLIC_PREFIX, '').replace(/^clothes\//, '');
+    if (!path) return url;
+    const { data } = await supabase.storage.from('clothes').createSignedUrl(path, 60);
+    if (data?.signedUrl) return data.signedUrl;
+  } catch { /* ignore */ }
+  return url;
+}
+
+async function prepareImageUrl(raw?: string): Promise<string> {
+  const normalized = normalizeImageUrl(raw) || PLACEHOLDER_IMAGE;
+  // small delay to mitigate propagation delay
+  await wait(600);
+  try {
+    const head = await fetch(normalized, { method: 'HEAD' });
+    if (head.ok) return normalized;
+  } catch { /* fallthrough */ }
+  return await toSignedUrlIfNeeded(normalized);
+}
+
+async function prepareAndSetClothesImages(items: any[], setClothes: (items: any[]) => void, setLoadingState: (v: boolean) => void) {
+  setLoadingState(true);
+  const prepared = await Promise.all(items.map(async (item) => {
+    const srcCandidates = [item.image_url, item.image, item.url];
+    let finalUrl = await prepareImageUrl(srcCandidates.find(Boolean));
+    return { ...item, image_url: finalUrl };
+  }));
+  setClothes(prepared);
+  setLoadingState(false);
+}
+
 interface OutfitModalProps {
   outfit: any;
   isOpen: boolean;
@@ -74,32 +128,29 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
   useEffect(() => {
     if (!isOpen || !outfit) return;
 
-    const owner = !!userId && outfit.user_id === userId;
+    (async () => {
+      const owner = !!userId && outfit.user_id === userId;
 
-    // Check if outfit_visualization has valid items with image URLs
-    const hasVisualizationImages = Array.isArray(outfit.ai_analysis?.outfit_visualization?.items) && 
-      outfit.ai_analysis.outfit_visualization.items.length > 0 &&
-      outfit.ai_analysis.outfit_visualization.items.some(item => item.image_url);
+      const hasVisualizationImages = Array.isArray(outfit.ai_analysis?.outfit_visualization?.items) && 
+        outfit.ai_analysis.outfit_visualization.items.length > 0 &&
+        outfit.ai_analysis.outfit_visualization.items.some((item: any) => item.image_url);
 
-    // Priority 1: Use visualization items if they have image URLs
-    if (hasVisualizationImages) {
-      console.log('Using outfit visualization items:', outfit.ai_analysis.outfit_visualization.items);
-      setClothesImages(outfit.ai_analysis.outfit_visualization.items);
+      if (hasVisualizationImages) {
+        console.log('Using outfit visualization items:', outfit.ai_analysis.outfit_visualization.items);
+        await prepareAndSetClothesImages(outfit.ai_analysis.outfit_visualization.items, setClothesImages, setLoading);
+        return;
+      }
+
+      if (owner && Array.isArray(outfit.recommended_clothes) && outfit.recommended_clothes.length > 0) {
+        console.log('Fetching clothes from database for owner, IDs:', outfit.recommended_clothes);
+        fetchClothesImages();
+        return;
+      }
+
+      console.warn('No clothes images available for outfit');
+      setClothesImages([]);
       setLoading(false);
-      return;
-    }
-
-    // Priority 2: For owner's outfits, fetch from database using IDs
-    if (owner && Array.isArray(outfit.recommended_clothes) && outfit.recommended_clothes.length > 0) {
-      console.log('Fetching clothes from database for owner, IDs:', outfit.recommended_clothes);
-      fetchClothesImages();
-      return;
-    }
-
-    // Fallback: nothing to show
-    console.warn('No clothes images available for outfit');
-    setClothesImages([]);
-    setLoading(false);
+    })();
   }, [isOpen, outfit, userId]);
 
   // Early return if outfit is null
@@ -124,7 +175,8 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
         .in('id', clothesIds);
 
       if (error) throw error;
-      setClothesImages(data || []);
+      await prepareAndSetClothesImages(data || [], setClothesImages, setLoading);
+
     } catch (error) {
       console.error('Error fetching clothes images:', error);
       setClothesImages([]);
@@ -325,7 +377,7 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                             src={item.image_url || item.image || item.url || PLACEHOLDER_IMAGE}
                             alt={`${item.category || item.type || 'Item'} - ${item.color || (item.colors?.[0]) || 'Unknown color'}`}
                             className="w-full h-full object-cover pointer-events-none select-none transition-none"
-                            loading="eager"
+                            loading="lazy"
                             style={{
                               minHeight: '150px',
                             }}

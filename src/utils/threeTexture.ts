@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 // Load, downscale, and prepare a texture for clothing images
 export async function loadProcessedTexture(url: string, opts?: { maxSize?: number; mirrorX?: boolean }) {
-  const maxSize = opts?.maxSize ?? 1024;
+  const maxSize = opts?.maxSize ?? 512; // lower to avoid GPU context loss
   const mirrorX = opts?.mirrorX ?? true;
 
   return new Promise<THREE.Texture>((resolve, reject) => {
@@ -19,8 +19,8 @@ export async function loadProcessedTexture(url: string, opts?: { maxSize?: numbe
 
         // Ensure power-of-two dims for stability on weaker GPUs
         const toPOT = (n: number) => 2 ** Math.max(1, Math.floor(Math.log2(n)));
-        const potW = Math.min(2048, toPOT(w));
-        const potH = Math.min(2048, toPOT(h));
+        const potW = Math.min(1024, toPOT(w));
+        const potH = Math.min(1024, toPOT(h));
 
         const canvas = document.createElement('canvas');
         canvas.width = potW;
@@ -40,6 +40,7 @@ export async function loadProcessedTexture(url: string, opts?: { maxSize?: numbe
         texture.generateMipmaps = false; // fewer GPU resources
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
+        texture.anisotropy = 1;
 
         if (mirrorX) {
           texture.wrapS = THREE.MirroredRepeatWrapping;

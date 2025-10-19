@@ -30,27 +30,23 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
       {/* Upper Torso - use outerwear if present, else top */}
       <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.45, 0.35, 1.2, 32]} />
-        <meshStandardMaterial 
-          {...((outerwearTex || topTex) ? { 
-            map: (outerwearTex ?? topTex)!,
-            side: THREE.DoubleSide
-          } : { color: '#e8e8e8' })}
-          metalness={0.2} 
-          roughness={0.6}
-        />
+        {(outerwearTex || topTex) ? (
+          <meshBasicMaterial map={(outerwearTex ?? topTex)!} side={THREE.DoubleSide} />
+        ) : (
+          <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
+        )}
+
       </mesh>
       
       {/* Lower Torso - use bottom */}
       <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.35, 0.4, 0.8, 32]} />
-        <meshStandardMaterial 
-          {...(bottomTex ? { 
-            map: bottomTex,
-            side: THREE.DoubleSide
-          } : { color: '#e8e8e8' })}
-          metalness={0.2} 
-          roughness={0.6}
-        />
+        {(bottomTex) ? (
+          <meshBasicMaterial map={bottomTex} side={THREE.DoubleSide} />
+        ) : (
+          <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
+        )}
+
       </mesh>
       
       {/* Shoulders */}
@@ -109,14 +105,12 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
       {/* Upper Legs */}
       <mesh position={[-0.2, -1.6, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.18, 0.15, 1.0, 16]} />
-        <meshStandardMaterial 
-          {...(bottomTex ? { 
-            map: bottomTex,
-            side: THREE.DoubleSide
-          } : { color: '#e8e8e8' })}
-          metalness={0.2} 
-          roughness={0.6}
-        />
+        {(bottomTex) ? (
+          <meshBasicMaterial map={bottomTex} side={THREE.DoubleSide} />
+        ) : (
+          <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
+        )}
+
       </mesh>
       <mesh position={[0.2, -1.6, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.18, 0.15, 1.0, 16]} />
@@ -307,7 +301,16 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
         </div>
       )}
       
-      <Canvas dpr={[1, 1.5]} shadows gl={{ antialias: true, alpha: true, powerPreference: 'high-performance', preserveDrawingBuffer: false }}>
+      <Canvas 
+        dpr={[1, 1.25]}
+        shadows={false}
+        gl={{ antialias: false, alpha: true, powerPreference: 'low-power', preserveDrawingBuffer: false }}
+        onCreated={({ gl }) => {
+          const cnv = gl.domElement as HTMLCanvasElement;
+          cnv.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('WebGL context lost'); }, false);
+          cnv.addEventListener('webglcontextrestored', () => { console.warn('WebGL context restored'); }, false);
+        }}
+      >
         <Suspense fallback={null}>
           <PerspectiveCamera makeDefault position={[0, 0.5, 5]} />
           

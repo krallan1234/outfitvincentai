@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, Loader2 } from 'lucide-react';
+import { Upload, Loader2, ImagePlus } from 'lucide-react';
 import { useClothes } from '@/hooks/useClothes';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
@@ -109,17 +110,51 @@ export const ClothesUpload = () => {
   const { uploadClothing, loading, clothes } = useClothes();
   const { toast } = useToast();
 
+  const processFile = (selectedFile: File) => {
+    setFile(selectedFile);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPreview(reader.result as string);
+    };
+    reader.readAsDataURL(selectedFile);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      setFile(selectedFile);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(selectedFile);
+      processFile(selectedFile);
     }
   };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: {
+      'image/*': ['.jpeg', '.jpg', '.png', '.webp', '.heic']
+    },
+    maxFiles: 1,
+    maxSize: 10 * 1024 * 1024, // 10MB
+    onDrop: (acceptedFiles) => {
+      if (acceptedFiles.length > 0) {
+        processFile(acceptedFiles[0]);
+      }
+    },
+    onDropRejected: (fileRejections) => {
+      const rejection = fileRejections[0];
+      if (rejection.errors[0]?.code === 'file-too-large') {
+        toast({
+          title: 'File Too Large',
+          description: 'Please select an image under 10MB.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Invalid File',
+          description: 'Please select a valid image file.',
+          variant: 'destructive',
+        });
+      }
+    },
+    disabled: loading
+  });
 
   const handleCameraCapture = async () => {
     try {
@@ -222,10 +257,17 @@ export const ClothesUpload = () => {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* File Upload */}
+          {/* Drag & Drop File Upload */}
           <div className="space-y-2">
             <Label htmlFor="file">Clothing Photo</Label>
-            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+            <div 
+              {...getRootProps()} 
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                isDragActive 
+                  ? 'border-primary bg-primary/5' 
+                  : 'border-muted-foreground/25 hover:border-muted-foreground/40'
+              } ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
               {preview ? (
                 <div className="space-y-4">
                   <img
@@ -237,7 +279,8 @@ export const ClothesUpload = () => {
                   <Button 
                     type="button" 
                     variant="outline" 
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setFile(null);
                       setPreview('');
                     }}
@@ -248,34 +291,39 @@ export const ClothesUpload = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <Upload className="mx-auto h-12 w-12 text-muted-foreground" aria-hidden="true" />
+                  {isDragActive ? (
+                    <>
+                      <ImagePlus className="mx-auto h-12 w-12 text-primary animate-bounce" aria-hidden="true" />
+                      <p className="text-base font-medium text-primary">Drop your photo here!</p>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mx-auto h-12 w-12 text-muted-foreground" aria-hidden="true" />
+                      <div className="space-y-2">
+                        <p className="text-base font-medium">
+                          Drag & drop your photo here
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          or click to browse (max 10MB)
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  <input {...getInputProps()} id="file" />
                   <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                    <Label htmlFor="file" className="cursor-pointer">
-                      <Button type="button" variant="outline" asChild>
-                        <span>Choose Photo</span>
-                      </Button>
-                    </Label>
-                    <Input
-                      id="file"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      className="hidden"
-                      aria-label="Upload clothing photo"
-                    />
                     <Button 
                       type="button" 
                       variant="outline"
-                      onClick={handleCameraCapture}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCameraCapture();
+                      }}
                       className="md:hidden"
                       aria-label="Take photo with camera"
                     >
                       📷 Take Photo
                     </Button>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Upload a clear photo of your clothing item
-                  </p>
                 </div>
               )}
             </div>

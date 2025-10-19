@@ -17,6 +17,8 @@ import { ClothesGallery } from './ClothesGallery';
 import { ProfilePreferences } from './ProfilePreferences';
 import { OutfitHistory } from './OutfitHistory';
 import { AdvancedMoodSelector } from './AdvancedMoodSelector';
+import { OccasionFilters } from './OccasionFilters';
+import { OutfitGenerationProgress } from './OutfitGenerationProgress';
 import { OnboardingTooltips } from './OnboardingTooltips';
 import { ErrorModal, useErrorModal } from './ErrorModal';
 import { OutfitModal } from './OutfitModal';
@@ -53,11 +55,13 @@ interface PurchaseLink {
 export const OutfitGenerator = () => {
   const [prompt, setPrompt] = useState('');
   const [mood, setMood] = useState('');
+  const [occasion, setOccasion] = useState('');
   const [generatedOutfit, setGeneratedOutfit] = useState<any>(null);
   const [enablePinterestBoard, setEnablePinterestBoard] = useState(false);
   const [selectedItems, setSelectedItems] = useState<ClothingItem[]>([]);
   const [purchaseLinks, setPurchaseLinks] = useState<PurchaseLink[]>([{ store_name: '', price: '', url: '' }]);
   const [loadingTip, setLoadingTip] = useState('');
+  const [generationStep, setGenerationStep] = useState(1);
   const [userLocation, setUserLocation] = useState('');
   const [showPreferences, setShowPreferences] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -168,18 +172,22 @@ export const OutfitGenerator = () => {
     }
 
     const tips = [
-      "Analyzing your selections...",
-      "Finding complementary pieces...",
-      "Checking Pinterest trends...",
-      weather ? "Considering current weather..." : "Matching colors and styles...",
-      "Creating your perfect outfit..."
+      "Analyzing your wardrobe selections...",
+      "Finding perfect color combinations...",
+      "Checking Pinterest trends for inspiration...",
+      weather ? "Considering current weather conditions..." : "Matching styles and patterns...",
+      "Finalizing your outfit with AI..."
     ];
     
     let tipIndex = 0;
+    setGenerationStep(1);
+    setLoadingTip(tips[0]);
+    
     const tipInterval = setInterval(() => {
-      setLoadingTip(tips[tipIndex % tips.length]);
       tipIndex++;
-    }, 2000);
+      setGenerationStep(Math.min(tipIndex + 1, 4));
+      setLoadingTip(tips[tipIndex % tips.length]);
+    }, 3000);
 
     try {
       // Get user preferences for personalization
@@ -195,10 +203,15 @@ export const OutfitGenerator = () => {
         userPreferences = data;
       }
 
+      // Add occasion context if selected
+      const contextPrompt = occasion 
+        ? `${prompt} for ${occasion}` 
+        : prompt;
+      
       // Add random variation seed to force different results when regenerating
       const varietyPrompt = forceVariety 
-        ? `${prompt} (style variation ${Math.floor(Math.random() * 10000)})` 
-        : prompt;
+        ? `${contextPrompt} (style variation ${Math.floor(Math.random() * 10000)})` 
+        : contextPrompt;
       
       // Filter out empty purchase links
       const validPurchaseLinks = purchaseLinks.filter(link => link.store_name.trim() !== '');
@@ -224,6 +237,7 @@ export const OutfitGenerator = () => {
     } finally {
       clearInterval(tipInterval);
       setLoadingTip('');
+      setGenerationStep(1);
     }
   };
 
@@ -376,6 +390,12 @@ export const OutfitGenerator = () => {
             />
           </div>
 
+          {/* Occasion Filters */}
+          <OccasionFilters 
+            selectedOccasion={occasion}
+            onOccasionChange={setOccasion}
+          />
+
           {/* Advanced Mood Selection */}
           <div id="mood-selector">
             <AdvancedMoodSelector value={mood} onChange={setMood} />
@@ -472,10 +492,7 @@ export const OutfitGenerator = () => {
           </div>
 
           {loading && loadingTip && (
-            <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <p className="text-sm text-muted-foreground">{loadingTip}</p>
-            </div>
+            <OutfitGenerationProgress step={generationStep} tip={loadingTip} />
           )}
 
           <div className="flex gap-2">

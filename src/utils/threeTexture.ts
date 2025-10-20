@@ -45,6 +45,29 @@ function cropImageToContent(img: HTMLImageElement): { canvas: HTMLCanvasElement;
   return { canvas: tempCanvas, bounds: { x: minX, y: minY, w, h } };
 }
 
+// Calculate average color of image for fallback fills
+function calculateAverageColor(canvas: HTMLCanvasElement, bounds: { x: number; y: number; w: number; h: number }): THREE.Color {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.Color(0xcccccc);
+  
+  const imageData = ctx.getImageData(bounds.x, bounds.y, Math.min(bounds.w, 50), Math.min(bounds.h, 50));
+  const data = imageData.data;
+  let r = 0, g = 0, b = 0, count = 0;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3];
+    if (alpha > 25) { // Only count non-transparent pixels
+      r += data[i];
+      g += data[i + 1];
+      b += data[i + 2];
+      count++;
+    }
+  }
+  
+  if (count === 0) return new THREE.Color(0xcccccc);
+  return new THREE.Color(r / (count * 255), g / (count * 255), b / (count * 255));
+}
+
 // Load, downscale, and prepare a texture for clothing images
 export async function loadProcessedTexture(url: string, opts?: { maxSize?: number; mirrorX?: boolean }) {
   const maxSize = opts?.maxSize ?? 512; // lower to avoid GPU context loss

@@ -1,17 +1,33 @@
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment, ContactShadows } from '@react-three/drei';
-import { Suspense, useRef, useState, useEffect } from 'react';
+import { Suspense, useRef, useState, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { Button } from './ui/button';
 import { RotateCw, ZoomIn, ZoomOut, RotateCcw, Loader2 } from 'lucide-react';
 import { loadProcessedTexture } from '@/utils/threeTexture';
+import { detectFabricType } from '@/utils/fabricMaterial';
+import { generateNormalMapFromTexture } from '@/utils/normalMapGenerator';
 interface Outfit3DViewerProps {
   imageUrl?: string;
   title: string;
   clothingItems?: any[];
 }
 
-function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Texture; bottomTex?: THREE.Texture; outerwearTex?: THREE.Texture }) {
+interface TextureWithMaterial {
+  texture: THREE.Texture;
+  normalMap?: THREE.Texture;
+  material: THREE.Material;
+}
+
+function MannequinModel({ 
+  topMat, 
+  bottomMat, 
+  outerwearMat 
+}: { 
+  topMat?: TextureWithMaterial; 
+  bottomMat?: TextureWithMaterial; 
+  outerwearMat?: TextureWithMaterial;
+}) {
   // Create an improved mannequin with better proportions and per-part textures
   return (
     <group>
@@ -30,18 +46,26 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
       {/* Upper Torso - use outerwear if present, else top */}
       <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.45, 0.35, 1.2, 32, 1, true]} />
-        {(outerwearTex || topTex) ? (
-          <meshBasicMaterial map={(outerwearTex ?? topTex)!} side={THREE.DoubleSide} />
+        {(outerwearMat || topMat) ? (
+          <primitive object={(outerwearMat ?? topMat)!.material} attach="material" />
         ) : (
           <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
         )}
       </mesh>
       
+      {/* Outerwear layer - slightly scaled up if present */}
+      {outerwearMat && topMat && (
+        <mesh position={[0, 0.5, 0]} castShadow receiveShadow scale={1.03}>
+          <cylinderGeometry args={[0.45, 0.35, 1.2, 32, 1, true]} />
+          <primitive object={outerwearMat.material} attach="material" />
+        </mesh>
+      )}
+      
       {/* Lower Torso - use bottom */}
       <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.35, 0.4, 0.8, 32, 1, true]} />
-        {(bottomTex) ? (
-          <meshBasicMaterial map={bottomTex} side={THREE.DoubleSide} />
+        {bottomMat ? (
+          <primitive object={bottomMat.material} attach="material" />
         ) : (
           <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
         )}
@@ -60,16 +84,16 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
       {/* Upper Arms - use top texture, T-pose */}
       <mesh position={[-0.65, 0.3, 0]} rotation-z={Math.PI / 2} castShadow>
         <cylinderGeometry args={[0.14, 0.12, 0.9, 16, 1, true]} />
-        {topTex ? (
-          <meshBasicMaterial map={topTex} side={THREE.DoubleSide} />
+        {topMat ? (
+          <primitive object={topMat.material} attach="material" />
         ) : (
           <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
         )}
       </mesh>
       <mesh position={[0.65, 0.3, 0]} rotation-z={-Math.PI / 2} castShadow>
         <cylinderGeometry args={[0.14, 0.12, 0.9, 16, 1, true]} />
-        {topTex ? (
-          <meshBasicMaterial map={topTex} side={THREE.DoubleSide} />
+        {topMat ? (
+          <primitive object={topMat.material} attach="material" />
         ) : (
           <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
         )}
@@ -98,26 +122,26 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
       {/* Hips - use bottom texture */}
       <mesh position={[0, -1.0, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.4, 0.38, 0.4, 32, 1, true]} />
-        {bottomTex ? (
-          <meshBasicMaterial map={bottomTex} side={THREE.DoubleSide} />
+        {bottomMat ? (
+          <primitive object={bottomMat.material} attach="material" />
         ) : (
           <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
         )}
       </mesh>
       
-      {/* Upper Legs - use bottom texture */}
+      {/* Upper Legs - use bottom texture with taper */}
       <mesh position={[-0.2, -1.6, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.18, 0.15, 1.0, 16, 1, true]} />
-        {bottomTex ? (
-          <meshBasicMaterial map={bottomTex} side={THREE.DoubleSide} />
+        {bottomMat ? (
+          <primitive object={bottomMat.material} attach="material" />
         ) : (
           <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
         )}
       </mesh>
       <mesh position={[0.2, -1.6, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.18, 0.15, 1.0, 16, 1, true]} />
-        {bottomTex ? (
-          <meshBasicMaterial map={bottomTex} side={THREE.DoubleSide} />
+        {bottomMat ? (
+          <primitive object={bottomMat.material} attach="material" />
         ) : (
           <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
         )}
@@ -147,13 +171,30 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
 }
 
 function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; clothingItems?: any[]; onLoad: () => void }) {
-  const [topTex, setTopTex] = useState<THREE.Texture | undefined>();
-  const [bottomTex, setBottomTex] = useState<THREE.Texture | undefined>();
-  const [outerTex, setOuterTex] = useState<THREE.Texture | undefined>();
+  const [topMat, setTopMat] = useState<TextureWithMaterial | undefined>();
+  const [bottomMat, setBottomMat] = useState<TextureWithMaterial | undefined>();
+  const [outerMat, setOuterMat] = useState<TextureWithMaterial | undefined>();
 
-  const load = (url: string) => {
-    console.log('Loading processed texture from:', url);
-    return loadProcessedTexture(url, { maxSize: 1024, mirrorX: true });
+  const load = async (url: string, category: string): Promise<TextureWithMaterial> => {
+    console.log('Loading processed texture from:', url, 'for category:', category);
+    const texture = await loadProcessedTexture(url, { maxSize: 1024, mirrorX: true });
+    
+    // Generate normal map for fabric depth
+    const normalMap = generateNormalMapFromTexture(texture);
+    
+    // Detect fabric type and create appropriate material
+    const fabricProps = detectFabricType(category);
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      normalMap: normalMap,
+      normalScale: new THREE.Vector2(0.3, 0.3),
+      roughness: fabricProps.roughness,
+      metalness: fabricProps.metalness,
+      envMapIntensity: fabricProps.envMapIntensity,
+      side: THREE.DoubleSide,
+    });
+    
+    return { texture, normalMap, material };
   };
 
   const getItemUrl = (cats: string[]) => {
@@ -171,61 +212,87 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
     let cancelled = false;
     const run = async () => {
       try {
-        let tt: THREE.Texture | undefined;
-        let bt: THREE.Texture | undefined;
-        let ot: THREE.Texture | undefined;
+        let tm: TextureWithMaterial | undefined;
+        let bm: TextureWithMaterial | undefined;
+        let om: TextureWithMaterial | undefined;
 
         if (clothingItems && clothingItems.length) {
           console.log('Loading textures for clothing items:', clothingItems);
-          const topUrl = getItemUrl(['top', 'shirt', 't-shirt', 'tshirt', 'blouse', 'sweater', 'sweatshirt']);
-          const bottomUrl = getItemUrl(['bottom', 'pants', 'trousers', 'skirt', 'shorts', 'jeans']);
-          const outerUrl = getItemUrl(['outerwear', 'outer', 'jacket', 'coat', 'blazer', 'hoodie', 'cardigan']);
           
-          console.log('URLs found:', { topUrl, bottomUrl, outerUrl });
+          const topItem = clothingItems.find((i) => {
+            const mc = String(i.main_category || '').toLowerCase();
+            const c = String(i.category || '').toLowerCase();
+            return ['top', 'shirt', 't-shirt', 'tshirt', 'blouse', 'sweater', 'sweatshirt'].some(cat => mc.includes(cat) || c.includes(cat));
+          });
+          
+          const bottomItem = clothingItems.find((i) => {
+            const mc = String(i.main_category || '').toLowerCase();
+            const c = String(i.category || '').toLowerCase();
+            return ['bottom', 'pants', 'trousers', 'skirt', 'shorts', 'jeans'].some(cat => mc.includes(cat) || c.includes(cat));
+          });
+          
+          const outerItem = clothingItems.find((i) => {
+            const mc = String(i.main_category || '').toLowerCase();
+            const c = String(i.category || '').toLowerCase();
+            return ['outerwear', 'outer', 'jacket', 'coat', 'blazer', 'hoodie', 'cardigan'].some(cat => mc.includes(cat) || c.includes(cat));
+          });
           
           const loadPromises = [];
           
-          if (topUrl) {
-            loadPromises.push(
-              load(topUrl)
-                .then(tex => { tt = tex; })
-                .catch(e => console.error('Failed to load top texture:', e))
-            );
-          }
-          if (bottomUrl) {
-            loadPromises.push(
-              load(bottomUrl)
-                .then(tex => { bt = tex; })
-                .catch(e => console.error('Failed to load bottom texture:', e))
-            );
-          }
-          if (outerUrl) {
-            loadPromises.push(
-              load(outerUrl)
-                .then(tex => { ot = tex; })
-                .catch(e => console.error('Failed to load outer texture:', e))
-            );
+          if (topItem) {
+            const url = topItem.image_url || topItem.image || topItem.url;
+            const category = topItem.category || topItem.main_category || 'top';
+            if (url) {
+              loadPromises.push(
+                load(url, category)
+                  .then(mat => { tm = mat; })
+                  .catch(e => console.error('Failed to load top texture:', e))
+              );
+            }
           }
           
-          // Wait for all textures to load
+          if (bottomItem) {
+            const url = bottomItem.image_url || bottomItem.image || bottomItem.url;
+            const category = bottomItem.category || bottomItem.main_category || 'bottom';
+            if (url) {
+              loadPromises.push(
+                load(url, category)
+                  .then(mat => { bm = mat; })
+                  .catch(e => console.error('Failed to load bottom texture:', e))
+              );
+            }
+          }
+          
+          if (outerItem) {
+            const url = outerItem.image_url || outerItem.image || outerItem.url;
+            const category = outerItem.category || outerItem.main_category || 'outerwear';
+            if (url) {
+              loadPromises.push(
+                load(url, category)
+                  .then(mat => { om = mat; })
+                  .catch(e => console.error('Failed to load outer texture:', e))
+              );
+            }
+          }
+          
           await Promise.all(loadPromises);
         }
         
-        if (!tt && !bt && imageUrl) {
+        if (!tm && !bm && imageUrl) {
           try {
-            const one = await load(imageUrl);
-            tt = one;
-            bt = one;
+            const one = await load(imageUrl, 'top');
+            tm = one;
+            bm = one;
           } catch (e) {
             console.error('Failed to load fallback image:', e);
           }
         }
 
         if (!cancelled) {
-          console.log('Setting textures:', { hasTop: !!tt, hasBottom: !!bt, hasOuter: !!ot });
-          setTopTex(tt);
-          setBottomTex(bt);
-          setOuterTex(ot);
+          console.log('Setting materials:', { hasTop: !!tm, hasBottom: !!bm, hasOuter: !!om });
+          setTopMat(tm);
+          setBottomMat(bm);
+          setOuterMat(om);
           onLoad();
         }
       } catch (e) {
@@ -239,13 +306,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
     };
   }, [imageUrl, clothingItems, onLoad]);
 
-  // Always show mannequin, even without textures
-  console.log('Rendering mannequin with textures:', { 
-    hasTop: !!topTex, 
-    hasBottom: !!bottomTex, 
-    hasOuter: !!outerTex 
-  });
-  return <MannequinModel topTex={topTex} bottomTex={bottomTex} outerwearTex={outerTex} />;
+  return <MannequinModel topMat={topMat} bottomMat={bottomMat} outerwearMat={outerMat} />;
 }
 
 export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewerProps) => {
@@ -313,11 +374,13 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
         <Suspense fallback={null}>
           <PerspectiveCamera makeDefault position={[0, 0.5, 5]} />
           
-          {/* Lighting Setup */}
-          <ambientLight intensity={0.6} />
+          {/* Enhanced Lighting Setup for realistic fabric appearance */}
+          <ambientLight intensity={0.5} />
+          
+          {/* Main key light from front-right */}
           <directionalLight
             position={[5, 8, 5]}
-            intensity={1.2}
+            intensity={1.4}
             castShadow
             shadow-mapSize-width={2048}
             shadow-mapSize-height={2048}
@@ -327,12 +390,23 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
             shadow-camera-top={10}
             shadow-camera-bottom={-10}
           />
-          <pointLight position={[-5, 5, -5]} intensity={0.4} color="#ffffff" />
+          
+          {/* Back rim light for depth */}
+          <directionalLight
+            position={[-5, 6, -5]}
+            intensity={0.6}
+            color="#f0f0ff"
+          />
+          
+          {/* Fill light from left */}
+          <pointLight position={[-4, 3, 2]} intensity={0.5} color="#ffffff" />
+          
+          {/* Top spotlight for fashion photography look */}
           <spotLight
-            position={[0, 8, 0]}
-            angle={0.3}
+            position={[0, 10, 2]}
+            angle={0.4}
             penumbra={1}
-            intensity={0.5}
+            intensity={0.8}
             castShadow
           />
           
@@ -344,10 +418,10 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
             <OutfitMesh imageUrl={imageUrl} clothingItems={clothingItems} onLoad={() => setIsLoading(false)} />
           </group>
           
-          {/* Ground shadow */}
+          {/* Ground shadow with improved visibility */}
           <ContactShadows
             position={[0, -3, 0]}
-            opacity={0.3}
+            opacity={0.4}
             scale={8}
             blur={2.5}
             far={4}
@@ -422,7 +496,8 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
       {/* Title Overlay */}
       <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-lg border border-primary/10">
         <p className="font-semibold text-sm font-serif">3D Preview: {title}</p>
-        <p className="text-xs text-muted-foreground">Drag to rotate • Scroll to zoom • Auto-rotating</p>
+        <p className="text-xs text-muted-foreground">Drag to rotate • Scroll to zoom</p>
+        <p className="text-xs text-muted-foreground/70 italic mt-1">Realistic fabric simulation applied</p>
       </div>
     </div>
   );

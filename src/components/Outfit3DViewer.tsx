@@ -29,24 +29,22 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
       
       {/* Upper Torso - use outerwear if present, else top */}
       <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.45, 0.35, 1.2, 32]} />
+        <cylinderGeometry args={[0.45, 0.35, 1.2, 32, 1, true]} />
         {(outerwearTex || topTex) ? (
           <meshBasicMaterial map={(outerwearTex ?? topTex)!} side={THREE.DoubleSide} />
         ) : (
           <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
         )}
-
       </mesh>
       
       {/* Lower Torso - use bottom */}
       <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.35, 0.4, 0.8, 32]} />
+        <cylinderGeometry args={[0.35, 0.4, 0.8, 32, 1, true]} />
         {(bottomTex) ? (
           <meshBasicMaterial map={bottomTex} side={THREE.DoubleSide} />
         ) : (
           <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
         )}
-
       </mesh>
       
       {/* Shoulders */}
@@ -59,14 +57,22 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
       
-      {/* Upper Arms */}
-      <mesh position={[-0.65, 0.3, 0]} rotation={[0, 0, 0.2]} castShadow>
-        <cylinderGeometry args={[0.14, 0.12, 0.9, 16]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
+      {/* Upper Arms - use top texture, T-pose */}
+      <mesh position={[-0.65, 0.3, 0]} rotation-z={Math.PI / 2} castShadow>
+        <cylinderGeometry args={[0.14, 0.12, 0.9, 16, 1, true]} />
+        {topTex ? (
+          <meshBasicMaterial map={topTex} side={THREE.DoubleSide} />
+        ) : (
+          <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
+        )}
       </mesh>
-      <mesh position={[0.65, 0.3, 0]} rotation={[0, 0, -0.2]} castShadow>
-        <cylinderGeometry args={[0.14, 0.12, 0.9, 16]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
+      <mesh position={[0.65, 0.3, 0]} rotation-z={-Math.PI / 2} castShadow>
+        <cylinderGeometry args={[0.14, 0.12, 0.9, 16, 1, true]} />
+        {topTex ? (
+          <meshBasicMaterial map={topTex} side={THREE.DoubleSide} />
+        ) : (
+          <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
+        )}
       </mesh>
       
       {/* Lower Arms */}
@@ -89,39 +95,32 @@ function MannequinModel({ topTex, bottomTex, outerwearTex }: { topTex?: THREE.Te
         <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
       </mesh>
       
-      {/* Hips */}
+      {/* Hips - use bottom texture */}
       <mesh position={[0, -1.0, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.4, 0.38, 0.4, 32]} />
-        <meshStandardMaterial 
-          {...(bottomTex ? { 
-            map: bottomTex,
-            side: THREE.DoubleSide
-          } : { color: '#e8e8e8' })}
-          metalness={0.2} 
-          roughness={0.6}
-        />
-      </mesh>
-      
-      {/* Upper Legs */}
-      <mesh position={[-0.2, -1.6, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.18, 0.15, 1.0, 16]} />
-        {(bottomTex) ? (
+        <cylinderGeometry args={[0.4, 0.38, 0.4, 32, 1, true]} />
+        {bottomTex ? (
           <meshBasicMaterial map={bottomTex} side={THREE.DoubleSide} />
         ) : (
           <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
         )}
-
+      </mesh>
+      
+      {/* Upper Legs - use bottom texture */}
+      <mesh position={[-0.2, -1.6, 0]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.18, 0.15, 1.0, 16, 1, true]} />
+        {bottomTex ? (
+          <meshBasicMaterial map={bottomTex} side={THREE.DoubleSide} />
+        ) : (
+          <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
+        )}
       </mesh>
       <mesh position={[0.2, -1.6, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.18, 0.15, 1.0, 16]} />
-        <meshStandardMaterial 
-          {...(bottomTex ? { 
-            map: bottomTex,
-            side: THREE.DoubleSide
-          } : { color: '#e8e8e8' })}
-          metalness={0.2} 
-          roughness={0.6}
-        />
+        <cylinderGeometry args={[0.18, 0.15, 1.0, 16, 1, true]} />
+        {bottomTex ? (
+          <meshBasicMaterial map={bottomTex} side={THREE.DoubleSide} />
+        ) : (
+          <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
+        )}
       </mesh>
       
       {/* Lower Legs */}

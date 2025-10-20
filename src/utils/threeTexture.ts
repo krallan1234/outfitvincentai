@@ -1,5 +1,50 @@
 import * as THREE from 'three';
 
+// Crop transparent or white margins from clothing images
+function cropImageToContent(img: HTMLImageElement): { canvas: HTMLCanvasElement; bounds: { x: number; y: number; w: number; h: number } } {
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = img.width;
+  tempCanvas.height = img.height;
+  const tempCtx = tempCanvas.getContext('2d');
+  if (!tempCtx) throw new Error('2D context unavailable');
+  
+  tempCtx.drawImage(img, 0, 0);
+  const imageData = tempCtx.getImageData(0, 0, img.width, img.height);
+  const data = imageData.data;
+  
+  let minX = img.width, minY = img.height, maxX = 0, maxY = 0;
+  
+  // Detect bounding box of non-transparent and non-white pixels
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      const i = (y * img.width + x) * 4;
+      const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+      
+      // Consider pixel as content if: alpha > 25 AND not nearly white
+      const isContent = a > 25 && !(r > 240 && g > 240 && b > 240);
+      
+      if (isContent) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  
+  // Add small padding and ensure valid bounds
+  const padding = 2;
+  minX = Math.max(0, minX - padding);
+  minY = Math.max(0, minY - padding);
+  maxX = Math.min(img.width - 1, maxX + padding);
+  maxY = Math.min(img.height - 1, maxY + padding);
+  
+  const w = Math.max(2, maxX - minX + 1);
+  const h = Math.max(2, maxY - minY + 1);
+  
+  return { canvas: tempCanvas, bounds: { x: minX, y: minY, w, h } };
+}
+
 // Load, downscale, and prepare a texture for clothing images
 export async function loadProcessedTexture(url: string, opts?: { maxSize?: number; mirrorX?: boolean }) {
   const maxSize = opts?.maxSize ?? 512; // lower to avoid GPU context loss
@@ -11,11 +56,14 @@ export async function loadProcessedTexture(url: string, opts?: { maxSize?: numbe
 
     img.onload = () => {
       try {
+        // Crop to content first
+        const { canvas: tempCanvas, bounds } = cropImageToContent(img);
+        
         // Compute scaled size capped at maxSize
-        const maxDim = Math.max(img.width, img.height);
+        const maxDim = Math.max(bounds.w, bounds.h);
         const scale = Math.min(1, maxSize / maxDim);
-        const w = Math.max(2, Math.floor(img.width * scale));
-        const h = Math.max(2, Math.floor(img.height * scale));
+        const w = Math.max(2, Math.floor(bounds.w * scale));
+        const h = Math.max(2, Math.floor(bounds.h * scale));
 
         // Ensure power-of-two dims for stability on weaker GPUs
         const toPOT = (n: number) => 2 ** Math.max(1, Math.floor(Math.log2(n)));
@@ -28,12 +76,12 @@ export async function loadProcessedTexture(url: string, opts?: { maxSize?: numbe
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('2D context unavailable');
 
-        // Fill with average-ish color as a safety net
+        // Fill with neutral color as a safety net
         ctx.fillStyle = '#cfcfcf';
         ctx.fillRect(0, 0, potW, potH);
 
-        // Draw the source image scaled to POT canvas
-        ctx.drawImage(img, 0, 0, potW, potH);
+        // Draw the cropped region scaled to POT canvas
+        ctx.drawImage(tempCanvas, bounds.x, bounds.y, bounds.w, bounds.h, 0, 0, potW, potH);
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;

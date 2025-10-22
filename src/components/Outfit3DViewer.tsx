@@ -1,12 +1,15 @@
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment, ContactShadows } from '@react-three/drei';
-import { Suspense, useRef, useState, useEffect, useMemo } from 'react';
+import { Suspense, useRef, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { Button } from './ui/button';
-import { RotateCw, ZoomIn, ZoomOut, RotateCcw, Loader2 } from 'lucide-react';
+import { RotateCw, ZoomIn, ZoomOut, RotateCcw, Loader2, Settings2, Play, Pause } from 'lucide-react';
 import { loadProcessedTexture } from '@/utils/threeTexture';
 import { detectFabricType } from '@/utils/fabricMaterial';
 import { generateNormalMapFromTexture } from '@/utils/normalMapGenerator';
+import { Switch } from './ui/switch';
+import { Label } from './ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 interface Outfit3DViewerProps {
   imageUrl?: string;
   title: string;
@@ -313,6 +316,8 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
   const controlsRef = useRef<any>(null);
   const [autoRotate, setAutoRotate] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
 
   const handleReset = () => {
     if (controlsRef.current) {
@@ -471,6 +476,7 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
             <RotateCw className="w-4 h-4" />
           </Button>
         </div>
+        
         <div className="flex gap-2">
           <Button
             variant="secondary"
@@ -491,12 +497,88 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
             <ZoomOut className="w-4 h-4" />
           </Button>
         </div>
+        
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => setAutoRotate(!autoRotate)}
+            className="bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
+            title={autoRotate ? "Pause rotation" : "Start rotation"}
+          >
+            {autoRotate ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+          </Button>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="secondary"
+                size="icon"
+                className="bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
+                title="Settings"
+              >
+                <Settings2 className="w-4 h-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64" align="end">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">3D Viewer Settings</h4>
+                  <p className="text-xs text-muted-foreground">Customize your viewing experience</p>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="auto-rotate" className="text-sm">Auto-rotate</Label>
+                  <Switch
+                    id="auto-rotate"
+                    checked={autoRotate}
+                    onCheckedChange={setAutoRotate}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-sm">Quality</Label>
+                  <div className="flex gap-2">
+                    {(['low', 'medium', 'high'] as const).map((q) => (
+                      <Button
+                        key={q}
+                        variant={quality === q ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setQuality(q)}
+                        className="flex-1 capitalize"
+                      >
+                        {q}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {quality === 'low' && 'Best for older devices'}
+                    {quality === 'medium' && 'Balanced performance'}
+                    {quality === 'high' && 'Best visual quality'}
+                  </p>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+        
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleReset}
+          className="bg-background/90 backdrop-blur-sm hover:bg-background shadow-lg"
+          title="Reset view"
+        >
+          Reset View
+        </Button>
       </div>
       
       {/* Title Overlay */}
       <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-lg border border-primary/10">
         <p className="font-semibold text-sm font-serif">3D Preview: {title}</p>
-        <p className="text-xs text-muted-foreground">Drag to rotate • Scroll to zoom</p>
+        <p className="text-xs text-muted-foreground">
+          {autoRotate ? 'Auto-rotating • ' : ''}Drag to rotate • Scroll to zoom
+        </p>
         <p className="text-xs text-muted-foreground/70 italic mt-1">Realistic fabric simulation applied</p>
       </div>
     </div>

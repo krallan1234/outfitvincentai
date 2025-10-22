@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Heart, ExternalLink, ShoppingBag, MessageCircle, Sparkles, CalendarPlus, Box, ScanFace } from 'lucide-react';
+import { Calendar, Heart, ExternalLink, ShoppingBag, MessageCircle, Sparkles, CalendarPlus, Box, ScanFace, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +10,8 @@ import { Outfit3DViewer } from '@/components/Outfit3DViewer';
 import { VirtualTryOn } from '@/components/VirtualTryOn';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { use3DCapability } from '@/hooks/use3DCapability';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"%3E%3Crect fill="%23ddd" width="400" height="400"/%3E%3C/svg%3E';
 
@@ -81,6 +83,8 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
   const [userId, setUserId] = useState<string | null>(null);
   const [showCalendarDialog, setShowCalendarDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [viewMode, setViewMode] = useState<'auto' | '2d' | '3d'>('auto');
+  const deviceCapability = use3DCapability();
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -288,13 +292,38 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
           {/* Outfit Visual */}
           <div className="space-y-3 sm:space-y-4">
-            <Tabs defaultValue="2d" className="w-full">
+            {/* Device capability warning */}
+            {!deviceCapability.supports3D && (
+              <Alert>
+                <ImageIcon className="h-4 w-4" />
+                <AlertDescription>
+                  Your device doesn't support 3D rendering. Showing 2D preview instead.
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {deviceCapability.supports3D && deviceCapability.gpuTier === 'low' && (
+              <Alert>
+                <AlertDescription className="text-xs">
+                  For best performance on your device, consider using 2D view.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Tabs 
+              defaultValue={
+                viewMode === 'auto' 
+                  ? (deviceCapability.supports3D && deviceCapability.gpuTier !== 'low' ? '3d' : '2d')
+                  : viewMode === '3d' ? '3d' : '2d'
+              } 
+              className="w-full"
+            >
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="2d">
                   <Sparkles className="h-4 w-4 mr-2" />
                   2D Image
                 </TabsTrigger>
-                <TabsTrigger value="3d">
+                <TabsTrigger value="3d" disabled={!deviceCapability.supports3D}>
                   <Box className="h-4 w-4 mr-2" />
                   3D Preview
                 </TabsTrigger>

@@ -759,6 +759,79 @@ serve(async (req) => {
     // Convert new format to legacy format for database compatibility
     const legacyRecommendedItems = outfitRecommendation.items.map(item => item.item_id);
 
+    // Step 3: Generate AI Hero Image using Gemini
+    console.log('Generating AI hero image with Gemini...');
+    let generatedImageUrl = null;
+    
+    try {
+      // Build image prompt based on outfit
+      const itemDescriptions = selectedItems.map(item => 
+        `${item.analysis.color} ${item.category}`
+      ).join(', ');
+      
+      const imagePrompt = `Professional fashion photograph of a neutral mannequin wearing ${itemDescriptions}. 
+The outfit should look elegant and well-styled. Studio lighting with soft shadows, clean neutral gray background, 
+front-facing 3/4 view. The mannequin should have a neutral pose showing off the complete outfit. 
+High fashion photography style, editorial quality, 4K resolution. 
+Mood: ${mood || 'stylish and modern'}. 
+The outfit conveys: ${outfitRecommendation.description}`;
+
+      console.log('Image generation prompt:', imagePrompt);
+
+      const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash-image-preview',
+          messages: [{
+            role: 'user',
+            content: imagePrompt
+          }],
+          modalities: ['image', 'text']
+        }),
+      });
+
+      if (imageResponse.ok) {
+        const imageData = await imageResponse.json();
+        const base64Image = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        
+        if (base64Image) {
+          console.log('AI image generated successfully');
+          
+          // Upload to Supabase Storage
+          const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+          const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+          
+          const fileName = `outfit_${Date.now()}_${Math.random().toString(36).substring(7)}.png`;
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('clothes')
+            .upload(`generated-outfits/${fileName}`, imageBuffer, {
+              contentType: 'image/png',
+              upsert: false
+            });
+
+          if (uploadError) {
+            console.error('Failed to upload generated image:', uploadError);
+          } else {
+            const { data: urlData } = supabase.storage
+              .from('clothes')
+              .getPublicUrl(`generated-outfits/${fileName}`);
+            
+            generatedImageUrl = urlData.publicUrl;
+            console.log('Generated image uploaded:', generatedImageUrl);
+          }
+        }
+      } else {
+        console.warn('Image generation failed:', imageResponse.status, await imageResponse.text());
+      }
+    } catch (imageError) {
+      console.error('Error generating AI image:', imageError);
+      // Continue without image - not critical
+    }
+
     // Save outfit to database
     const { data: savedOutfit, error: saveError } = await supabase
       .from('outfits')
@@ -768,7 +841,7 @@ serve(async (req) => {
         prompt,
         mood,
         is_public: isPublic,
-        generated_image_url: null, // Will be generated on frontend with Canvas
+        generated_image_url: generatedImageUrl,
         description: outfitRecommendation.description,
         recommended_clothes: legacyRecommendedItems,
         purchase_links: purchaseLinks || [],

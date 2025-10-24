@@ -130,20 +130,63 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
   const [bottomMat, setBottomMat] = useState<TextureWithMaterial | undefined>();
   const [outerMat, setOuterMat] = useState<TextureWithMaterial | undefined>();
 
-  const normalizeUrl = (u: string | undefined) => {
+  const normalizeUrl = async (u: string | undefined): Promise<string | undefined> => {
     if (!u) return undefined;
     try {
-      if (u.startsWith('data:') || u.startsWith('blob:')) return u;
-      if (u.startsWith('http://') || u.startsWith('https://')) return u;
-      if (u.startsWith('/')) return new URL(u, window.location.origin).toString();
-      return new URL('/' + u, window.location.origin).toString();
-    } catch {
+      // Handle data: and blob: URLs
+      if (u.startsWith('data:') || u.startsWith('blob:')) {
+        console.log('[Outfit3DViewer] Using data/blob URL directly');
+        return u;
+      }
+      
+      // Handle http/https URLs
+      if (u.startsWith('http://') || u.startsWith('https://')) {
+        console.log('[Outfit3DViewer] Checking URL availability:', u);
+        // Try HEAD request to check if accessible
+        try {
+          const response = await fetch(u, { method: 'HEAD' });
+          if (response.ok) {
+            console.log('[Outfit3DViewer] URL is accessible:', u);
+            return u;
+          }
+          console.warn('[Outfit3DViewer] URL HEAD request failed, attempting signed URL:', response.status);
+        } catch (headError) {
+          console.warn('[Outfit3DViewer] URL HEAD request error, attempting signed URL:', headError);
+        }
+        
+        // Try to get a signed URL if it's from Supabase storage
+        if (u.includes('/storage/v1/object/public/clothes/')) {
+          const path = u.split('/object/public/clothes/')[1];
+          console.log('[Outfit3DViewer] Attempting to create signed URL for path:', path);
+          const { supabase } = await import('@/integrations/supabase/client');
+          const { data } = await supabase.storage.from('clothes').createSignedUrl(path, 60);
+          if (data?.signedUrl) {
+            console.log('[Outfit3DViewer] Created signed URL successfully');
+            return data.signedUrl;
+          }
+        }
+        return u; // Return original if signed URL fails
+      }
+      
+      // Handle relative URLs
+      if (u.startsWith('/')) {
+        const fullUrl = new URL(u, window.location.origin).toString();
+        console.log('[Outfit3DViewer] Converted relative URL:', fullUrl);
+        return fullUrl;
+      }
+      
+      // Assume it's a Supabase path
+      const fullUrl = new URL('/' + u, window.location.origin).toString();
+      console.log('[Outfit3DViewer] Converted path to URL:', fullUrl);
+      return fullUrl;
+    } catch (e) {
+      console.error('[Outfit3DViewer] URL normalization error:', e);
       return u;
     }
   };
 
   const load = async (url: string, category: string, textureMaps?: any): Promise<TextureWithMaterial> => {
-    console.log('Loading processed texture from:', url, 'for category:', category, 'with AI maps:', !!textureMaps);
+    console.log('[Outfit3DViewer] Loading processed texture from:', url, 'for category:', category, 'with AI maps:', !!textureMaps);
     // Use smaller textures to avoid GPU context loss on mid/low devices
     const texture = await loadProcessedTexture(url, { maxSize: 512, mirrorX: true });
     
@@ -152,40 +195,50 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
     
     // Use AI-generated texture maps if available (2048x2048 high quality)
     if (textureMaps?.normal_url) {
-      console.log('Loading AI-generated 2048px normal map from:', textureMaps.normal_url);
-      normalMap = await new Promise<THREE.Texture>((resolve, reject) => {
-        new THREE.TextureLoader().load(
-          textureMaps.normal_url,
-          (tex) => {
-            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-            tex.minFilter = THREE.LinearMipmapLinearFilter;
-            tex.magFilter = THREE.LinearFilter;
-            (tex as any).colorSpace = THREE.LinearSRGBColorSpace;
-            resolve(tex);
-          },
-          undefined,
-          reject
-        );
-      });
-      } else {
-        console.debug('[Outfit3DViewer] Generating normal map from base texture');
+      console.log('[Outfit3DViewer] Loading AI-generated 2048px normal map from:', textureMaps.normal_url);
+      try {
+        normalMap = await new Promise<THREE.Texture>((resolve, reject) => {
+          new THREE.TextureLoader().load(
+            textureMaps.normal_url,
+            (tex) => {
+              tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+              tex.minFilter = THREE.LinearMipmapLinearFilter;
+              tex.magFilter = THREE.LinearFilter;
+              tex.colorSpace = THREE.LinearSRGBColorSpace;
+              resolve(tex);
+            },
+            undefined,
+            reject
+          );
+        });
+      } catch (e) {
+        console.error('[Outfit3DViewer] Failed to load AI normal map, generating fallback:', e);
         normalMap = generateNormalMapFromTexture(texture);
       }
+    } else {
+      console.debug('[Outfit3DViewer] Generating normal map from base texture');
+      normalMap = generateNormalMapFromTexture(texture);
+    }
     
     if (textureMaps?.roughness_url) {
-      console.log('Loading AI-generated roughness map from:', textureMaps.roughness_url);
-      roughnessMap = await new Promise<THREE.Texture>((resolve, reject) => {
-        new THREE.TextureLoader().load(
-          textureMaps.roughness_url,
-          (tex) => {
-            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-            (tex as any).colorSpace = THREE.LinearSRGBColorSpace;
-            resolve(tex);
-          },
-          undefined,
-          reject
-        );
-      });
+      console.log('[Outfit3DViewer] Loading AI-generated roughness map from:', textureMaps.roughness_url);
+      try {
+        roughnessMap = await new Promise<THREE.Texture>((resolve, reject) => {
+          new THREE.TextureLoader().load(
+            textureMaps.roughness_url,
+            (tex) => {
+              tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+              tex.colorSpace = THREE.LinearSRGBColorSpace;
+              resolve(tex);
+            },
+            undefined,
+            reject
+          );
+        });
+      } catch (e) {
+        console.error('[Outfit3DViewer] Failed to load AI roughness map:', e);
+        roughnessMap = undefined;
+      }
     }
     
     // Detect fabric type and create appropriate material
@@ -227,7 +280,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
         let om: TextureWithMaterial | undefined;
 
         if (clothingItems && clothingItems.length) {
-          console.log('Loading textures for clothing items:', clothingItems);
+          console.log('[Outfit3DViewer] Loading textures for clothing items:', clothingItems.length, 'items');
           
           const topItem = clothingItems.find((i) => {
             const mc = String(i.main_category || '').toLowerCase();
@@ -247,54 +300,78 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
             return ['outerwear', 'outer', 'jacket', 'coat', 'blazer', 'hoodie', 'cardigan'].some(cat => mc.includes(cat) || c.includes(cat));
           });
           
+          console.log('[Outfit3DViewer] Found items:', { hasTop: !!topItem, hasBottom: !!bottomItem, hasOuter: !!outerItem });
+          
           const loadPromises = [];
           
           if (topItem) {
-            const url = normalizeUrl(topItem.image_url || topItem.image || topItem.url);
+            const rawUrl = topItem.image_url || topItem.image || topItem.url;
+            console.log('[Outfit3DViewer] Processing top item URL:', rawUrl);
+            const url = await normalizeUrl(rawUrl);
             const category = topItem.category || topItem.main_category || 'top';
             if (url) {
               loadPromises.push(
                 load(url, category, topItem.texture_maps)
-                  .then(mat => { tm = mat; })
-                  .catch(e => console.error('Failed to load top texture:', e))
+                  .then(mat => { 
+                    tm = mat;
+                    console.log('[Outfit3DViewer] Top texture loaded successfully');
+                  })
+                  .catch(e => console.error('[Outfit3DViewer] Failed to load top texture:', e))
               );
             }
           }
           
           if (bottomItem) {
-            const url = normalizeUrl(bottomItem.image_url || bottomItem.image || bottomItem.url);
+            const rawUrl = bottomItem.image_url || bottomItem.image || bottomItem.url;
+            console.log('[Outfit3DViewer] Processing bottom item URL:', rawUrl);
+            const url = await normalizeUrl(rawUrl);
             const category = bottomItem.category || bottomItem.main_category || 'bottom';
             if (url) {
               loadPromises.push(
                 load(url, category, bottomItem.texture_maps)
-                  .then(mat => { bm = mat; })
-                  .catch(e => console.error('Failed to load bottom texture:', e))
+                  .then(mat => { 
+                    bm = mat;
+                    console.log('[Outfit3DViewer] Bottom texture loaded successfully');
+                  })
+                  .catch(e => console.error('[Outfit3DViewer] Failed to load bottom texture:', e))
               );
             }
           }
           
           if (outerItem) {
-            const url = normalizeUrl(outerItem.image_url || outerItem.image || outerItem.url);
+            const rawUrl = outerItem.image_url || outerItem.image || outerItem.url;
+            console.log('[Outfit3DViewer] Processing outer item URL:', rawUrl);
+            const url = await normalizeUrl(rawUrl);
             const category = outerItem.category || outerItem.main_category || 'outerwear';
             if (url) {
               loadPromises.push(
                 load(url, category, outerItem.texture_maps)
-                  .then(mat => { om = mat; })
-                  .catch(e => console.error('Failed to load outer texture:', e))
+                  .then(mat => { 
+                    om = mat;
+                    console.log('[Outfit3DViewer] Outer texture loaded successfully');
+                  })
+                  .catch(e => console.error('[Outfit3DViewer] Failed to load outer texture:', e))
               );
             }
           }
           
           await Promise.all(loadPromises);
+          console.log('[Outfit3DViewer] All texture loading complete');
         }
         
-        if (!tm && !bm && imageUrl) {
+        // Only fallback to imageUrl if no clothing items were processed
+        if (!tm && !bm && !om && imageUrl && (!clothingItems || clothingItems.length === 0)) {
+          console.log('[Outfit3DViewer] No clothing items, attempting to load fallback imageUrl:', imageUrl);
           try {
-            const one = await load(normalizeUrl(imageUrl)!, 'top');
-            tm = one;
-            bm = one;
+            const url = await normalizeUrl(imageUrl);
+            if (url) {
+              const one = await load(url, 'top');
+              tm = one;
+              bm = one;
+              console.log('[Outfit3DViewer] Fallback imageUrl loaded successfully');
+            }
           } catch (e) {
-            console.error('Failed to load fallback image:', e);
+            console.error('[Outfit3DViewer] Failed to load fallback imageUrl:', e);
           }
         }
 
@@ -307,19 +384,22 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
               ctx.fillStyle = (x + y) % 2 ? '#a0a0a0' : '#e0e0e0';
               ctx.fillRect((x * size) / cells, (y * size) / cells, size / cells, size / cells);
             } }
-            const t = new THREE.CanvasTexture(c); (t as any).colorSpace = THREE.SRGBColorSpace;
+            const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
             const mat = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, side: THREE.DoubleSide });
             tm = { texture: t, material: mat };
           }
-          console.log('Setting materials:', { hasTop: !!tm, hasBottom: !!bm, hasOuter: !!om });
+          console.log('[Outfit3DViewer] Setting materials:', { hasTop: !!tm, hasBottom: !!bm, hasOuter: !!om });
           setTopMat(tm);
           setBottomMat(bm);
           setOuterMat(om);
-          onLoad();
         }
       } catch (e) {
-        console.error('Failed to load textures for 3D outfit:', e);
-        if (!cancelled) onLoad();
+        console.error('[Outfit3DViewer] Failed to load textures for 3D outfit:', e);
+      } finally {
+        if (!cancelled) {
+          console.log('[Outfit3DViewer] Texture loading complete, calling onLoad');
+          onLoad();
+        }
       }
     };
     run();

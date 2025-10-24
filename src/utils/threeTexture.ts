@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 function createTestTexture(size: number = 64): THREE.Texture {
+  console.log('[threeTexture] Creating checkerboard test texture');
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d')!;
@@ -97,14 +98,18 @@ export async function loadProcessedTexture(url: string, opts?: { maxSize?: numbe
   const maxSize = opts?.maxSize ?? 512; // lower to avoid GPU context loss
   const mirrorX = opts?.mirrorX ?? true;
 
+  console.log('[threeTexture] Loading texture from:', url);
+
   return new Promise<THREE.Texture>((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
 
     img.onload = () => {
       try {
+        console.log('[threeTexture] Image loaded successfully:', { url, width: img.width, height: img.height });
         // Crop to content first
         const { canvas: tempCanvas, bounds } = cropImageToContent(img);
+        console.log('[threeTexture] Cropped bounds:', bounds);
         
         // Compute scaled size capped at maxSize
         const maxDim = Math.max(bounds.w, bounds.h);
@@ -148,16 +153,27 @@ export async function loadProcessedTexture(url: string, opts?: { maxSize?: numbe
         texture.wrapT = THREE.ClampToEdgeWrapping;
         texture.needsUpdate = true;
 
+        console.log('[threeTexture] Texture processed successfully:', { url, dimensions: `${potW}x${potH}`, mirrorX });
         resolve(texture);
       } catch (e) {
         console.error('[threeTexture] Failed to process texture', { url, error: e });
-        try { resolve(createTestTexture(64)); } catch { reject(e as any); }
+        try { 
+          console.warn('[threeTexture] Using checkerboard fallback for:', url);
+          resolve(createTestTexture(64)); 
+        } catch { 
+          reject(e as any); 
+        }
       }
     };
 
     img.onerror = (e) => {
       console.error('[threeTexture] Image failed to load', { url, error: e });
-      try { resolve(createTestTexture(64)); } catch { reject(e as any); }
+      try { 
+        console.warn('[threeTexture] Using checkerboard fallback for failed load:', url);
+        resolve(createTestTexture(64)); 
+      } catch { 
+        reject(e as any); 
+      }
     };
     img.src = url;
   });

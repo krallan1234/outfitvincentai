@@ -5,12 +5,13 @@ import * as THREE from 'three';
  * This adds subtle depth to clothing textures for more realistic rendering
  */
 export function generateNormalMapFromTexture(texture: THREE.Texture): THREE.Texture {
-  const canvas = document.createElement('canvas');
-  const size = 256; // Small size for performance
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Failed to get 2D context');
+  try {
+    const canvas = document.createElement('canvas');
+    const size = 256; // Small size for performance
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Failed to get 2D context');
   
   // Draw the source texture
   const img = texture.image as HTMLCanvasElement | HTMLImageElement;
@@ -61,13 +62,31 @@ export function generateNormalMapFromTexture(texture: THREE.Texture): THREE.Text
     }
   }
   
-  ctx.putImageData(new ImageData(normalData, size, size), 0, 0);
-  
-  const normalTexture = new THREE.CanvasTexture(canvas);
-  normalTexture.wrapS = texture.wrapS;
-  normalTexture.wrapT = texture.wrapT;
-  normalTexture.repeat.copy(texture.repeat);
-  normalTexture.needsUpdate = true;
-  
-  return normalTexture;
+    ctx.putImageData(new ImageData(normalData, size, size), 0, 0);
+    
+    const normalTexture = new THREE.CanvasTexture(canvas);
+    normalTexture.wrapS = texture.wrapS;
+    normalTexture.wrapT = texture.wrapT;
+    normalTexture.repeat.copy(texture.repeat);
+    normalTexture.needsUpdate = true;
+    
+    console.log('[normalMapGenerator] Normal map generated successfully');
+    return normalTexture;
+  } catch (e) {
+    console.error('[normalMapGenerator] Failed to generate normal map, creating flat normal:', e);
+    // Return a flat normal map (neutral blue)
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = 'rgb(127, 127, 255)'; // Flat normal pointing out
+      ctx.fillRect(0, 0, 64, 64);
+    }
+    const flatNormal = new THREE.CanvasTexture(canvas);
+    flatNormal.wrapS = texture.wrapS;
+    flatNormal.wrapT = texture.wrapT;
+    flatNormal.repeat.copy(texture.repeat);
+    return flatNormal;
+  }
 }

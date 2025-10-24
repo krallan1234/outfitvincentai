@@ -10,6 +10,7 @@ import { generateNormalMapFromTexture } from '@/utils/normalMapGenerator';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+const SUPABASE_URL = 'https://bichfpvapfibrpplrtcr.supabase.co';
 interface Outfit3DViewerProps {
   imageUrl?: string;
   title: string;
@@ -133,52 +134,50 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
   const normalizeUrl = async (u: string | undefined): Promise<string | undefined> => {
     if (!u) return undefined;
     try {
-      // Handle data: and blob: URLs
-      if (u.startsWith('data:') || u.startsWith('blob:')) {
-        console.log('[Outfit3DViewer] Using data/blob URL directly');
+      // Already valid schemes
+      if (u.startsWith('data:') || u.startsWith('blob:')) return u;
+
+      // If it's an absolute Supabase URL, try HEAD and fallback to signed URL if needed
+      if (u.startsWith('http://') || u.startsWith('https://')) {
+        if (u.includes('/storage/v1/object/public/')) {
+          try {
+            const head = await fetch(u, { method: 'HEAD' });
+            if (head.ok) return u;
+            console.warn('[Outfit3DViewer] Public URL HEAD failed, signing...', head.status);
+          } catch (e) {
+            console.warn('[Outfit3DViewer] Public URL HEAD error, signing...', e);
+          }
+          // Attempt to sign if it's from the clothes bucket
+          const clothesIdx = u.indexOf('/object/public/clothes/');
+          if (clothesIdx !== -1) {
+            const path = u.slice(clothesIdx + '/object/public/clothes/'.length);
+            const { supabase } = await import('@/integrations/supabase/client');
+            const { data } = await supabase.storage.from('clothes').createSignedUrl(path, 60);
+            if (data?.signedUrl) {
+              const signed = data.signedUrl.startsWith('/object/')
+                ? `${SUPABASE_URL}/storage/v1${data.signedUrl}`
+                : data.signedUrl;
+              return signed;
+            }
+          }
+        }
         return u;
       }
-      
-      // Handle http/https URLs
-      if (u.startsWith('http://') || u.startsWith('https://')) {
-        console.log('[Outfit3DViewer] Checking URL availability:', u);
-        // Try HEAD request to check if accessible
-        try {
-          const response = await fetch(u, { method: 'HEAD' });
-          if (response.ok) {
-            console.log('[Outfit3DViewer] URL is accessible:', u);
-            return u;
-          }
-          console.warn('[Outfit3DViewer] URL HEAD request failed, attempting signed URL:', response.status);
-        } catch (headError) {
-          console.warn('[Outfit3DViewer] URL HEAD request error, attempting signed URL:', headError);
-        }
-        
-        // Try to get a signed URL if it's from Supabase storage
-        if (u.includes('/storage/v1/object/public/clothes/')) {
-          const path = u.split('/object/public/clothes/')[1];
-          console.log('[Outfit3DViewer] Attempting to create signed URL for path:', path);
-          const { supabase } = await import('@/integrations/supabase/client');
-          const { data } = await supabase.storage.from('clothes').createSignedUrl(path, 60);
-          if (data?.signedUrl) {
-            console.log('[Outfit3DViewer] Created signed URL successfully');
-            return data.signedUrl;
-          }
-        }
-        return u; // Return original if signed URL fails
+
+      // Relative URLs coming from Supabase (signed or public)
+      if (u.startsWith('/object/') || u.startsWith('/storage/')) {
+        return `${SUPABASE_URL}${u.startsWith('/storage') ? '' : '/storage/v1'}${u.startsWith('/storage') ? '' : ''}${u}`.replace('/storage/v1/storage', '/storage/v1');
       }
-      
-      // Handle relative URLs
-      if (u.startsWith('/')) {
-        const fullUrl = new URL(u, window.location.origin).toString();
-        console.log('[Outfit3DViewer] Converted relative URL:', fullUrl);
-        return fullUrl;
+
+      // Other app-relative URLs (assets)
+      if (u.startsWith('/')) return new URL(u, window.location.origin).toString();
+
+      // Bare storage path like "clothes/xyz.jpg" -> make public URL
+      if (!u.includes('://')) {
+        return `${SUPABASE_URL}/storage/v1/object/public/${u.startsWith('clothes/') ? u : `clothes/${u}`}`;
       }
-      
-      // Assume it's a Supabase path
-      const fullUrl = new URL('/' + u, window.location.origin).toString();
-      console.log('[Outfit3DViewer] Converted path to URL:', fullUrl);
-      return fullUrl;
+
+      return u;
     } catch (e) {
       console.error('[Outfit3DViewer] URL normalization error:', e);
       return u;

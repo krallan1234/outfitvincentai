@@ -29,12 +29,18 @@ serve(async (req) => {
 
     console.log('Generating texture maps for clothing type:', clothingType);
 
-    // Generate diffuse map (realistic back view)
-    const diffusePrompt = `Generate a professional photograph of the BACK VIEW of this ${clothingType}. 
-      Match the exact color, pattern, and fabric texture from the front view.
-      Studio lighting, neutral white background, flat lay perspective.
-      Realistic wrinkles and fabric behavior.
-      High detail, photorealistic quality.`;
+    // Generate diffuse map (seamless 360° fabric texture)
+    const diffusePrompt = `Generate a seamless, tileable fabric texture for this ${clothingType}.
+      Requirements:
+      - Extract the base fabric color and pattern from the input image
+      - Create a flat, seamless 2D texture that can wrap 360° around a 3D model
+      - Remove any logos, text, or asymmetric patterns that would break the texture loop
+      - Reconstruct missing areas (sides/back) by mirroring and inferring fabric continuation
+      - Neutral white lighting, no shadows, no perspective distortion
+      - Output should be a flat fabric swatch, not rendered on any model
+      - High detail photorealistic fabric texture
+      - Size: 1024x1024 pixels
+      - Perfectly tileable on all edges`;
 
     const diffuseResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -69,13 +75,18 @@ serve(async (req) => {
       throw new Error('No diffuse image generated');
     }
 
-    // Generate normal map (surface detail enhancement)
-    const normalPrompt = `Generate a NORMAL MAP (surface detail texture) for this ${clothingType}.
-      Purple-blue gradient representing surface height variations.
-      Emphasize fabric weave, seams, stitching, and wrinkles.
-      Flat areas should be neutral purple (RGB 128, 128, 255).
-      Raised areas lighter, recessed areas darker.
-      Seamless, tileable texture.`;
+    // Generate normal map (surface detail for light/shadow)
+    const normalPrompt = `Generate a NORMAL MAP texture for this ${clothingType} fabric.
+      Requirements:
+      - Normal map color coding: flat neutral = RGB(128, 128, 255) purple-blue
+      - Raised/bumpy areas = lighter blue-white tones
+      - Recessed areas (seams, weave valleys) = darker purple-blue tones
+      - Show fabric surface details: weave pattern, thread texture, subtle wrinkles
+      - Emphasize seams and stitching as darker lines
+      - Must be seamless and tileable for 3D UV wrapping
+      - No perspective or lighting - pure height data encoded in RGB
+      - Size: 1024x1024 pixels
+      - Uniform detail distribution across entire texture`;
 
     const normalResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -101,12 +112,20 @@ serve(async (req) => {
     const normalData = await normalResponse.json();
     const normalBase64 = normalData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
-    // Generate roughness map (material reflectivity)
-    const roughnessPrompt = `Generate a ROUGHNESS MAP (grayscale) for this ${clothingType}.
-      White = rough/matte surfaces (cotton, wool)
-      Black = smooth/glossy surfaces (silk, leather, buttons)
-      Gray = semi-gloss (polyester, denim)
-      Analyze fabric type and create appropriate roughness values.`;
+    // Generate roughness map (material reflectivity/glossiness)
+    const roughnessPrompt = `Generate a ROUGHNESS MAP (grayscale) for this ${clothingType} fabric.
+      Requirements:
+      - Grayscale values representing surface glossiness:
+        * White (255) = very rough/matte (cotton, wool, unfinished fabrics)
+        * Light gray (180-220) = slightly rough (denim, canvas)
+        * Medium gray (100-150) = semi-gloss (polyester, treated fabrics)
+        * Dark gray (30-80) = glossy (silk, satin, leather)
+        * Black (0) = mirror-like (buttons, zippers, metallic elements)
+      - Analyze the fabric type from the input image
+      - Consistent roughness across fabric areas
+      - Detail variations for seams, buttons, or material transitions
+      - Seamless and tileable texture
+      - Size: 1024x1024 pixels`;
 
     const roughnessResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -159,21 +178,69 @@ serve(async (req) => {
       return urlData.publicUrl;
     };
 
-    const [diffuseUrl, normalUrl, roughnessUrl] = await Promise.all([
+    // Generate alpha map (transparency mask) - optional for most clothing
+    let alphaBase64 = null;
+    const needsAlpha = ['lace', 'mesh', 'net', 'sheer', 'transparent'].some(term => 
+      clothingType.toLowerCase().includes(term)
+    );
+
+    if (needsAlpha) {
+      const alphaPrompt = `Generate an ALPHA/TRANSPARENCY MAP (grayscale) for this ${clothingType}.
+        Requirements:
+        - White (255) = fully opaque solid fabric areas
+        - Black (0) = fully transparent holes, cutouts, or see-through areas
+        - Gray values = semi-transparent (lace patterns, mesh, gauze)
+        - Identify transparent fabric areas, holes, or decorative cutouts
+        - Most of the fabric should be white (opaque)
+        - Seamless and tileable texture
+        - Size: 1024x1024 pixels`;
+
+      const alphaResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash-image-preview',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: alphaPrompt },
+                { type: 'image_url', image_url: { url: imageUrl } }
+              ]
+            }
+          ],
+          modalities: ['image', 'text']
+        })
+      });
+
+      if (alphaResponse.ok) {
+        const alphaData = await alphaResponse.json();
+        alphaBase64 = alphaData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+      }
+    }
+
+    const [diffuseUrl, normalUrl, roughnessUrl, alphaUrl] = await Promise.all([
       uploadMap(diffuseBase64, 'diffuse'),
       uploadMap(normalBase64 || '', 'normal'),
-      uploadMap(roughnessBase64 || '', 'roughness')
+      uploadMap(roughnessBase64 || '', 'roughness'),
+      alphaBase64 ? uploadMap(alphaBase64, 'alpha') : Promise.resolve(null)
     ]);
 
     const result = {
-      type: clothingType,
+      status: 'success',
+      item_type: clothingType,
       diffuse_url: diffuseUrl,
       normal_url: normalUrl,
       roughness_url: roughnessUrl,
-      alpha_url: null, // Not needed for most clothing
+      alpha_url: alphaUrl,
       metadata: {
         generated_at: new Date().toISOString(),
-        source_image: imageUrl
+        source_image: imageUrl,
+        texture_size: '1024x1024',
+        seamless: true
       }
     };
 

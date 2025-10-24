@@ -29,18 +29,19 @@ serve(async (req) => {
 
     console.log('Generating texture maps for clothing type:', clothingType);
 
-    // Generate diffuse map (seamless 360° fabric texture)
+    // Enhanced diffuse map with higher resolution
     const diffusePrompt = `Generate a seamless, tileable fabric texture for this ${clothingType}.
       Requirements:
-      - Extract the base fabric color and pattern from the input image
-      - Create a flat, seamless 2D texture that can wrap 360° around a 3D model
-      - Remove any logos, text, or asymmetric patterns that would break the texture loop
-      - Reconstruct missing areas (sides/back) by mirroring and inferring fabric continuation
-      - Neutral white lighting, no shadows, no perspective distortion
-      - Output should be a flat fabric swatch, not rendered on any model
-      - High detail photorealistic fabric texture
-      - Size: 1024x1024 pixels
-      - Perfectly tileable on all edges`;
+      - Extract the exact base fabric color and pattern from the input image
+      - Create a flat, seamless 2D texture that wraps perfectly 360° around a 3D model
+      - Remove ALL logos, text, labels, or asymmetric patterns that would break seamless tiling
+      - Reconstruct missing areas (sides/back) by intelligently mirroring and continuing the fabric pattern
+      - Use neutral white/daylight lighting, no shadows, no highlights, no perspective distortion
+      - Output must be a flat fabric swatch texture, NOT rendered on any model or mannequin
+      - Ultra-high detail photorealistic fabric texture with visible weave/knit structure
+      - Fabric-specific details: cotton = visible weave, denim = twill pattern, silk = smooth sheen
+      - Size: 2048x2048 pixels for maximum detail
+      - Perfectly tileable on all edges with no visible seams`;
 
     const diffuseResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -75,18 +76,19 @@ serve(async (req) => {
       throw new Error('No diffuse image generated');
     }
 
-    // Generate normal map (surface detail for light/shadow)
+    // Enhanced normal map for better 3D depth
     const normalPrompt = `Generate a NORMAL MAP texture for this ${clothingType} fabric.
       Requirements:
-      - Normal map color coding: flat neutral = RGB(128, 128, 255) purple-blue
-      - Raised/bumpy areas = lighter blue-white tones
-      - Recessed areas (seams, weave valleys) = darker purple-blue tones
-      - Show fabric surface details: weave pattern, thread texture, subtle wrinkles
-      - Emphasize seams and stitching as darker lines
-      - Must be seamless and tileable for 3D UV wrapping
-      - No perspective or lighting - pure height data encoded in RGB
-      - Size: 1024x1024 pixels
-      - Uniform detail distribution across entire texture`;
+      - Normal map color coding: completely flat = RGB(128, 128, 255) neutral purple-blue
+      - Raised/bumpy areas (thread peaks, wrinkles) = lighter blue-white tones RGB(180-255, 180-255, 200-255)
+      - Recessed areas (seams, weave valleys, folds) = darker purple-blue tones RGB(50-100, 50-100, 200-255)
+      - Show realistic fabric micro-details: individual thread weave, knit pattern, subtle natural wrinkles
+      - Emphasize all seams, stitching, and hems as darker recessed lines
+      - Add subtle fabric folds and natural draping where appropriate
+      - Must be perfectly seamless and tileable for 3D UV wrapping
+      - No perspective, no lighting, no shadows - pure surface height data encoded in RGB
+      - Size: 2048x2048 pixels for high detail
+      - Uniform detail distribution with natural fabric variation`;
 
     const normalResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -112,20 +114,21 @@ serve(async (req) => {
     const normalData = await normalResponse.json();
     const normalBase64 = normalData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
-    // Generate roughness map (material reflectivity/glossiness)
+    // Enhanced roughness map for material properties
     const roughnessPrompt = `Generate a ROUGHNESS MAP (grayscale) for this ${clothingType} fabric.
       Requirements:
-      - Grayscale values representing surface glossiness:
-        * White (255) = very rough/matte (cotton, wool, unfinished fabrics)
-        * Light gray (180-220) = slightly rough (denim, canvas)
-        * Medium gray (100-150) = semi-gloss (polyester, treated fabrics)
-        * Dark gray (30-80) = glossy (silk, satin, leather)
-        * Black (0) = mirror-like (buttons, zippers, metallic elements)
-      - Analyze the fabric type from the input image
-      - Consistent roughness across fabric areas
-      - Detail variations for seams, buttons, or material transitions
-      - Seamless and tileable texture
-      - Size: 1024x1024 pixels`;
+      - Grayscale values representing surface glossiness and light reflection:
+        * White (240-255) = very rough/matte (raw cotton, wool, fleece, terry cloth)
+        * Light gray (180-220) = slightly rough (denim, canvas, chambray, twill)
+        * Medium gray (100-150) = semi-gloss (polyester, nylon, treated cotton)
+        * Dark gray (30-80) = glossy (silk, satin, leather, vinyl)
+        * Near-black (5-25) = mirror-like reflective (metallic buttons, zippers, sequins)
+      - Carefully analyze the fabric type and finish from the input image
+      - Keep consistent roughness across similar fabric areas
+      - Add subtle variation for fabric texture (slightly varied grays, not uniform)
+      - Show detail variations for: seams (slightly rougher), buttons/zippers (glossy), worn areas
+      - Perfectly seamless and tileable texture
+      - Size: 2048x2048 pixels for detail`;
 
     const roughnessResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -187,13 +190,13 @@ serve(async (req) => {
     if (needsAlpha) {
       const alphaPrompt = `Generate an ALPHA/TRANSPARENCY MAP (grayscale) for this ${clothingType}.
         Requirements:
-        - White (255) = fully opaque solid fabric areas
-        - Black (0) = fully transparent holes, cutouts, or see-through areas
-        - Gray values = semi-transparent (lace patterns, mesh, gauze)
-        - Identify transparent fabric areas, holes, or decorative cutouts
-        - Most of the fabric should be white (opaque)
-        - Seamless and tileable texture
-        - Size: 1024x1024 pixels`;
+        - White (255) = fully opaque solid fabric areas (most of the texture)
+        - Black (0) = fully transparent holes, cutouts, or see-through mesh areas
+        - Gray values (128-200) = semi-transparent areas (lace patterns, mesh, gauze, tulle)
+        - Carefully identify any transparent fabric areas, decorative holes, or mesh patterns
+        - Most clothing should be 90%+ white (opaque) unless it's specifically lace/mesh
+        - Perfectly seamless and tileable texture
+        - Size: 2048x2048 pixels`;
 
       const alphaResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
@@ -239,8 +242,9 @@ serve(async (req) => {
       metadata: {
         generated_at: new Date().toISOString(),
         source_image: imageUrl,
-        texture_size: '1024x1024',
-        seamless: true
+        texture_size: '2048x2048',
+        seamless: true,
+        ai_model: 'google/gemini-2.5-flash-image-preview'
       }
     };
 

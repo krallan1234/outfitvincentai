@@ -51,12 +51,32 @@ export default function OutfitPreview3D({ textures }: OutfitPreview3DProps) {
           alphaMap: item.alpha_url ? texLoader.load(item.alpha_url) : undefined
         });
 
-        // hitta rätt del av mannequin (t.ex. shirt → torso)
-        mannequin.traverse((child) => {
-          if (child instanceof THREE.Mesh && child.name.toLowerCase().includes(item.item_type)) {
+      // Enhanced mesh name matching for better texture mapping
+      mannequin.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          const meshName = child.name.toLowerCase();
+          const itemType = item.item_type.toLowerCase();
+          
+          // Map clothing types to mesh parts
+          const isMatch = 
+            // Tops/Shirts
+            (itemType.includes('shirt') || itemType.includes('top') || itemType.includes('blouse')) &&
+            (meshName.includes('torso') || meshName.includes('chest') || meshName.includes('shirt') || meshName.includes('body') || meshName.includes('upper')) ||
+            // Bottoms
+            (itemType.includes('pants') || itemType.includes('jeans') || itemType.includes('trousers') || itemType.includes('shorts')) &&
+            (meshName.includes('leg') || meshName.includes('pants') || meshName.includes('lower') || meshName.includes('hips')) ||
+            // Outerwear
+            (itemType.includes('jacket') || itemType.includes('coat') || itemType.includes('sweater')) &&
+            (meshName.includes('torso') || meshName.includes('chest') || meshName.includes('arm') || meshName.includes('sleeve'));
+          
+          if (isMatch) {
             child.material = material;
+            child.castShadow = true;
+            child.receiveShadow = true;
+            console.log(`Applied texture to mesh: ${child.name} for item type: ${item.item_type}`);
           }
-        });
+        }
+      });
       }
     });
 

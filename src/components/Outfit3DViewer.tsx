@@ -83,20 +83,22 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
   const [outerMat, setOuterMat] = useState<TextureWithMaterial | undefined>();
 
   const load = async (url: string, category: string, textureMaps?: any): Promise<TextureWithMaterial> => {
-    console.log('Loading processed texture from:', url, 'for category:', category);
-    const texture = await loadProcessedTexture(url, { maxSize: 1024, mirrorX: true });
+    console.log('Loading processed texture from:', url, 'for category:', category, 'with AI maps:', !!textureMaps);
+    const texture = await loadProcessedTexture(url, { maxSize: 2048, mirrorX: true });
     
     let normalMap: THREE.Texture;
     let roughnessMap: THREE.Texture | undefined;
     
-    // Use AI-generated texture maps if available
+    // Use AI-generated texture maps if available (2048x2048 high quality)
     if (textureMaps?.normal_url) {
-      console.log('Loading AI-generated normal map from:', textureMaps.normal_url);
+      console.log('Loading AI-generated 2048px normal map from:', textureMaps.normal_url);
       normalMap = await new Promise<THREE.Texture>((resolve, reject) => {
         new THREE.TextureLoader().load(
           textureMaps.normal_url,
           (tex) => {
             tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            tex.minFilter = THREE.LinearMipmapLinearFilter;
+            tex.magFilter = THREE.LinearFilter;
             resolve(tex);
           },
           undefined,

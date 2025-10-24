@@ -112,10 +112,35 @@ export const useClothes = () => {
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      // Store the path instead of public URL for signed URL generation
-      const storagePath = fileName;
+      // Get public URL immediately after upload
+      const { data: { publicUrl } } = supabase.storage
+        .from('clothes')
+        .getPublicUrl(fileName);
 
-      // Save to database with storage path (not public URL)
+      console.log('Uploaded file, public URL:', publicUrl);
+
+      // Generate texture maps automatically (non-blocking)
+      let textureMaps = null;
+      try {
+        console.log('Triggering texture generation for:', metadata.category);
+        const { data: textureData, error: textureError } = await supabase.functions.invoke('generate-texture-maps', {
+          body: { 
+            imageUrl: publicUrl,
+            clothingType: metadata.category 
+          }
+        });
+        
+        if (!textureError && textureData) {
+          textureMaps = textureData;
+          console.log('✓ Textures generated:', textureMaps);
+        } else {
+          console.warn('Texture generation failed (non-critical):', textureError);
+        }
+      } catch (err) {
+        console.warn('Texture generation error (continuing):', err);
+      }
+
+      // Save to database with public URL and textures
       const finalMetadata = {
         ...metadata,
         color: metadata.color || aiDetectedColor || 'unknown',
@@ -125,8 +150,9 @@ export const useClothes = () => {
         .from('clothes')
         .insert({
           user_id: user.id,
-          image_url: storagePath, // Store path for signed URL generation
+          image_url: publicUrl, // Store public URL for direct access
           ...finalMetadata,
+          texture_maps: textureMaps, // Include generated textures
           ai_detected_metadata: aiDetectedColor ? { color: aiDetectedColor } : null,
         })
         .select()

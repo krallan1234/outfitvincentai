@@ -40,43 +40,63 @@ export default function OutfitPreview3D({ textures }: OutfitPreview3DProps) {
       const mannequin = gltf.scene;
       scene.add(mannequin);
 
-      // applicera texturer per klädtyp
+      // Apply textures to mannequin meshes
       for (const item of textures) {
         const texLoader = new THREE.TextureLoader();
-        const material = new THREE.MeshStandardMaterial({
+        
+        // Create material with available maps (fallback to diffuse only if others missing)
+        const materialConfig: any = {
           map: texLoader.load(item.diffuse_url),
-          normalMap: texLoader.load(item.normal_url),
-          roughnessMap: texLoader.load(item.roughness_url),
-          transparent: !!item.alpha_url,
-          alphaMap: item.alpha_url ? texLoader.load(item.alpha_url) : undefined
-        });
-
-      // Enhanced mesh name matching for better texture mapping
-      mannequin.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          const meshName = child.name.toLowerCase();
-          const itemType = item.item_type.toLowerCase();
-          
-          // Map clothing types to mesh parts
-          const isMatch = 
-            // Tops/Shirts
-            (itemType.includes('shirt') || itemType.includes('top') || itemType.includes('blouse')) &&
-            (meshName.includes('torso') || meshName.includes('chest') || meshName.includes('shirt') || meshName.includes('body') || meshName.includes('upper')) ||
-            // Bottoms
-            (itemType.includes('pants') || itemType.includes('jeans') || itemType.includes('trousers') || itemType.includes('shorts')) &&
-            (meshName.includes('leg') || meshName.includes('pants') || meshName.includes('lower') || meshName.includes('hips')) ||
-            // Outerwear
-            (itemType.includes('jacket') || itemType.includes('coat') || itemType.includes('sweater')) &&
-            (meshName.includes('torso') || meshName.includes('chest') || meshName.includes('arm') || meshName.includes('sleeve'));
-          
-          if (isMatch) {
-            child.material = material;
-            child.castShadow = true;
-            child.receiveShadow = true;
-            console.log(`Applied texture to mesh: ${child.name} for item type: ${item.item_type}`);
-          }
+          roughness: 0.8, // Default fabric roughness
+          metalness: 0.1, // Minimal metalness for fabric
+        };
+        
+        // Only add optional maps if they exist
+        if (item.normal_url) {
+          materialConfig.normalMap = texLoader.load(item.normal_url);
         }
-      });
+        if (item.roughness_url) {
+          materialConfig.roughnessMap = texLoader.load(item.roughness_url);
+        }
+        if (item.alpha_url) {
+          materialConfig.transparent = true;
+          materialConfig.alphaMap = texLoader.load(item.alpha_url);
+        }
+        
+        const material = new THREE.MeshStandardMaterial(materialConfig);
+
+        // Apply material to matching mesh parts
+        mannequin.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            const meshName = child.name.toLowerCase();
+            const itemType = item.item_type.toLowerCase();
+            
+            // Enhanced mesh matching logic
+            const isMatch = 
+              // Tops/Shirts
+              (itemType.includes('shirt') || itemType.includes('top') || itemType.includes('blouse') || itemType.includes('t-shirt')) &&
+              (meshName.includes('torso') || meshName.includes('chest') || meshName.includes('shirt') || meshName.includes('body') || meshName.includes('upper')) ||
+              // Bottoms
+              (itemType.includes('pants') || itemType.includes('jeans') || itemType.includes('trousers') || itemType.includes('shorts')) &&
+              (meshName.includes('leg') || meshName.includes('pants') || meshName.includes('lower') || meshName.includes('hips')) ||
+              // Outerwear
+              (itemType.includes('jacket') || itemType.includes('coat') || itemType.includes('sweater') || itemType.includes('blazer')) &&
+              (meshName.includes('torso') || meshName.includes('chest') || meshName.includes('arm') || meshName.includes('sleeve') || meshName.includes('upper')) ||
+              // Dresses
+              (itemType.includes('dress') || itemType.includes('gown')) &&
+              (meshName.includes('torso') || meshName.includes('body') || meshName.includes('dress')) ||
+              // Footwear
+              (itemType.includes('shoe') || itemType.includes('boot') || itemType.includes('sneaker')) &&
+              (meshName.includes('foot') || meshName.includes('shoe') || meshName.includes('feet'));
+            
+            if (isMatch) {
+              child.material = material;
+              child.castShadow = true;
+              child.receiveShadow = true;
+              console.log(`✓ Applied texture to: ${child.name} for ${item.item_type}`);
+            }
+          }
+        });
       }
     });
 

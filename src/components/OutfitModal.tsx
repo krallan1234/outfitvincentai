@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { use3DCapability } from '@/hooks/use3DCapability';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { TextureGenerationStatus } from '@/components/TextureGenerationStatus';
+
 
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"%3E%3Crect fill="%23ddd" width="400" height="400"/%3E%3C/svg%3E';
 
@@ -370,11 +370,6 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
               </TabsContent>
               
               <TabsContent value="3d" className="space-y-3 sm:space-y-4">
-                {/* Texture Generation Status */}
-                {outfit.recommended_clothes && outfit.recommended_clothes.length > 0 && (
-                  <TextureGenerationStatus clothingItemIds={outfit.recommended_clothes} />
-                )}
-                
                 {(outfit.generated_image_url || clothesImages.length > 0) && (
                   <Outfit3DViewer
                     imageUrl={outfit.generated_image_url}

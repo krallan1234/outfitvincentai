@@ -870,6 +870,61 @@ The outfit conveys: ${outfitRecommendation.description}`;
 
     console.log('Outfit generated and saved successfully');
 
+    // Trigger automatic texture generation for all clothes items (async, don't wait)
+    if (legacyRecommendedItems && legacyRecommendedItems.length > 0) {
+      console.log('Starting automatic texture generation for', legacyRecommendedItems.length, 'outfit items');
+      
+      // Fetch selected clothes items to get their image URLs and categories
+      const { data: outfitClothes, error: clothesError } = await supabase
+        .from('clothes')
+        .select('id, image_url, category, texture_maps')
+        .in('id', legacyRecommendedItems);
+
+      if (clothesError) {
+        console.error('Failed to fetch outfit clothes for texture generation:', clothesError);
+      } else if (outfitClothes) {
+        // Trigger texture generation only for items that don't have texture maps yet
+        for (const item of outfitClothes) {
+          // Skip if texture maps already exist
+          if (item.texture_maps) {
+            console.log('Texture maps already exist for item:', item.id);
+            continue;
+          }
+          
+          console.log('Triggering texture generation for item:', item.id, item.category);
+          
+          // Call generate-texture-maps function asynchronously (fire and forget)
+          supabase.functions.invoke('generate-texture-maps', {
+            body: {
+              imageUrl: item.image_url,
+              clothingType: item.category
+            }
+          }).then(({ data: textureMaps, error: textureError }) => {
+            if (textureError) {
+              console.error('Texture generation failed for item', item.id, ':', textureError);
+            } else if (textureMaps) {
+              console.log('Texture maps generated for item', item.id);
+              
+              // Update the clothes item with texture maps
+              supabase
+                .from('clothes')
+                .update({ texture_maps: textureMaps })
+                .eq('id', item.id)
+                .then(({ error: updateError }) => {
+                  if (updateError) {
+                    console.error('Failed to save texture maps for item', item.id, ':', updateError);
+                  } else {
+                    console.log('Texture maps saved successfully for item', item.id);
+                  }
+                });
+            }
+          }).catch(err => {
+            console.error('Texture generation exception for item', item.id, ':', err);
+          });
+        }
+      }
+    }
+
     return new Response(JSON.stringify({
       outfit: savedOutfit,
       recommendedClothes: selectedItems,

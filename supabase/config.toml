@@ -20,3 +20,6 @@ verify_jwt = true
 
 [functions.detect-clothing-style]
 verify_jwt = true
+
+[functions.generate-texture-maps]
+verify_jwt = true

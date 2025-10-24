@@ -178,20 +178,55 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
   const [bottomMat, setBottomMat] = useState<TextureWithMaterial | undefined>();
   const [outerMat, setOuterMat] = useState<TextureWithMaterial | undefined>();
 
-  const load = async (url: string, category: string): Promise<TextureWithMaterial> => {
+  const load = async (url: string, category: string, textureMaps?: any): Promise<TextureWithMaterial> => {
     console.log('Loading processed texture from:', url, 'for category:', category);
     const texture = await loadProcessedTexture(url, { maxSize: 1024, mirrorX: true });
     
-    // Generate normal map for fabric depth
-    const normalMap = generateNormalMapFromTexture(texture);
+    let normalMap: THREE.Texture;
+    let roughnessMap: THREE.Texture | undefined;
+    
+    // Use AI-generated texture maps if available
+    if (textureMaps?.normal_url) {
+      console.log('Loading AI-generated normal map from:', textureMaps.normal_url);
+      normalMap = await new Promise<THREE.Texture>((resolve, reject) => {
+        new THREE.TextureLoader().load(
+          textureMaps.normal_url,
+          (tex) => {
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            resolve(tex);
+          },
+          undefined,
+          reject
+        );
+      });
+    } else {
+      // Fallback: Generate normal map from texture
+      normalMap = generateNormalMapFromTexture(texture);
+    }
+    
+    if (textureMaps?.roughness_url) {
+      console.log('Loading AI-generated roughness map from:', textureMaps.roughness_url);
+      roughnessMap = await new Promise<THREE.Texture>((resolve, reject) => {
+        new THREE.TextureLoader().load(
+          textureMaps.roughness_url,
+          (tex) => {
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            resolve(tex);
+          },
+          undefined,
+          reject
+        );
+      });
+    }
     
     // Detect fabric type and create appropriate material
     const fabricProps = detectFabricType(category);
     const material = new THREE.MeshStandardMaterial({
       map: texture,
       normalMap: normalMap,
-      normalScale: new THREE.Vector2(0.3, 0.3),
-      roughness: fabricProps.roughness,
+      normalScale: new THREE.Vector2(textureMaps?.normal_url ? 1.5 : 0.3, textureMaps?.normal_url ? 1.5 : 0.3),
+      roughness: roughnessMap ? 1.0 : fabricProps.roughness,
+      roughnessMap: roughnessMap,
       metalness: fabricProps.metalness,
       envMapIntensity: fabricProps.envMapIntensity,
       side: THREE.DoubleSide,
@@ -247,7 +282,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
             const category = topItem.category || topItem.main_category || 'top';
             if (url) {
               loadPromises.push(
-                load(url, category)
+                load(url, category, topItem.texture_maps)
                   .then(mat => { tm = mat; })
                   .catch(e => console.error('Failed to load top texture:', e))
               );
@@ -259,7 +294,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
             const category = bottomItem.category || bottomItem.main_category || 'bottom';
             if (url) {
               loadPromises.push(
-                load(url, category)
+                load(url, category, bottomItem.texture_maps)
                   .then(mat => { bm = mat; })
                   .catch(e => console.error('Failed to load bottom texture:', e))
               );
@@ -271,7 +306,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
             const category = outerItem.category || outerItem.main_category || 'outerwear';
             if (url) {
               loadPromises.push(
-                load(url, category)
+                load(url, category, outerItem.texture_maps)
                   .then(mat => { om = mat; })
                   .catch(e => console.error('Failed to load outer texture:', e))
               );

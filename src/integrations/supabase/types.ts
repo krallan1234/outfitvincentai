@@ -25,6 +25,7 @@ export type Database = {
           id: string
           image_url: string
           style: string | null
+          texture_maps: Json | null
           updated_at: string
           user_id: string
         }
@@ -38,6 +39,7 @@ export type Database = {
           id?: string
           image_url: string
           style?: string | null
+          texture_maps?: Json | null
           updated_at?: string
           user_id: string
         }
@@ -51,6 +53,7 @@ export type Database = {
           id?: string
           image_url?: string
           style?: string | null
+          texture_maps?: Json | null
           updated_at?: string
           user_id?: string
         }

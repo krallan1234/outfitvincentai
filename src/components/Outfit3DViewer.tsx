@@ -49,7 +49,12 @@ function MannequinModel({
           mat = topMat?.material;
         }
         if (mat) {
-          child.material = mat;
+          const ms = mat as THREE.MeshStandardMaterial;
+          if ((child as any).isSkinnedMesh && ms) {
+            (ms as any).skinning = true;
+            ms.needsUpdate = true;
+          }
+          child.material = (ms as any) || mat;
           applied++;
         }
         // Enable shadows
@@ -59,10 +64,14 @@ function MannequinModel({
     });
     // Fallback: if nothing matched, apply a single material to all meshes
     if (applied === 0) {
-      const fallbackMat = outerwearMat?.material || topMat?.material || bottomMat?.material;
+      const fallbackMat = (outerwearMat?.material || topMat?.material || bottomMat?.material) as THREE.MeshStandardMaterial | undefined;
       if (fallbackMat) {
         scene.traverse((child) => {
           if (child instanceof THREE.Mesh) {
+            if ((child as any).isSkinnedMesh) {
+              (fallbackMat as any).skinning = true;
+              (fallbackMat as any).needsUpdate = true;
+            }
             child.material = fallbackMat;
             child.castShadow = true;
             child.receiveShadow = true;
@@ -85,7 +94,8 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
 
   const load = async (url: string, category: string, textureMaps?: any): Promise<TextureWithMaterial> => {
     console.log('Loading processed texture from:', url, 'for category:', category, 'with AI maps:', !!textureMaps);
-    const texture = await loadProcessedTexture(url, { maxSize: 2048, mirrorX: true });
+    // Use smaller textures to avoid GPU context loss on mid/low devices
+    const texture = await loadProcessedTexture(url, { maxSize: 512, mirrorX: true });
     
     let normalMap: THREE.Texture;
     let roughnessMap: THREE.Texture | undefined;

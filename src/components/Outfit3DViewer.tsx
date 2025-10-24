@@ -35,15 +35,24 @@ function MannequinModel({
   
   useEffect(() => {
     if (!scene) return;
+    // Debug: list mesh names
+    const meshNames: string[] = [];
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) meshNames.push(child.name || '(unnamed)');
+    });
+    console.groupCollapsed('[Outfit3DViewer] Mannequin meshes');
+    meshNames.forEach((n) => console.log('mesh:', n));
+    console.groupEnd();
+
     let applied = 0;
     // First pass: try semantic matching
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        const name = child.name.toLowerCase();
+        const name = (child.name || '').toLowerCase();
         let mat: THREE.Material | undefined;
-        if (name.includes('torso') || name.includes('shirt') || name.includes('chest') || name.includes('body')) {
+        if (name.includes('torso') || name.includes('shirt') || name.includes('chest') || name.includes('body') || name.includes('upper')) {
           mat = outerwearMat?.material || topMat?.material;
-        } else if (name.includes('leg') || name.includes('pants') || name.includes('trouser') || name.includes('hips')) {
+        } else if (name.includes('leg') || name.includes('pants') || name.includes('trouser') || name.includes('hips') || name.includes('thigh')) {
           mat = bottomMat?.material;
         } else if (name.includes('arm') || name.includes('sleeve')) {
           mat = topMat?.material;
@@ -56,16 +65,43 @@ function MannequinModel({
           }
           child.material = (ms as any) || mat;
           applied++;
+          console.debug('[Outfit3DViewer] Applied material to', child.name);
         }
         // Enable shadows
         child.castShadow = true;
         child.receiveShadow = true;
       }
     });
+
+    // Secondary pass: split by height if both top & bottom exist but names didn't match
+    if (applied === 0 && topMat?.material && bottomMat?.material) {
+      console.warn('[Outfit3DViewer] No semantic mesh match. Splitting by Y center as fallback.');
+      scene.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          const geom = (child.geometry as THREE.BufferGeometry);
+          if (!geom.boundingBox) geom.computeBoundingBox();
+          const box = geom.boundingBox!;
+          const centerY = (box.min.y + box.max.y) / 2;
+          const preferTop = centerY >= 0;
+          const chosen = preferTop ? topMat.material : bottomMat.material;
+          const ms = chosen as THREE.MeshStandardMaterial;
+          if ((child as any).isSkinnedMesh && ms) {
+            (ms as any).skinning = true;
+            ms.needsUpdate = true;
+          }
+          child.material = (ms as any) || chosen;
+          child.castShadow = true;
+          child.receiveShadow = true;
+          applied++;
+        }
+      });
+    }
+
     // Fallback: if nothing matched, apply a single material to all meshes
     if (applied === 0) {
       const fallbackMat = (outerwearMat?.material || topMat?.material || bottomMat?.material) as THREE.MeshStandardMaterial | undefined;
       if (fallbackMat) {
+        console.warn('[Outfit3DViewer] Applying single fallback material to all meshes.');
         scene.traverse((child) => {
           if (child instanceof THREE.Mesh) {
             if ((child as any).isSkinnedMesh) {
@@ -77,6 +113,8 @@ function MannequinModel({
             child.receiveShadow = true;
           }
         });
+      } else {
+        console.error('[Outfit3DViewer] No materials available to apply.');
       }
     }
   }, [scene, topMat, bottomMat, outerwearMat]);
@@ -91,6 +129,18 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
   const [topMat, setTopMat] = useState<TextureWithMaterial | undefined>();
   const [bottomMat, setBottomMat] = useState<TextureWithMaterial | undefined>();
   const [outerMat, setOuterMat] = useState<TextureWithMaterial | undefined>();
+
+  const normalizeUrl = (u: string | undefined) => {
+    if (!u) return undefined;
+    try {
+      if (u.startsWith('data:') || u.startsWith('blob:')) return u;
+      if (u.startsWith('http://') || u.startsWith('https://')) return u;
+      if (u.startsWith('/')) return new URL(u, window.location.origin).toString();
+      return new URL('/' + u, window.location.origin).toString();
+    } catch {
+      return u;
+    }
+  };
 
   const load = async (url: string, category: string, textureMaps?: any): Promise<TextureWithMaterial> => {
     console.log('Loading processed texture from:', url, 'for category:', category, 'with AI maps:', !!textureMaps);
@@ -110,16 +160,17 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
             tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
             tex.minFilter = THREE.LinearMipmapLinearFilter;
             tex.magFilter = THREE.LinearFilter;
+            (tex as any).colorSpace = THREE.LinearSRGBColorSpace;
             resolve(tex);
           },
           undefined,
           reject
         );
       });
-    } else {
-      // Fallback: Generate normal map from texture
-      normalMap = generateNormalMapFromTexture(texture);
-    }
+      } else {
+        console.debug('[Outfit3DViewer] Generating normal map from base texture');
+        normalMap = generateNormalMapFromTexture(texture);
+      }
     
     if (textureMaps?.roughness_url) {
       console.log('Loading AI-generated roughness map from:', textureMaps.roughness_url);
@@ -128,6 +179,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
           textureMaps.roughness_url,
           (tex) => {
             tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            (tex as any).colorSpace = THREE.LinearSRGBColorSpace;
             resolve(tex);
           },
           undefined,
@@ -198,7 +250,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
           const loadPromises = [];
           
           if (topItem) {
-            const url = topItem.image_url || topItem.image || topItem.url;
+            const url = normalizeUrl(topItem.image_url || topItem.image || topItem.url);
             const category = topItem.category || topItem.main_category || 'top';
             if (url) {
               loadPromises.push(
@@ -210,7 +262,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
           }
           
           if (bottomItem) {
-            const url = bottomItem.image_url || bottomItem.image || bottomItem.url;
+            const url = normalizeUrl(bottomItem.image_url || bottomItem.image || bottomItem.url);
             const category = bottomItem.category || bottomItem.main_category || 'bottom';
             if (url) {
               loadPromises.push(
@@ -222,7 +274,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
           }
           
           if (outerItem) {
-            const url = outerItem.image_url || outerItem.image || outerItem.url;
+            const url = normalizeUrl(outerItem.image_url || outerItem.image || outerItem.url);
             const category = outerItem.category || outerItem.main_category || 'outerwear';
             if (url) {
               loadPromises.push(
@@ -238,7 +290,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
         
         if (!tm && !bm && imageUrl) {
           try {
-            const one = await load(imageUrl, 'top');
+            const one = await load(normalizeUrl(imageUrl)!, 'top');
             tm = one;
             bm = one;
           } catch (e) {
@@ -247,6 +299,18 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
         }
 
         if (!cancelled) {
+          if (!tm && !bm && !om) {
+            console.warn('[Outfit3DViewer] No textures loaded, applying debug checker texture');
+            const size = 32; const c = document.createElement('canvas'); c.width = c.height = size;
+            const ctx = c.getContext('2d')!; const cells = 8;
+            for (let y = 0; y < cells; y++) { for (let x = 0; x < cells; x++) {
+              ctx.fillStyle = (x + y) % 2 ? '#a0a0a0' : '#e0e0e0';
+              ctx.fillRect((x * size) / cells, (y * size) / cells, size / cells, size / cells);
+            } }
+            const t = new THREE.CanvasTexture(c); (t as any).colorSpace = THREE.SRGBColorSpace;
+            const mat = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, side: THREE.DoubleSide });
+            tm = { texture: t, material: mat };
+          }
           console.log('Setting materials:', { hasTop: !!tm, hasBottom: !!bm, hasOuter: !!om });
           setTopMat(tm);
           setBottomMat(bm);

@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Environment, ContactShadows } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Environment, ContactShadows, useGLTF } from '@react-three/drei';
 import { Suspense, useRef, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { Button } from './ui/button';
@@ -31,147 +31,51 @@ function MannequinModel({
   bottomMat?: TextureWithMaterial; 
   outerwearMat?: TextureWithMaterial;
 }) {
-  // Create an improved mannequin with better proportions and per-part textures
-  return (
-    <group>
-      {/* Head */}
-      <mesh position={[0, 1.6, 0]} castShadow>
-        <capsuleGeometry args={[0.35, 0.4, 16, 32]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-      
-      {/* Neck */}
-      <mesh position={[0, 1.1, 0]} castShadow>
-        <cylinderGeometry args={[0.15, 0.18, 0.3, 16]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-      
-      {/* Upper Torso - use outerwear if present, else top */}
-      <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.45, 0.35, 1.2, 32, 1, true]} />
-        {(outerwearMat || topMat) ? (
-          <primitive object={(outerwearMat ?? topMat)!.material} attach="material" />
-        ) : (
-          <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
-        )}
-      </mesh>
-      
-      {/* Outerwear layer - slightly scaled up if present */}
-      {outerwearMat && topMat && (
-        <mesh position={[0, 0.5, 0]} castShadow receiveShadow scale={1.03}>
-          <cylinderGeometry args={[0.45, 0.35, 1.2, 32, 1, true]} />
-          <primitive object={outerwearMat.material} attach="material" />
-        </mesh>
-      )}
-      
-      {/* Lower Torso - use bottom */}
-      <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.35, 0.4, 0.8, 32, 1, true]} />
-        {bottomMat ? (
-          <primitive object={bottomMat.material} attach="material" />
-        ) : (
-          <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
-        )}
-      </mesh>
-      
-      {/* Shoulders */}
-      <mesh position={[-0.5, 0.8, 0]} castShadow>
-        <sphereGeometry args={[0.2, 16, 16]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-      <mesh position={[0.5, 0.8, 0]} castShadow>
-        <sphereGeometry args={[0.2, 16, 16]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-      
-      {/* Upper Arms - use top texture, T-pose */}
-      <mesh position={[-0.65, 0.3, 0]} rotation-z={Math.PI / 2} castShadow>
-        <cylinderGeometry args={[0.14, 0.12, 0.9, 16, 1, true]} />
-        {topMat ? (
-          <primitive object={topMat.material} attach="material" />
-        ) : (
-          <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-        )}
-      </mesh>
-      <mesh position={[0.65, 0.3, 0]} rotation-z={-Math.PI / 2} castShadow>
-        <cylinderGeometry args={[0.14, 0.12, 0.9, 16, 1, true]} />
-        {topMat ? (
-          <primitive object={topMat.material} attach="material" />
-        ) : (
-          <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-        )}
-      </mesh>
-      
-      {/* Lower Arms */}
-      <mesh position={[-0.78, -0.3, 0]} rotation={[0, 0, 0.1]} castShadow>
-        <cylinderGeometry args={[0.12, 0.1, 0.8, 16]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-      <mesh position={[0.78, -0.3, 0]} rotation={[0, 0, -0.1]} castShadow>
-        <cylinderGeometry args={[0.12, 0.1, 0.8, 16]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-      
-      {/* Hands */}
-      <mesh position={[-0.82, -0.75, 0]} castShadow>
-        <sphereGeometry args={[0.12, 16, 16]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-      <mesh position={[0.82, -0.75, 0]} castShadow>
-        <sphereGeometry args={[0.12, 16, 16]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-      
-      {/* Hips - use bottom texture */}
-      <mesh position={[0, -1.0, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.4, 0.38, 0.4, 32, 1, true]} />
-        {bottomMat ? (
-          <primitive object={bottomMat.material} attach="material" />
-        ) : (
-          <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
-        )}
-      </mesh>
-      
-      {/* Upper Legs - use bottom texture with taper */}
-      <mesh position={[-0.2, -1.6, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.18, 0.15, 1.0, 16, 1, true]} />
-        {bottomMat ? (
-          <primitive object={bottomMat.material} attach="material" />
-        ) : (
-          <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
-        )}
-      </mesh>
-      <mesh position={[0.2, -1.6, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.18, 0.15, 1.0, 16, 1, true]} />
-        {bottomMat ? (
-          <primitive object={bottomMat.material} attach="material" />
-        ) : (
-          <meshStandardMaterial color="#e8e8e8" metalness={0.2} roughness={0.6} />
-        )}
-      </mesh>
-      
-      {/* Lower Legs */}
-      <mesh position={[-0.2, -2.5, 0]} castShadow>
-        <cylinderGeometry args={[0.15, 0.13, 0.8, 16]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-      <mesh position={[0.2, -2.5, 0]} castShadow>
-        <cylinderGeometry args={[0.15, 0.13, 0.8, 16]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-      
-      {/* Feet */}
-      <mesh position={[-0.2, -2.95, 0.1]} castShadow>
-        <boxGeometry args={[0.15, 0.1, 0.3]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-      <mesh position={[0.2, -2.95, 0.1]} castShadow>
-        <boxGeometry args={[0.15, 0.1, 0.3]} />
-        <meshStandardMaterial color="#e8e8e8" metalness={0.1} roughness={0.8} />
-      </mesh>
-    </group>
-  );
+  const { scene } = useGLTF('/models/mannequin.glb');
+  
+  useEffect(() => {
+    if (!scene) return;
+    
+    // Traverse the loaded model and apply textures based on mesh names
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const name = child.name.toLowerCase();
+        
+        // Apply top material to torso/shirt parts
+        if (name.includes('torso') || name.includes('shirt') || name.includes('chest') || name.includes('body')) {
+          if (outerwearMat) {
+            child.material = outerwearMat.material;
+          } else if (topMat) {
+            child.material = topMat.material;
+          }
+        }
+        
+        // Apply bottom material to legs/pants parts
+        if (name.includes('leg') || name.includes('pants') || name.includes('trouser') || name.includes('hips')) {
+          if (bottomMat) {
+            child.material = bottomMat.material;
+          }
+        }
+        
+        // Apply top material to arms/sleeves
+        if (name.includes('arm') || name.includes('sleeve')) {
+          if (topMat) {
+            child.material = topMat.material;
+          }
+        }
+        
+        // Enable shadows
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+  }, [scene, topMat, bottomMat, outerwearMat]);
+  
+  return <primitive object={scene} position={[0, -1, 0]} scale={1} />;
 }
+
+// Preload the GLTF model
+useGLTF.preload('/models/mannequin.glb');
 
 function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; clothingItems?: any[]; onLoad: () => void }) {
   const [topMat, setTopMat] = useState<TextureWithMaterial | undefined>();

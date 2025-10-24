@@ -35,40 +35,41 @@ function MannequinModel({
   
   useEffect(() => {
     if (!scene) return;
-    
-    // Traverse the loaded model and apply textures based on mesh names
+    let applied = 0;
+    // First pass: try semantic matching
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         const name = child.name.toLowerCase();
-        
-        // Apply top material to torso/shirt parts
+        let mat: THREE.Material | undefined;
         if (name.includes('torso') || name.includes('shirt') || name.includes('chest') || name.includes('body')) {
-          if (outerwearMat) {
-            child.material = outerwearMat.material;
-          } else if (topMat) {
-            child.material = topMat.material;
-          }
+          mat = outerwearMat?.material || topMat?.material;
+        } else if (name.includes('leg') || name.includes('pants') || name.includes('trouser') || name.includes('hips')) {
+          mat = bottomMat?.material;
+        } else if (name.includes('arm') || name.includes('sleeve')) {
+          mat = topMat?.material;
         }
-        
-        // Apply bottom material to legs/pants parts
-        if (name.includes('leg') || name.includes('pants') || name.includes('trouser') || name.includes('hips')) {
-          if (bottomMat) {
-            child.material = bottomMat.material;
-          }
+        if (mat) {
+          child.material = mat;
+          applied++;
         }
-        
-        // Apply top material to arms/sleeves
-        if (name.includes('arm') || name.includes('sleeve')) {
-          if (topMat) {
-            child.material = topMat.material;
-          }
-        }
-        
         // Enable shadows
         child.castShadow = true;
         child.receiveShadow = true;
       }
     });
+    // Fallback: if nothing matched, apply a single material to all meshes
+    if (applied === 0) {
+      const fallbackMat = outerwearMat?.material || topMat?.material || bottomMat?.material;
+      if (fallbackMat) {
+        scene.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.material = fallbackMat;
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+      }
+    }
   }, [scene, topMat, bottomMat, outerwearMat]);
   
   return <primitive object={scene} position={[0, -1, 0]} scale={1} />;
@@ -127,16 +128,19 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
     
     // Detect fabric type and create appropriate material
     const fabricProps = detectFabricType(category);
-    const material = new THREE.MeshStandardMaterial({
+    const matParams: THREE.MeshStandardMaterialParameters = {
       map: texture,
       normalMap: normalMap,
       normalScale: new THREE.Vector2(textureMaps?.normal_url ? 1.5 : 0.3, textureMaps?.normal_url ? 1.5 : 0.3),
       roughness: roughnessMap ? 1.0 : fabricProps.roughness,
-      roughnessMap: roughnessMap,
       metalness: fabricProps.metalness,
       envMapIntensity: fabricProps.envMapIntensity,
       side: THREE.DoubleSide,
-    });
+    };
+    if (roughnessMap) {
+      matParams.roughnessMap = roughnessMap;
+    }
+    const material = new THREE.MeshStandardMaterial(matParams);
     
     return { texture, normalMap, material };
   };

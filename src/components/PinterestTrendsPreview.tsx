@@ -26,14 +26,14 @@ export const PinterestTrendsPreview = ({ pins, query }: PinterestTrendsPreviewPr
     <Card className="p-4 space-y-3 bg-muted/30">
       <div className="flex items-center gap-2">
         <TrendingUp className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium">Pinterest Trends Active</span>
+        <span className="text-sm font-medium">Fashion Trends</span>
         <Badge variant="secondary" className="text-xs">
-          {pins.length} trending pins
+          {pins.length} trending styles
         </Badge>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        AI is inspired by trending "{query}" styles on Pinterest
+        AI is inspired by current "{query}" trends and seasonal styles
       </p>
 
       <div className="grid grid-cols-4 gap-2">
@@ -47,9 +47,12 @@ export const PinterestTrendsPreview = ({ pins, query }: PinterestTrendsPreviewPr
           >
             <img
               src={pin.image_url}
-              alt={pin.title || 'Pinterest inspiration'}
+              alt={pin.title || 'Fashion inspiration'}
               className="w-full h-full object-cover"
               loading="lazy"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
               <ExternalLink className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />

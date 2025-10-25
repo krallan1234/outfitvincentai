@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   try {
-    const { urls, expiresIn = 900 } = await req.json() as SignUrlRequest; // 15 minutes default
+    const { urls, expiresIn = 300 } = await req.json() as SignUrlRequest;
     
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
       throw new Error('urls array is required');
@@ -28,7 +28,7 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    console.log(`[get-signed-urls] 🔐 Processing ${urls.length} URLs with ${expiresIn}s (${Math.round(expiresIn/60)}min) expiry`);
+    console.log(`[get-signed-urls] Processing ${urls.length} URLs with ${expiresIn}s expiry`);
     
     const signedUrls: Record<string, string> = {};
     const errors: Record<string, string> = {};
@@ -53,7 +53,7 @@ serve(async (req) => {
           continue;
         }
         
-        console.log(`[get-signed-urls] 📝 Signing path: ${path}`);
+        console.log(`[get-signed-urls] Signing path: ${path}`);
         
         const { data, error } = await supabase.storage
           .from('clothes')
@@ -70,7 +70,7 @@ serve(async (req) => {
             ? data.signedUrl 
             : `${supabaseUrl}/storage/v1${data.signedUrl}`;
           signedUrls[url] = signedUrl;
-          console.log(`[get-signed-urls] ✅ Successfully signed ${path}`);
+          console.log(`[get-signed-urls] Successfully signed ${path}`);
         } else {
           console.error(`[get-signed-urls] No signed URL returned for ${path}`);
           signedUrls[url] = url;
@@ -82,7 +82,7 @@ serve(async (req) => {
       }
     }
     
-    console.log(`[get-signed-urls] ✅ Complete: ${Object.keys(signedUrls).length} URLs signed, ${Object.keys(errors).length} errors`);
+    console.log(`[get-signed-urls] Complete: ${Object.keys(signedUrls).length} URLs signed, ${Object.keys(errors).length} errors`);
     
     return new Response(
       JSON.stringify({ 

@@ -72,7 +72,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[generate-outfit] 🎨 Analyzing ${clothes.length} clothing items for outfit generation (style: ${styleContext})`);
+    console.log(`Analyzing ${clothes.length} clothing items for outfit generation`);
 
     // Prepare clothes analysis with category grouping
     console.log('Preparing clothes analysis and category grouping...');
@@ -147,7 +147,7 @@ serve(async (req) => {
       const lowerPrompt = prompt.toLowerCase();
       for (const [style, rules] of Object.entries(styleRules)) {
         if (rules.keywords.some(keyword => lowerPrompt.includes(keyword))) {
-          console.log(`[generate-outfit] 🔍 Detected style context: ${style}`);
+          console.log(`Detected style context: ${style}`);
           return style;
         }
       }
@@ -220,7 +220,7 @@ serve(async (req) => {
       
       // If explicitly excluded, mark as inappropriate
       if (isExcluded) {
-        console.log(`[generate-outfit] ❌ Filtering out ${item.category} (${item.color}) - excluded for ${styleContext} context`);
+        console.log(`Filtering out ${item.category} (${item.color}) - excluded for ${styleContext} context`);
         return null;
       }
 
@@ -242,7 +242,7 @@ serve(async (req) => {
       accessories: validClothes.filter(item => item.analysis.main_category === 'accessories')
     };
 
-    console.log(`[generate-outfit] ✅ Clothes filtered for ${styleContext} style:`, {
+    console.log(`Clothes filtered for ${styleContext} style:`, {
       total_available: validClothes.length,
       filtered_out: clothes.length - validClothes.length,
       top: clothesByCategory.top.length,
@@ -270,7 +270,7 @@ serve(async (req) => {
     
     // If user has connected a Pinterest board, use pins from their board
     if (pinterestBoardId) {
-      console.log(`[generate-outfit] 🎨 Using connected Pinterest board: ${pinterestBoardId}`);
+      console.log(`Using connected Pinterest board: ${pinterestBoardId}`);
       try {
         const { data: boardData, error: boardError } = await supabase
           .from('pinterest_boards')
@@ -285,7 +285,7 @@ serve(async (req) => {
           boardInspiration = pins
             .sort(() => Math.random() - 0.5)
             .slice(0, 5);
-          console.log(`[generate-outfit] ✅ Analyzing ${boardInspiration.length} pins from board "${boardData.board_name}"`);
+          console.log(`Analyzing ${boardInspiration.length} pins from board "${boardData.board_name}"`);
         }
       } catch (error) {
         console.warn('Failed to fetch Pinterest board data:', error);
@@ -294,10 +294,10 @@ serve(async (req) => {
     
     // Log Pinterest inspiration sources
     if (pinterestContext) {
-      console.log('[generate-outfit] 📌 Using Pinterest trends context from frontend:', pinterestContext.substring(0, 100) + '...');
+      console.log('Using Pinterest trends context from frontend:', pinterestContext);
     }
     if (pinterestTrends.length > 0) {
-      console.log(`[generate-outfit] 📌 Using ${pinterestTrends.length} Pinterest trend pins from frontend`);
+      console.log(`Using ${pinterestTrends.length} Pinterest trend pins from frontend`);
     }
 
     // Get recent outfits to avoid repeats
@@ -312,7 +312,7 @@ serve(async (req) => {
       ?.flatMap(o => o.recommended_clothes || [])
       .filter((id, index, self) => self.indexOf(id) === index) || [];
     
-    console.log(`[generate-outfit] 🔄 Avoiding ${recentItemIds.length} recently used items for variety`);
+    console.log(`Avoiding ${recentItemIds.length} recently used items for variety`);
 
     // Step 2: Use Gemini 2.5 Pro to generate outfit recommendations with enhanced thinking
     const generateOutfitPrompt = (attempt = 1, shouldIncludeAccessory = false) => {

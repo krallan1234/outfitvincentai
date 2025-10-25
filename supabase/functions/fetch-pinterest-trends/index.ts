@@ -304,11 +304,12 @@ function generateFallbackPinterestData(query: string, limit: number) {
     category = styleCategories.casual;
   }
   
+  // Generate minimal pin data without external image URLs
   const pins = Array.from({ length: Math.min(limit, 10) }, (_, i) => ({
     id: `fallback_${i}`,
     title: `${query} inspiration ${i + 1}`,
     description: `Curated style inspiration for ${query}`,
-    image_url: `https://via.placeholder.com/600x800/cccccc/666666?text=${encodeURIComponent(query)}`,
+    image_url: '', // Empty to avoid loading errors
     link: '#',
     save_count: 1000 - (i * 100),
     dominant_color: category.colors[i % category.colors.length],

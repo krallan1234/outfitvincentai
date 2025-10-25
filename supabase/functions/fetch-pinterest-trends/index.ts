@@ -15,6 +15,24 @@ interface PinterestPin {
   dominant_color?: string;
 }
 
+// In-memory cache with 6h TTL
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
+
+const getCachedData = (key: string) => {
+  const cached = cache.get(key);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    console.log(`[fetch-pinterest-trends] Using cached data for "${key}"`);
+    return cached.data;
+  }
+  return null;
+};
+
+const setCachedData = (key: string, data: any) => {
+  cache.set(key, { data, timestamp: Date.now() });
+  console.log(`[fetch-pinterest-trends] Cached data for "${key}"`);
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -25,6 +43,19 @@ serve(async (req) => {
     
     if (!query) {
       throw new Error('Query parameter is required');
+    }
+
+    // Check cache first
+    const cacheKey = `${query}_${limit}`;
+    const cachedResult = getCachedData(cacheKey);
+    if (cachedResult) {
+      return new Response(JSON.stringify(cachedResult), {
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'X-Cache': 'HIT',
+        },
+      });
     }
 
     const clientId = Deno.env.get('PINTEREST_CLIENT_ID');
@@ -118,8 +149,15 @@ serve(async (req) => {
 
     console.log(`Found ${pins.length} trending pins for "${query}"`);
 
+    // Cache the result
+    setCachedData(cacheKey, summary);
+
     return new Response(JSON.stringify(summary), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { 
+        ...corsHeaders, 
+        'Content-Type': 'application/json',
+        'X-Cache': 'MISS',
+      },
     });
   } catch (error) {
     console.error('Error in fetch-pinterest-trends:', error);

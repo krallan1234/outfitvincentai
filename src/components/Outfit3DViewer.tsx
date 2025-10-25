@@ -10,6 +10,8 @@ import { generateNormalMapFromTexture } from '@/utils/normalMapGenerator';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Outfit2DFallback } from './Outfit2DFallback';
+
 const SUPABASE_URL = 'https://bichfpvapfibrpplrtcr.supabase.co';
 interface Outfit3DViewerProps {
   imageUrl?: string;
@@ -126,55 +128,70 @@ function MannequinModel({
 // Preload the GLTF model
 useGLTF.preload('/models/mannequin.glb');
 
-function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; clothingItems?: any[]; onLoad: () => void }) {
+function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: string; clothingItems?: any[]; onLoad: () => void; onError: () => void }) {
   const [topMat, setTopMat] = useState<TextureWithMaterial | undefined>();
   const [bottomMat, setBottomMat] = useState<TextureWithMaterial | undefined>();
   const [outerMat, setOuterMat] = useState<TextureWithMaterial | undefined>();
+
+  const getSignedUrls = async (urls: string[]): Promise<Record<string, string>> => {
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data, error } = await supabase.functions.invoke('get-signed-urls', {
+        body: { urls, expiresIn: 300 }
+      });
+      
+      if (error) {
+        console.error('[Outfit3DViewer] get-signed-urls error:', error);
+        // Fallback to original URLs
+        const fallback: Record<string, string> = {};
+        urls.forEach(url => fallback[url] = url);
+        return fallback;
+      }
+      
+      return data?.signedUrls || {};
+    } catch (e) {
+      console.error('[Outfit3DViewer] Exception calling get-signed-urls:', e);
+      // Fallback to original URLs
+      const fallback: Record<string, string> = {};
+      urls.forEach(url => fallback[url] = url);
+      return fallback;
+    }
+  };
 
   const normalizeUrl = async (u: string | undefined): Promise<string | undefined> => {
     if (!u) return undefined;
     try {
       // Already valid schemes
       if (u.startsWith('data:') || u.startsWith('blob:')) return u;
-
-      // If it's an absolute Supabase URL, try HEAD and fallback to signed URL if needed
+      
+      // For HTTP URLs, try to get signed version via edge function
       if (u.startsWith('http://') || u.startsWith('https://')) {
-        if (u.includes('/storage/v1/object/public/')) {
-          try {
-            const head = await fetch(u, { method: 'HEAD' });
-            if (head.ok) return u;
-            console.warn('[Outfit3DViewer] Public URL HEAD failed, signing...', head.status);
-          } catch (e) {
-            console.warn('[Outfit3DViewer] Public URL HEAD error, signing...', e);
-          }
-          // Attempt to sign if it's from the clothes bucket
-          const clothesIdx = u.indexOf('/object/public/clothes/');
-          if (clothesIdx !== -1) {
-            const path = u.slice(clothesIdx + '/object/public/clothes/'.length);
-            const { supabase } = await import('@/integrations/supabase/client');
-            const { data } = await supabase.storage.from('clothes').createSignedUrl(path, 60);
-            if (data?.signedUrl) {
-              const signed = data.signedUrl.startsWith('/object/')
-                ? `${SUPABASE_URL}/storage/v1${data.signedUrl}`
-                : data.signedUrl;
-              return signed;
-            }
+        if (u.includes('/storage/v1/object/')) {
+          const signedUrls = await getSignedUrls([u]);
+          const signed = signedUrls[u];
+          if (signed && signed !== u) {
+            console.log('[Outfit3DViewer] Using signed URL for:', u);
+            return signed;
           }
         }
         return u;
       }
 
-      // Relative URLs coming from Supabase (signed or public)
+      // Relative URLs - convert to absolute and sign
       if (u.startsWith('/object/') || u.startsWith('/storage/')) {
-        return `${SUPABASE_URL}${u.startsWith('/storage') ? '' : '/storage/v1'}${u.startsWith('/storage') ? '' : ''}${u}`.replace('/storage/v1/storage', '/storage/v1');
+        const absolute = `${SUPABASE_URL}${u.startsWith('/storage') ? '' : '/storage/v1'}${u}`.replace('/storage/v1/storage', '/storage/v1');
+        const signedUrls = await getSignedUrls([absolute]);
+        return signedUrls[absolute] || absolute;
       }
 
       // Other app-relative URLs (assets)
       if (u.startsWith('/')) return new URL(u, window.location.origin).toString();
 
-      // Bare storage path like "clothes/xyz.jpg" -> make public URL
+      // Bare storage path like "clothes/xyz.jpg" -> make public URL and sign
       if (!u.includes('://')) {
-        return `${SUPABASE_URL}/storage/v1/object/public/${u.startsWith('clothes/') ? u : `clothes/${u}`}`;
+        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${u.startsWith('clothes/') ? u : `clothes/${u}`}`;
+        const signedUrls = await getSignedUrls([publicUrl]);
+        return signedUrls[publicUrl] || publicUrl;
       }
 
       return u;
@@ -184,10 +201,17 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
     }
   };
 
-  const load = async (url: string, category: string, textureMaps?: any): Promise<TextureWithMaterial> => {
-    console.log('[Outfit3DViewer] Loading processed texture from:', url, 'for category:', category, 'with AI maps:', !!textureMaps);
-    // Use smaller textures to avoid GPU context loss on mid/low devices
-    const texture = await loadProcessedTexture(url, { maxSize: 512, mirrorX: true });
+  const load = async (url: string, category: string, textureMaps?: any, retryCount = 0): Promise<TextureWithMaterial> => {
+    console.log(`[Outfit3DViewer] Loading texture from: ${url} (category: ${category}, retry: ${retryCount}, has AI maps: ${!!textureMaps})`);
+    
+    try {
+      // Timeout wrapper for texture loading (8s)
+      const texturePromise = loadProcessedTexture(url, { maxSize: 512, mirrorX: true });
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Texture load timeout (8s)')), 8000)
+      );
+      
+      const texture = await Promise.race([texturePromise, timeoutPromise]);
     
     let normalMap: THREE.Texture;
     let roughnessMap: THREE.Texture | undefined;
@@ -254,9 +278,31 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
     if (roughnessMap) {
       matParams.roughnessMap = roughnessMap;
     }
-    const material = new THREE.MeshStandardMaterial(matParams);
-    
-    return { texture, normalMap, material };
+      const material = new THREE.MeshStandardMaterial(matParams);
+      
+      return { texture, normalMap, material };
+    } catch (error) {
+      console.error(`[Outfit3DViewer] Failed to load texture from ${url}:`, error);
+      
+      // Retry logic with exponential backoff (2 retries max)
+      if (retryCount < 2) {
+        const backoffMs = retryCount === 0 ? 200 : 600;
+        console.log(`[Outfit3DViewer] Retrying after ${backoffMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+        
+        // Try to get a fresh signed URL
+        const freshUrl = await normalizeUrl(url);
+        if (freshUrl && freshUrl !== url) {
+          console.log('[Outfit3DViewer] Retrying with fresh signed URL');
+          return load(freshUrl, category, textureMaps, retryCount + 1);
+        }
+        
+        return load(url, category, textureMaps, retryCount + 1);
+      }
+      
+      // All retries exhausted, throw error
+      throw error;
+    }
   };
 
   const getItemUrl = (cats: string[]) => {
@@ -272,7 +318,17 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
 
   useEffect(() => {
     let cancelled = false;
+    let timeoutId: number;
+    
     const run = async () => {
+      // Set 8s timeout for entire load operation
+      timeoutId = setTimeout(() => {
+        if (!cancelled) {
+          console.error('[Outfit3DViewer] 8s timeout exceeded for texture loading');
+          onError();
+        }
+      }, 8000) as unknown as number;
+      
       try {
         let tm: TextureWithMaterial | undefined;
         let bm: TextureWithMaterial | undefined;
@@ -394,8 +450,12 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
         }
       } catch (e) {
         console.error('[Outfit3DViewer] Failed to load textures for 3D outfit:', e);
+        if (!cancelled) {
+          onError();
+        }
       } finally {
         if (!cancelled) {
+          clearTimeout(timeoutId);
           console.log('[Outfit3DViewer] Texture loading complete, calling onLoad');
           onLoad();
         }
@@ -404,8 +464,9 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad }: { imageUrl?: string; cl
     run();
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
     };
-  }, [imageUrl, clothingItems, onLoad]);
+  }, [imageUrl, clothingItems, onLoad, onError]);
 
   return <MannequinModel topMat={topMat} bottomMat={bottomMat} outerwearMat={outerMat} />;
 }
@@ -414,6 +475,7 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
   const controlsRef = useRef<any>(null);
   const [autoRotate, setAutoRotate] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
 
@@ -451,6 +513,24 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
       controlsRef.current.setAzimuthalAngle(azimuth - Math.PI / 4);
     }
   };
+  
+  const handleRetry3D = () => {
+    setLoadError(false);
+    setIsLoading(true);
+  };
+
+  // Show 2D fallback if error occurred
+  if (loadError) {
+    return (
+      <div className="relative w-full h-auto bg-gradient-to-b from-muted/30 to-background rounded-xl overflow-hidden border border-primary/10 p-4">
+        <Outfit2DFallback 
+          clothingItems={clothingItems || []} 
+          onRetry={handleRetry3D}
+          showRetry={true}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-[500px] bg-gradient-to-b from-muted/30 to-background rounded-xl overflow-hidden border border-primary/10">
@@ -518,7 +598,15 @@ export const Outfit3DViewer = ({ imageUrl, title, clothingItems }: Outfit3DViewe
           
           {/* 3D Outfit Model */}
           <group position={[0, 0.5, 0]}>
-            <OutfitMesh imageUrl={imageUrl} clothingItems={clothingItems} onLoad={() => setIsLoading(false)} />
+            <OutfitMesh 
+              imageUrl={imageUrl} 
+              clothingItems={clothingItems} 
+              onLoad={() => setIsLoading(false)} 
+              onError={() => {
+                setIsLoading(false);
+                setLoadError(true);
+              }}
+            />
           </group>
           
           {/* Ground shadow with improved visibility */}

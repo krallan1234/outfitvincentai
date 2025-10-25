@@ -178,7 +178,8 @@ serve(async (req) => {
         style: item.style || 'casual',
         formality: item.style === 'formal' ? 'formal' : item.style === 'business' ? 'semi-formal' : 'casual',
         season: 'all',
-        versatility: 7
+        versatility: 7,
+        style_score: 0.5 // Default score
       };
 
       // Check if we have AI analysis from previous uploads
@@ -859,13 +860,42 @@ serve(async (req) => {
     );
     
     const outfitVisualization = {
-      items: selectedItems.map(item => ({
-        id: item.id,
-        category: item.category,
-        main_category: item.analysis.main_category,
-        color: item.analysis.color,
-        image_url: item.image_url
-      })),
+      items: selectedItems.map(item => {
+        // Calculate style_score based on style context match
+        const itemCategory = (item.category || '').toLowerCase();
+        const itemStyle = (item.analysis?.style || '').toLowerCase();
+        
+        // Calculate score based on how well item matches the style context
+        let styleScore = 0.5; // Default
+        
+        // Check if item is in allowed list
+        const isAllowed = contextRules.allowed.some(allowed => 
+          itemCategory.includes(allowed.toLowerCase()) || 
+          itemStyle.includes(allowed.toLowerCase())
+        );
+        
+        // Check if item matches priority styles
+        const matchesPriority = contextRules.priority.some(priority => 
+          itemStyle.includes(priority.toLowerCase())
+        );
+        
+        if (isAllowed && matchesPriority) {
+          styleScore = 0.9; // Perfect match
+        } else if (isAllowed) {
+          styleScore = 0.7; // Good match
+        } else if (matchesPriority) {
+          styleScore = 0.6; // Style match but not explicitly allowed
+        }
+        
+        return {
+          id: item.id,
+          category: item.category,
+          main_category: item.analysis.main_category,
+          color: item.analysis.color,
+          image_url: item.image_url,
+          style_score: styleScore
+        };
+      }),
       description: `${selectedItems.map(item => 
         `${item.analysis.color} ${item.category}`
       ).join(' + ')}`,
@@ -968,7 +998,9 @@ The outfit conveys: ${outfitRecommendation.description}`;
           pinterest_trends: pinterestTrends.slice(0, 2),
           clothes_analysis: validClothes,
           outfit_visualization: outfitVisualization,
-          structured_items: outfitRecommendation.items // New structured format
+          structured_items: outfitRecommendation.items, // New structured format
+          style_context: styleContext,
+          used_pinterest_trends: (pinterestTrends.length > 0 || boardInspiration.length > 0)
         }
       })
       .select()

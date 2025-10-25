@@ -9,6 +9,9 @@ verify_jwt = true
 [functions.fetch-pinterest-trends]
 verify_jwt = false
 
+[functions.get-signed-urls]
+verify_jwt = true
+
 [functions.weather]
 verify_jwt = true
 

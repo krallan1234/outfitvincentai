@@ -463,31 +463,19 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
             onError();
             return;
           }
-            const size = 32; const c = document.createElement('canvas'); c.width = c.height = size;
-            const ctx = c.getContext('2d')!; const cells = 8;
-            for (let y = 0; y < cells; y++) { for (let x = 0; x < cells; x++) {
-              ctx.fillStyle = (x + y) % 2 ? '#a0a0a0' : '#e0e0e0';
-              ctx.fillRect((x * size) / cells, (y * size) / cells, size / cells, size / cells);
-            } }
-            const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-            const mat = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, side: THREE.DoubleSide });
-            tm = { texture: t, material: mat };
-          }
-          console.log('[Outfit3DViewer] Setting materials:', { hasTop: !!tm, hasBottom: !!bm, hasOuter: !!om });
+          
+          console.log('[Outfit3DViewer] ℹ️ Setting materials:', { hasTop: !!tm, hasBottom: !!bm, hasOuter: !!om });
           setTopMat(tm);
           setBottomMat(bm);
           setOuterMat(om);
+          onLoad();
+          console.log('[Outfit3DViewer] ✅ Materials applied to mannequin');
         }
-      } catch (e) {
-        console.error('[Outfit3DViewer] Failed to load textures for 3D outfit:', e);
-        if (!cancelled) {
-          onError();
-        }
-      } finally {
+      } catch (err) {
         if (!cancelled) {
           clearTimeout(timeoutId);
-          console.log('[Outfit3DViewer] Texture loading complete, calling onLoad');
-          onLoad();
+          console.error('[Outfit3DViewer] ❌ Error during texture loading:', err);
+          onError();
         }
       }
     };

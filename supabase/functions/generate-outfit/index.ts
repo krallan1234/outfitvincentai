@@ -96,7 +96,68 @@ serve(async (req) => {
       ]
     };
 
-    // Normalize and group clothes by category
+    // Define style compatibility rules based on formality and context
+    const styleRules = {
+      'business': {
+        priority: ['formal', 'business', 'smart casual', 'semi-formal'],
+        allowed: ['blazer', 'shirt', 'blouse', 'dress pants', 'skirt', 'chinos', 'dress', 'suit', 'loafers', 'heels', 'oxfords', 'pumps', 'belt', 'watch', 'tie', 'necklace'],
+        excluded: ['joggers', 'sweatpants', 'hoodie', 'sneakers', 'flip-flops', 'tank top', 'crop top', 'athletic', 'gym', 'sporty'],
+        keywords: ['business', 'meeting', 'office', 'professional', 'work', 'corporate', 'interview']
+      },
+      'formal': {
+        priority: ['formal', 'elegant', 'evening'],
+        allowed: ['dress', 'suit', 'blazer', 'dress shirt', 'gown', 'heels', 'pumps', 'oxfords', 'tie', 'bow tie', 'clutch', 'jewelry'],
+        excluded: ['jeans', 'sneakers', 't-shirt', 'hoodie', 'athletic', 'casual', 'sporty', 'joggers'],
+        keywords: ['formal', 'elegant', 'gala', 'evening', 'wedding', 'cocktail', 'black tie']
+      },
+      'casual': {
+        priority: ['casual', 'smart casual', 'relaxed'],
+        allowed: ['t-shirt', 'jeans', 'sweater', 'sneakers', 'casual shirt', 'chinos', 'shorts', 'sandals', 'hoodie', 'cap'],
+        excluded: ['blazer', 'suit', 'formal dress', 'heels'],
+        keywords: ['casual', 'everyday', 'relaxed', 'comfortable', 'weekend', 'hangout']
+      },
+      'athletic': {
+        priority: ['athletic', 'sporty', 'active'],
+        allowed: ['joggers', 'sweatpants', 'athletic shorts', 'tank top', 'sports bra', 'sneakers', 'hoodie', 'cap'],
+        excluded: ['dress', 'suit', 'heels', 'blazer', 'formal'],
+        keywords: ['gym', 'workout', 'athletic', 'sporty', 'exercise', 'running', 'fitness', 'active']
+      },
+      'streetwear': {
+        priority: ['streetwear', 'urban', 'edgy', 'trendy'],
+        allowed: ['hoodie', 'sneakers', 'joggers', 'oversized', 'graphic tee', 'denim', 'cap', 'chains'],
+        excluded: ['blazer', 'formal dress', 'heels', 'business'],
+        keywords: ['streetwear', 'urban', 'hip hop', 'cool', 'edgy', 'trendy', 'street style']
+      },
+      'date': {
+        priority: ['elegant', 'smart casual', 'stylish'],
+        allowed: ['dress', 'nice shirt', 'blazer', 'heels', 'stylish shoes', 'jewelry', 'skirt', 'fitted pants'],
+        excluded: ['joggers', 'sweatpants', 'athletic', 'gym', 'sloppy'],
+        keywords: ['date', 'romantic', 'dinner', 'night out', 'elegant']
+      },
+      'summer': {
+        priority: ['light', 'breathable', 'casual'],
+        allowed: ['shorts', 'tank top', 'sundress', 'sandals', 'light fabrics', 't-shirt', 'skirt'],
+        excluded: ['heavy coat', 'boots', 'thick sweater', 'wool'],
+        keywords: ['summer', 'beach', 'hot', 'sunny', 'warm', 'vacation']
+      }
+    };
+
+    // Detect style context from prompt
+    const detectStyleContext = (prompt: string): string => {
+      const lowerPrompt = prompt.toLowerCase();
+      for (const [style, rules] of Object.entries(styleRules)) {
+        if (rules.keywords.some(keyword => lowerPrompt.includes(keyword))) {
+          console.log(`Detected style context: ${style}`);
+          return style;
+        }
+      }
+      return 'casual'; // default
+    };
+
+    const styleContext = detectStyleContext(prompt);
+    const contextRules = styleRules[styleContext] || styleRules['casual'];
+
+    // Normalize and group clothes by category with style filtering
     const clothesAnalysis = clothes.map((item) => {
       // Use existing metadata as fallback, enhanced with AI data if available
       let normalizedCategory = item.category?.toLowerCase() || 'other';
@@ -145,13 +206,30 @@ serve(async (req) => {
         }
       }
 
+      // Filter based on style context rules
+      const itemCategory = normalizedCategory.toLowerCase();
+      const itemStyle = (analysis.style || '').toLowerCase();
+      
+      // Check if item is explicitly excluded for this style context
+      const isExcluded = contextRules.excluded.some(excluded => 
+        itemCategory.includes(excluded.toLowerCase()) || 
+        item.category?.toLowerCase().includes(excluded.toLowerCase()) ||
+        itemStyle.includes(excluded.toLowerCase())
+      );
+      
+      // If explicitly excluded, mark as inappropriate
+      if (isExcluded) {
+        console.log(`Filtering out ${item.category} (${item.color}) - excluded for ${styleContext} context`);
+        return null;
+      }
+
       return {
         ...item,
         analysis
       };
-    });
+    }).filter(item => item !== null); // Remove filtered items
 
-    const validClothes = clothesAnalysis.filter(item => item !== null);
+    const validClothes = clothesAnalysis;
     
     // Group clothes by main category for logical outfit creation
     const clothesByCategory = {
@@ -163,7 +241,9 @@ serve(async (req) => {
       accessories: validClothes.filter(item => item.analysis.main_category === 'accessories')
     };
 
-    console.log('Clothes grouped by category:', {
+    console.log(`Clothes filtered for ${styleContext} style:`, {
+      total_available: validClothes.length,
+      filtered_out: clothes.length - validClothes.length,
       top: clothesByCategory.top.length,
       bottom: clothesByCategory.bottom.length,
       dress: clothesByCategory.dress.length,
@@ -171,6 +251,17 @@ serve(async (req) => {
       footwear: clothesByCategory.footwear.length,
       accessories: clothesByCategory.accessories.length
     });
+
+    // Check if we have enough items after filtering
+    if (validClothes.length < 2) {
+      console.error(`Not enough suitable items for ${styleContext} style after filtering`);
+      return new Response(JSON.stringify({ 
+        error: `Not enough suitable clothing items for "${styleContext}" style. Try adding more ${contextRules.allowed.slice(0, 3).join(', ')} to your wardrobe.`
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Step 1: Use Pinterest inspiration from frontend or user's board
     let pinterestTrends = pinterestPins || [];
@@ -233,6 +324,49 @@ serve(async (req) => {
       
       return `
       You are a professional fashion stylist with expertise in creating logical, category-based outfit combinations.
+      
+      CRITICAL STYLE CONTEXT: ${styleContext.toUpperCase()}
+      This outfit MUST match the "${styleContext}" style. The clothes have been pre-filtered to match this context.
+      
+      STRICT STYLE REQUIREMENTS FOR ${styleContext.toUpperCase()}:
+      - Priority styles: ${contextRules.priority.join(', ')}
+      - ONLY use items that fit: ${contextRules.allowed.join(', ')}
+      - NEVER include: ${contextRules.excluded.join(', ')}
+      - Context keywords: ${contextRules.keywords.join(', ')}
+      
+      ${styleContext === 'business' ? `
+      BUSINESS STYLE RULES:
+      - MUST include: Blazer OR dress shirt/blouse with dress pants/skirt
+      - Footwear: ONLY loafers, oxfords, heels, or dress shoes
+      - Colors: Professional colors (navy, gray, black, white, beige)
+      - NO casual items like sneakers, hoodies, or athletic wear
+      - Accessories: Watch, belt, or subtle jewelry only
+      ` : ''}
+      
+      ${styleContext === 'formal' ? `
+      FORMAL STYLE RULES:
+      - MUST include: Suit, dress, or formal gown
+      - Footwear: ONLY heels, pumps, or dress shoes
+      - NO jeans, sneakers, or casual tops
+      - Elegant accessories: Jewelry, clutch, tie
+      - Sophisticated color palette
+      ` : ''}
+      
+      ${styleContext === 'athletic' ? `
+      ATHLETIC STYLE RULES:
+      - MUST include: Athletic wear (joggers, sports top, athletic shorts)
+      - Footwear: ONLY sneakers or athletic shoes
+      - NO formal wear, dresses, or business attire
+      - Functional accessories: Cap, sports watch
+      ` : ''}
+      
+      ${styleContext === 'date' ? `
+      DATE NIGHT STYLE RULES:
+      - MUST be stylish and elegant
+      - Avoid overly casual items (no sweatpants, athletic wear)
+      - Balance sophistication with comfort
+      - Appropriate accessories to elevate the look
+      ` : ''}
       
       ${weatherData ? `
       CURRENT WEATHER CONDITIONS:
@@ -395,13 +529,15 @@ serve(async (req) => {
       1. Use your fashion expertise to choose items that complement each other in color, style, and mood
       2. Draw inspiration from Pinterest trends to create modern, trendy combinations
       3. Consider color harmony (complementary, analogous, or monochromatic schemes)
-      4. Match formality levels (casual with casual, formal with formal)
-      5. Ensure the outfit is appropriate for the requested mood/occasion
+      4. CRITICAL: Match formality levels strictly - ${styleContext} items ONLY
+      5. Ensure the outfit is appropriate for the requested mood/occasion: "${prompt}"
       6. ACCESSORY MATCHING: For casual moods, prefer kepsar/caps; for elegant/formal moods, prefer ringar/rings or klockor/watches
       7. Be creative and confident in your choices - select items that create a cohesive, stylish look
-      8. If Pinterest trends suggest specific accessory combinations (e.g., caps with streetwear, rings with elegant outfits), incorporate them
-      9. RANDOMIZE WITHIN STYLE RULES: Don't default to "white shirt + black pants" every time - explore color combinations
-      10. SURPRISE ME: Take calculated fashion risks that still result in a wearable, stylish outfit
+      8. If Pinterest trends suggest specific accessory combinations, incorporate them
+      9. RANDOMIZE WITHIN STYLE RULES: Don't default to safe combinations - explore colors while respecting ${styleContext} rules
+      10. SURPRISE ME: Take calculated fashion risks that still follow ${styleContext} guidelines
+      11. VALIDATE EACH ITEM: Before selecting, ask "Does this fit ${styleContext} style?" If no, skip it.
+      12. NO STYLE MIXING: Don't mix athletic with formal, casual with business unless explicitly requested
 
       REQUIRED JSON FORMAT - NO MARKDOWN WRAPPER:
       {
@@ -644,6 +780,30 @@ serve(async (req) => {
             } else {
               return new Response(JSON.stringify({ 
                 error: 'Could not create a complete outfit with available items. Try adding more clothes.' 
+              }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+          }
+
+          // Validate style appropriateness - ensure items match the detected style context
+          const outfitItemCategories = outfitRecommendation.items.map(item => 
+            item.item_name?.toLowerCase() || item.category?.toLowerCase() || ''
+          );
+          
+          // Check if any excluded items slipped through
+          const hasExcludedItems = outfitItemCategories.some(itemCat => 
+            contextRules.excluded.some(excluded => itemCat.includes(excluded.toLowerCase()))
+          );
+          
+          if (hasExcludedItems) {
+            console.log(`Style validation failed: outfit contains items excluded for ${styleContext} style, retrying...`);
+            if (attemptCount < maxAttempts) {
+              continue; // Retry with stricter prompt
+            } else {
+              return new Response(JSON.stringify({ 
+                error: `Could not generate a suitable ${styleContext} outfit. Please try a different style or add more appropriate items.` 
               }), {
                 status: 200,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },

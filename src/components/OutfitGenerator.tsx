@@ -215,13 +215,31 @@ export const OutfitGenerator = () => {
         ? `${contextPrompt} (style variation ${Math.floor(Math.random() * 10000)})` 
         : contextPrompt;
       
-      // Fetch Pinterest trends for inspiration
+      // Fetch Pinterest trends for inspiration with style-specific keywords
       let pinterestContext = '';
       let pinterestPins: any[] = [];
       try {
-        console.log('Fetching Pinterest trends for:', varietyPrompt);
+        // Enhance search query with style-specific keywords for better trend matching
+        let enhancedQuery = varietyPrompt;
+        const lowerPrompt = varietyPrompt.toLowerCase();
+        
+        if (lowerPrompt.includes('business') || lowerPrompt.includes('meeting') || lowerPrompt.includes('office')) {
+          enhancedQuery += ' professional office business attire formal workwear';
+        } else if (lowerPrompt.includes('formal') || lowerPrompt.includes('elegant') || lowerPrompt.includes('gala')) {
+          enhancedQuery += ' formal elegant evening wear sophisticated';
+        } else if (lowerPrompt.includes('athletic') || lowerPrompt.includes('gym') || lowerPrompt.includes('sporty')) {
+          enhancedQuery += ' athletic activewear sportswear fitness gym';
+        } else if (lowerPrompt.includes('date') || lowerPrompt.includes('romantic')) {
+          enhancedQuery += ' date night romantic dinner outfit stylish';
+        } else if (lowerPrompt.includes('street') || lowerPrompt.includes('urban')) {
+          enhancedQuery += ' streetwear urban fashion trendy cool';
+        } else if (lowerPrompt.includes('casual') || lowerPrompt.includes('weekend')) {
+          enhancedQuery += ' casual comfortable relaxed everyday style';
+        }
+        
+        console.log('Fetching Pinterest trends with enhanced query:', enhancedQuery);
         const trendsResponse = await supabase.functions.invoke('fetch-pinterest-trends', {
-          body: { query: varietyPrompt, limit: 20 }
+          body: { query: enhancedQuery, limit: 20 }
         });
         
         if (trendsResponse.data && !trendsResponse.error) {

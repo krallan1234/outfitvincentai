@@ -34,6 +34,8 @@ serve(async (req) => {
       throw new Error('Pinterest API credentials not configured');
     }
 
+    console.log('Requesting Pinterest access token with client credentials flow...');
+
     // Get access token using client credentials flow
     const tokenResponse = await fetch('https://api.pinterest.com/v5/oauth/token', {
       method: 'POST',
@@ -43,16 +45,20 @@ serve(async (req) => {
       },
       body: new URLSearchParams({
         grant_type: 'client_credentials',
-      }),
+        scope: 'boards:read pins:read',
+      }).toString(),
     });
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error('Pinterest token error:', errorText);
-      throw new Error(`Failed to get Pinterest access token: ${tokenResponse.status}`);
+      console.error('Token request failed with status:', tokenResponse.status);
+      throw new Error(`Failed to get Pinterest access token: ${tokenResponse.status} - ${errorText}`);
     }
 
-    const { access_token } = await tokenResponse.json();
+    const tokenData = await tokenResponse.json();
+    console.log('Access token received successfully');
+    const { access_token } = tokenData;
 
     // Search for pins
     const searchUrl = new URL('https://api.pinterest.com/v5/search/pins');

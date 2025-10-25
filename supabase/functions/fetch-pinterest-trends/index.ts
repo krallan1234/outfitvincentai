@@ -42,14 +42,22 @@ serve(async (req) => {
     const { query, limit = 20 } = await req.json();
     
     if (!query) {
-      throw new Error('Query parameter is required');
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Query parameter is required',
+        pins: [],
+        ai_context: '',
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Check cache first
     const cacheKey = `${query}_${limit}`;
     const cachedResult = getCachedData(cacheKey);
     if (cachedResult) {
-      return new Response(JSON.stringify(cachedResult), {
+      return new Response(JSON.stringify({ success: true, ...cachedResult }), {
         headers: { 
           ...corsHeaders, 
           'Content-Type': 'application/json',
@@ -61,8 +69,23 @@ serve(async (req) => {
     const clientId = Deno.env.get('PINTEREST_CLIENT_ID');
     const clientSecret = Deno.env.get('PINTEREST_CLIENT_SECRET');
     
+    console.log('[fetch-pinterest-trends] Environment check:', {
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret,
+      clientIdLength: clientId?.length || 0,
+    });
+    
     if (!clientId || !clientSecret) {
-      throw new Error('Pinterest API credentials not configured');
+      console.error('[fetch-pinterest-trends] Missing Pinterest credentials');
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Pinterest API credentials not configured. Please contact administrator.',
+        pins: [],
+        ai_context: '',
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('Requesting Pinterest access token with client credentials flow...');
@@ -82,9 +105,20 @@ serve(async (req) => {
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('Pinterest token error:', errorText);
-      console.error('Token request failed with status:', tokenResponse.status);
-      throw new Error(`Failed to get Pinterest access token: ${tokenResponse.status} - ${errorText}`);
+      console.error('[fetch-pinterest-trends] Pinterest token error:', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        error: errorText,
+      });
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: `Failed to authenticate with Pinterest API (${tokenResponse.status}). Please check API credentials.`,
+        pins: [],
+        ai_context: '',
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const tokenData = await tokenResponse.json();
@@ -105,8 +139,21 @@ serve(async (req) => {
 
     if (!searchResponse.ok) {
       const errorText = await searchResponse.text();
-      console.error('Pinterest search error:', errorText);
-      throw new Error(`Pinterest search failed: ${searchResponse.status}`);
+      console.error('[fetch-pinterest-trends] Pinterest search error:', {
+        status: searchResponse.status,
+        statusText: searchResponse.statusText,
+        error: errorText,
+        query,
+      });
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: `Pinterest search failed (${searchResponse.status}). The API might be rate-limited or unavailable.`,
+        pins: [],
+        ai_context: '',
+      }), {
+        status: searchResponse.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const searchData = await searchResponse.json();
@@ -152,7 +199,7 @@ serve(async (req) => {
     // Cache the result
     setCachedData(cacheKey, summary);
 
-    return new Response(JSON.stringify(summary), {
+    return new Response(JSON.stringify({ success: true, ...summary }), {
       headers: { 
         ...corsHeaders, 
         'Content-Type': 'application/json',
@@ -160,10 +207,12 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error('Error in fetch-pinterest-trends:', error);
+    console.error('[fetch-pinterest-trends] Unhandled error:', error);
+    console.error('[fetch-pinterest-trends] Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown server error',
         pins: [],
         ai_context: '',
       }), 

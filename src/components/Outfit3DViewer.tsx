@@ -205,13 +205,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
     console.log(`[Outfit3DViewer] Loading texture from: ${url} (category: ${category}, retry: ${retryCount}, has AI maps: ${!!textureMaps})`);
     
     try {
-      // Timeout wrapper for texture loading (8s)
-      const texturePromise = loadProcessedTexture(url, { maxSize: 512, mirrorX: true });
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Texture load timeout (8s)')), 8000)
-      );
-      
-      const texture = await Promise.race([texturePromise, timeoutPromise]);
+      const texture = await loadProcessedTexture(url, { maxSize: 512, mirrorX: true });
     
     let normalMap: THREE.Texture;
     let roughnessMap: THREE.Texture | undefined;
@@ -318,16 +312,16 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
 
   useEffect(() => {
     let cancelled = false;
-    let timeoutId: number;
+    let timeoutId: ReturnType<typeof setTimeout>;
     
     const run = async () => {
       // Set 8s timeout for entire load operation
       timeoutId = setTimeout(() => {
         if (!cancelled) {
-          console.error('[Outfit3DViewer] 8s timeout exceeded for texture loading');
+          console.error('[Outfit3DViewer] 8s timeout exceeded for entire texture loading operation');
           onError();
         }
-      }, 8000) as unknown as number;
+      }, 8000);
       
       try {
         let tm: TextureWithMaterial | undefined;
@@ -431,6 +425,8 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
         }
 
         if (!cancelled) {
+          clearTimeout(timeoutId);
+          
           if (!tm && !bm && !om) {
             console.warn('[Outfit3DViewer] No textures loaded, applying debug checker texture');
             const size = 32; const c = document.createElement('canvas'); c.width = c.height = size;

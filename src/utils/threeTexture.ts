@@ -25,7 +25,8 @@ function cropImageToContent(img: HTMLImageElement): { canvas: HTMLCanvasElement;
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = img.width;
   tempCanvas.height = img.height;
-  const tempCtx = tempCanvas.getContext('2d');
+  // Use willReadFrequently for better performance when reading pixels
+  const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
   if (!tempCtx) throw new Error('2D context unavailable');
   
   tempCtx.drawImage(img, 0, 0);
@@ -72,7 +73,8 @@ function cropImageToContent(img: HTMLImageElement): { canvas: HTMLCanvasElement;
 
 // Calculate average color of image for fallback fills
 function calculateAverageColor(canvas: HTMLCanvasElement, bounds: { x: number; y: number; w: number; h: number }): THREE.Color {
-  const ctx = canvas.getContext('2d');
+  // Use willReadFrequently for better performance
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return new THREE.Color(0xcccccc);
   
   const imageData = ctx.getImageData(bounds.x, bounds.y, Math.min(bounds.w, 50), Math.min(bounds.h, 50));
@@ -93,88 +95,128 @@ function calculateAverageColor(canvas: HTMLCanvasElement, bounds: { x: number; y
   return new THREE.Color(r / (count * 255), g / (count * 255), b / (count * 255));
 }
 
+// Load texture with retry logic and exponential backoff
+export async function loadTextureWithRetry(url: string, retryCount = 0): Promise<THREE.Texture> {
+  try {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    console.log(`[threeTexture] Loading image (attempt ${retryCount + 1}/3):`, url);
+    
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error(`Image load failed: ${url}`));
+      img.src = url;
+    });
+    
+    // Use createImageBitmap if available for faster decode
+    let bitmap: ImageBitmap | null = null;
+    if (typeof createImageBitmap !== 'undefined') {
+      try {
+        bitmap = await createImageBitmap(img);
+        console.log('[threeTexture] Used createImageBitmap for faster decode');
+      } catch (e) {
+        console.warn('[threeTexture] createImageBitmap failed, using img element:', e);
+      }
+    }
+    
+    const texture = new THREE.Texture(bitmap || img);
+    texture.needsUpdate = true;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    
+    console.log('[threeTexture] Texture loaded successfully:', url);
+    return texture;
+  } catch (error) {
+    console.error(`[threeTexture] Load attempt ${retryCount + 1} failed for:`, url, error);
+    
+    // Retry with exponential backoff (2 retries max)
+    if (retryCount < 2) {
+      const backoffMs = retryCount === 0 ? 200 : 600;
+      console.log(`[threeTexture] Retrying after ${backoffMs}ms...`);
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+      return loadTextureWithRetry(url, retryCount + 1);
+    }
+    
+    // All retries exhausted, return fallback checkerboard
+    console.error('[threeTexture] Final failure loading', url, '- returning checkerboard fallback');
+    return createTestTexture(64);
+  }
+}
+
 // Load, downscale, and prepare a texture for clothing images
 export async function loadProcessedTexture(url: string, opts?: { maxSize?: number; mirrorX?: boolean }) {
-  const maxSize = opts?.maxSize ?? 512; // lower to avoid GPU context loss
+  const maxSize = opts?.maxSize ?? 512;
   const mirrorX = opts?.mirrorX ?? true;
 
   console.log('[threeTexture] Loading texture from:', url);
 
-  return new Promise<THREE.Texture>((resolve, reject) => {
+  try {
     const img = new Image();
     img.crossOrigin = 'anonymous';
 
-    img.onload = () => {
-      try {
-        console.log('[threeTexture] Image loaded successfully:', { url, width: img.width, height: img.height });
-        // Crop to content first
-        const { canvas: tempCanvas, bounds } = cropImageToContent(img);
-        console.log('[threeTexture] Cropped bounds:', bounds);
-        
-        // Compute scaled size capped at maxSize
-        const maxDim = Math.max(bounds.w, bounds.h);
-        const scale = Math.min(1, maxSize / maxDim);
-        const w = Math.max(2, Math.floor(bounds.w * scale));
-        const h = Math.max(2, Math.floor(bounds.h * scale));
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = (e) => reject(e);
+      img.src = url;
+    });
 
-        // Ensure power-of-two dims for stability on weaker GPUs
-        const toPOT = (n: number) => 2 ** Math.max(1, Math.floor(Math.log2(n)));
-        const potW = Math.min(1024, toPOT(w));
-        const potH = Math.min(1024, toPOT(h));
+    console.log('[threeTexture] Image loaded successfully:', { url, width: img.width, height: img.height });
+    
+    // Crop to content first
+    const { canvas: tempCanvas, bounds } = cropImageToContent(img);
+    console.log('[threeTexture] Cropped bounds:', bounds);
+    
+    // Compute scaled size capped at maxSize
+    const maxDim = Math.max(bounds.w, bounds.h);
+    const scale = Math.min(1, maxSize / maxDim);
+    const w = Math.max(2, Math.floor(bounds.w * scale));
+    const h = Math.max(2, Math.floor(bounds.h * scale));
 
-        const canvas = document.createElement('canvas');
-        canvas.width = potW;
-        canvas.height = potH;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('2D context unavailable');
+    // Ensure power-of-two dims for stability on weaker GPUs
+    const toPOT = (n: number) => 2 ** Math.max(1, Math.floor(Math.log2(n)));
+    const potW = Math.min(1024, toPOT(w));
+    const potH = Math.min(1024, toPOT(h));
 
-        // Fill with average color as a safety net
-        const avg = calculateAverageColor(tempCanvas, bounds);
-        ctx.fillStyle = avg.getStyle();
-        ctx.fillRect(0, 0, potW, potH);
+    const canvas = document.createElement('canvas');
+    canvas.width = potW;
+    canvas.height = potH;
+    // Use willReadFrequently for better performance when reading pixels
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('2D context unavailable');
 
-        // Draw the cropped region scaled to POT canvas
-        ctx.drawImage(tempCanvas, bounds.x, bounds.y, bounds.w, bounds.h, 0, 0, potW, potH);
+    // Fill with average color as a safety net
+    const avg = calculateAverageColor(tempCanvas, bounds);
+    ctx.fillStyle = avg.getStyle();
+    ctx.fillRect(0, 0, potW, potH);
 
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.generateMipmaps = false; // fewer GPU resources
-        texture.minFilter = THREE.LinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.anisotropy = 1;
+    // Draw the cropped region scaled to POT canvas
+    ctx.drawImage(tempCanvas, bounds.x, bounds.y, bounds.w, bounds.h, 0, 0, potW, potH);
 
-        if (mirrorX) {
-          texture.wrapS = THREE.MirroredRepeatWrapping;
-          texture.repeat.set(2, 1); // mirror to "cover" back side
-        } else {
-          texture.wrapS = THREE.RepeatWrapping;
-          texture.repeat.set(1, 1);
-        }
-        texture.wrapT = THREE.ClampToEdgeWrapping;
-        texture.needsUpdate = true;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.anisotropy = 1;
 
-        console.log('[threeTexture] Texture processed successfully:', { url, dimensions: `${potW}x${potH}`, mirrorX });
-        resolve(texture);
-      } catch (e) {
-        console.error('[threeTexture] Failed to process texture', { url, error: e });
-        try { 
-          console.warn('[threeTexture] Using checkerboard fallback for:', url);
-          resolve(createTestTexture(64)); 
-        } catch { 
-          reject(e as any); 
-        }
-      }
-    };
+    if (mirrorX) {
+      texture.wrapS = THREE.MirroredRepeatWrapping;
+      texture.repeat.set(2, 1);
+    } else {
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.repeat.set(1, 1);
+    }
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.needsUpdate = true;
 
-    img.onerror = (e) => {
-      console.error('[threeTexture] Image failed to load', { url, error: e });
-      try { 
-        console.warn('[threeTexture] Using checkerboard fallback for failed load:', url);
-        resolve(createTestTexture(64)); 
-      } catch { 
-        reject(e as any); 
-      }
-    };
-    img.src = url;
-  });
+    console.log('[threeTexture] Texture processed successfully:', { url, dimensions: `${potW}x${potH}`, mirrorX });
+    return texture;
+  } catch (e) {
+    console.error('[threeTexture] Failed to process texture', { url, error: e });
+    console.warn('[threeTexture] Using checkerboard fallback for:', url);
+    return createTestTexture(64);
+  }
 }

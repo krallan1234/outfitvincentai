@@ -32,30 +32,62 @@ function normalizeImageUrl(u?: string): string | undefined {
 }
 
 async function toSignedUrlIfNeeded(url: string): Promise<string> {
-  try {
-    const resp = await fetch(url, { method: 'HEAD' });
-    if (resp.ok) return url;
-  } catch { /* ignore and try signed */ }
+  // Check if this is a clothes bucket URL that needs signing
+  const needsSigning = url.includes('/storage/v1/object/') && 
+                      (url.includes('/clothes/') || url.includes('clothes%2F'));
+  
+  if (!needsSigning) {
+    // Not a storage URL, return as-is
+    return url;
+  }
 
   try {
-    const path = url.includes('/object/public/clothes/')
-      ? url.split('/object/public/clothes/')[1]
-      : url.replace(PUBLIC_PREFIX, '').replace(/^clothes\//, '');
+    // Extract path from URL
+    let path = url;
+    if (url.includes('/object/public/clothes/')) {
+      path = url.split('/object/public/clothes/')[1];
+    } else if (url.includes('/object/sign/clothes/')) {
+      // Already a signed URL, return as-is
+      return url;
+    } else {
+      path = url.replace(PUBLIC_PREFIX, '').replace(/^clothes\//, '');
+    }
+    
     if (!path) return url;
-    const { data } = await supabase.storage.from('clothes').createSignedUrl(path, 60);
-    if (data?.signedUrl) return data.signedUrl;
-  } catch { /* ignore */ }
+    
+    console.log('[OutfitModal] Creating signed URL for path:', path);
+    const { data, error } = await supabase.storage.from('clothes').createSignedUrl(path, 300);
+    
+    if (error) {
+      console.error('[OutfitModal] Failed to create signed URL:', error);
+      return url;
+    }
+    
+    if (data?.signedUrl) {
+      console.log('[OutfitModal] Successfully created signed URL');
+      return data.signedUrl;
+    }
+  } catch (e) {
+    console.error('[OutfitModal] Exception creating signed URL:', e);
+  }
+  
   return url;
 }
 
 async function prepareImageUrl(raw?: string): Promise<string> {
   const normalized = normalizeImageUrl(raw) || PLACEHOLDER_IMAGE;
-  // small delay to mitigate propagation delay
+  
+  // If it's a placeholder or already a blob/data URL, return as-is
+  if (normalized === PLACEHOLDER_IMAGE || 
+      normalized.startsWith('blob:') || 
+      normalized.startsWith('data:')) {
+    return normalized;
+  }
+  
+  // Small delay to mitigate propagation delay
   await wait(600);
-  try {
-    const head = await fetch(normalized, { method: 'HEAD' });
-    if (head.ok) return normalized;
-  } catch { /* fallthrough */ }
+  
+  // Always use signed URLs for storage bucket URLs (skip HEAD check to avoid 400s)
   return await toSignedUrlIfNeeded(normalized);
 }
 

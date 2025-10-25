@@ -201,8 +201,8 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
     }
   };
 
-  const load = async (url: string, category: string, textureMaps?: any, retryCount = 0): Promise<TextureWithMaterial> => {
-    console.log(`[Outfit3DViewer] Loading texture from: ${url} (category: ${category}, retry: ${retryCount}, has AI maps: ${!!textureMaps})`);
+    const load = async (url: string, category: string, textureMaps?: any, retryCount = 0): Promise<TextureWithMaterial> => {
+    console.log(`[Outfit3DViewer] 📥 Loading texture from: ${url.substring(0, 80)}... (category: ${category}, retry: ${retryCount}, has AI maps: ${!!textureMaps})`);
     
     try {
       const texture = await loadProcessedTexture(url, { maxSize: 512, mirrorX: true });
@@ -212,7 +212,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
     
     // Use AI-generated texture maps if available (2048x2048 high quality)
     if (textureMaps?.normal_url) {
-      console.log('[Outfit3DViewer] Loading AI-generated 2048px normal map from:', textureMaps.normal_url);
+      console.log('[Outfit3DViewer] 🎨 Loading AI-generated 2048px normal map');
       try {
         normalMap = await new Promise<THREE.Texture>((resolve, reject) => {
           new THREE.TextureLoader().load(
@@ -229,16 +229,16 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
           );
         });
       } catch (e) {
-        console.error('[Outfit3DViewer] Failed to load AI normal map, generating fallback:', e);
+        console.error('[Outfit3DViewer] ❌ Failed to load AI normal map, generating fallback:', e);
         normalMap = generateNormalMapFromTexture(texture);
       }
     } else {
-      console.debug('[Outfit3DViewer] Generating normal map from base texture');
+      console.debug('[Outfit3DViewer] 🔧 Generating normal map from base texture');
       normalMap = generateNormalMapFromTexture(texture);
     }
     
     if (textureMaps?.roughness_url) {
-      console.log('[Outfit3DViewer] Loading AI-generated roughness map from:', textureMaps.roughness_url);
+      console.log('[Outfit3DViewer] 🎨 Loading AI-generated roughness map');
       try {
         roughnessMap = await new Promise<THREE.Texture>((resolve, reject) => {
           new THREE.TextureLoader().load(
@@ -253,7 +253,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
           );
         });
       } catch (e) {
-        console.error('[Outfit3DViewer] Failed to load AI roughness map:', e);
+        console.error('[Outfit3DViewer] ❌ Failed to load AI roughness map:', e);
         roughnessMap = undefined;
       }
     }
@@ -274,20 +274,21 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
     }
       const material = new THREE.MeshStandardMaterial(matParams);
       
+      console.log(`[Outfit3DViewer] ✅ Texture loaded successfully for ${category}`);
       return { texture, normalMap, material };
     } catch (error) {
-      console.error(`[Outfit3DViewer] Failed to load texture from ${url}:`, error);
+      console.error(`[Outfit3DViewer] ❌ Failed to load texture from ${url.substring(0, 80)}:`, error);
       
       // Retry logic with exponential backoff (2 retries max)
       if (retryCount < 2) {
         const backoffMs = retryCount === 0 ? 200 : 600;
-        console.log(`[Outfit3DViewer] Retrying after ${backoffMs}ms...`);
+        console.log(`[Outfit3DViewer] 🔄 Retrying after ${backoffMs}ms (attempt ${retryCount + 2}/3)...`);
         await new Promise(resolve => setTimeout(resolve, backoffMs));
         
         // Try to get a fresh signed URL
         const freshUrl = await normalizeUrl(url);
         if (freshUrl && freshUrl !== url) {
-          console.log('[Outfit3DViewer] Retrying with fresh signed URL');
+          console.log('[Outfit3DViewer] 🔐 Retrying with fresh signed URL');
           return load(freshUrl, category, textureMaps, retryCount + 1);
         }
         
@@ -329,7 +330,7 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
         let om: TextureWithMaterial | undefined;
 
         if (clothingItems && clothingItems.length) {
-          console.log('[Outfit3DViewer] Loading textures for clothing items:', clothingItems.length, 'items');
+          console.log('[Outfit3DViewer] 🎬 Loading textures for clothing items:', clothingItems.length, 'items');
           
           const topItem = clothingItems.find((i) => {
             const mc = String(i.main_category || '').toLowerCase();
@@ -349,13 +350,13 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
             return ['outerwear', 'outer', 'jacket', 'coat', 'blazer', 'hoodie', 'cardigan'].some(cat => mc.includes(cat) || c.includes(cat));
           });
           
-          console.log('[Outfit3DViewer] Found items:', { hasTop: !!topItem, hasBottom: !!bottomItem, hasOuter: !!outerItem });
+          console.log('[Outfit3DViewer] 🔍 Found items:', { hasTop: !!topItem, hasBottom: !!bottomItem, hasOuter: !!outerItem });
           
           const loadPromises = [];
           
           if (topItem) {
             const rawUrl = topItem.image_url || topItem.image || topItem.url;
-            console.log('[Outfit3DViewer] Processing top item URL:', rawUrl);
+            console.log('[Outfit3DViewer] 👕 Processing top item URL:', rawUrl?.substring(0, 60) + '...');
             const url = await normalizeUrl(rawUrl);
             const category = topItem.category || topItem.main_category || 'top';
             if (url) {
@@ -363,16 +364,26 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
                 load(url, category, topItem.texture_maps)
                   .then(mat => { 
                     tm = mat;
-                    console.log('[Outfit3DViewer] Top texture loaded successfully');
+                    console.log('[Outfit3DViewer] ✅ Top texture loaded successfully');
                   })
-                  .catch(e => console.error('[Outfit3DViewer] Failed to load top texture:', e))
+                  .catch(e => {
+                    console.error('[Outfit3DViewer] ❌ Failed to load top texture:', e);
+                    // Try fallback to image_url if texture_maps failed
+                    if (topItem.texture_maps && rawUrl) {
+                      console.log('[Outfit3DViewer] 🔄 Trying image_url fallback for top');
+                      return load(url, category, undefined).then(mat => {
+                        tm = mat;
+                        console.log('[Outfit3DViewer] ✅ Top loaded with image_url fallback');
+                      }).catch(() => console.error('[Outfit3DViewer] ❌ Top fallback also failed'));
+                    }
+                  })
               );
             }
           }
           
           if (bottomItem) {
             const rawUrl = bottomItem.image_url || bottomItem.image || bottomItem.url;
-            console.log('[Outfit3DViewer] Processing bottom item URL:', rawUrl);
+            console.log('[Outfit3DViewer] 👖 Processing bottom item URL:', rawUrl?.substring(0, 60) + '...');
             const url = await normalizeUrl(rawUrl);
             const category = bottomItem.category || bottomItem.main_category || 'bottom';
             if (url) {
@@ -380,16 +391,26 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
                 load(url, category, bottomItem.texture_maps)
                   .then(mat => { 
                     bm = mat;
-                    console.log('[Outfit3DViewer] Bottom texture loaded successfully');
+                    console.log('[Outfit3DViewer] ✅ Bottom texture loaded successfully');
                   })
-                  .catch(e => console.error('[Outfit3DViewer] Failed to load bottom texture:', e))
+                  .catch(e => {
+                    console.error('[Outfit3DViewer] ❌ Failed to load bottom texture:', e);
+                    // Try fallback to image_url if texture_maps failed
+                    if (bottomItem.texture_maps && rawUrl) {
+                      console.log('[Outfit3DViewer] 🔄 Trying image_url fallback for bottom');
+                      return load(url, category, undefined).then(mat => {
+                        bm = mat;
+                        console.log('[Outfit3DViewer] ✅ Bottom loaded with image_url fallback');
+                      }).catch(() => console.error('[Outfit3DViewer] ❌ Bottom fallback also failed'));
+                    }
+                  })
               );
             }
           }
           
           if (outerItem) {
             const rawUrl = outerItem.image_url || outerItem.image || outerItem.url;
-            console.log('[Outfit3DViewer] Processing outer item URL:', rawUrl);
+            console.log('[Outfit3DViewer] 🧥 Processing outer item URL:', rawUrl?.substring(0, 60) + '...');
             const url = await normalizeUrl(rawUrl);
             const category = outerItem.category || outerItem.main_category || 'outerwear';
             if (url) {
@@ -397,30 +418,40 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
                 load(url, category, outerItem.texture_maps)
                   .then(mat => { 
                     om = mat;
-                    console.log('[Outfit3DViewer] Outer texture loaded successfully');
+                    console.log('[Outfit3DViewer] ✅ Outer texture loaded successfully');
                   })
-                  .catch(e => console.error('[Outfit3DViewer] Failed to load outer texture:', e))
+                  .catch(e => {
+                    console.error('[Outfit3DViewer] ❌ Failed to load outer texture:', e);
+                    // Try fallback to image_url if texture_maps failed
+                    if (outerItem.texture_maps && rawUrl) {
+                      console.log('[Outfit3DViewer] 🔄 Trying image_url fallback for outer');
+                      return load(url, category, undefined).then(mat => {
+                        om = mat;
+                        console.log('[Outfit3DViewer] ✅ Outer loaded with image_url fallback');
+                      }).catch(() => console.error('[Outfit3DViewer] ❌ Outer fallback also failed'));
+                    }
+                  })
               );
             }
           }
           
           await Promise.all(loadPromises);
-          console.log('[Outfit3DViewer] All texture loading complete');
+          console.log('[Outfit3DViewer] ✅ All texture loading complete');
         }
         
         // Only fallback to imageUrl if no clothing items were processed
         if (!tm && !bm && !om && imageUrl && (!clothingItems || clothingItems.length === 0)) {
-          console.log('[Outfit3DViewer] No clothing items, attempting to load fallback imageUrl:', imageUrl);
+          console.log('[Outfit3DViewer] 🖼️ No clothing items, attempting to load fallback imageUrl');
           try {
             const url = await normalizeUrl(imageUrl);
             if (url) {
               const one = await load(url, 'top');
               tm = one;
               bm = one;
-              console.log('[Outfit3DViewer] Fallback imageUrl loaded successfully');
+              console.log('[Outfit3DViewer] ✅ Fallback imageUrl loaded successfully');
             }
           } catch (e) {
-            console.error('[Outfit3DViewer] Failed to load fallback imageUrl:', e);
+            console.error('[Outfit3DViewer] ❌ Failed to load fallback imageUrl:', e);
           }
         }
 
@@ -428,7 +459,10 @@ function OutfitMesh({ imageUrl, clothingItems, onLoad, onError }: { imageUrl?: s
           clearTimeout(timeoutId);
           
           if (!tm && !bm && !om) {
-            console.warn('[Outfit3DViewer] No textures loaded, applying debug checker texture');
+            console.warn('[Outfit3DViewer] ⚠️ No materials available to apply - showing 2D fallback');
+            onError();
+            return;
+          }
             const size = 32; const c = document.createElement('canvas'); c.width = c.height = size;
             const ctx = c.getContext('2d')!; const cells = 8;
             for (let y = 0; y < cells; y++) { for (let x = 0; x < cells; x++) {

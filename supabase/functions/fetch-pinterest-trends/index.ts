@@ -33,40 +33,14 @@ const setCachedData = (key: string, data: any) => {
   console.log(`[fetch-pinterest-trends] Cached data for "${key}"`);
 };
 
-// Helper: obtain app access token (client credentials) with retries
-async function getAppAccessToken(clientId: string, clientSecret: string, attempt = 1): Promise<string> {
-  console.log(`[fetch-pinterest-trends] Requesting Pinterest access token (attempt ${attempt})...`);
-  const tokenResponse = await fetch('https://api.pinterest.com/v5/oauth/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-    },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      scope: 'boards:read pins:read',
-    }).toString(),
-  });
-
-  if (!tokenResponse.ok) {
-    const errorText = await tokenResponse.text();
-    console.error('[fetch-pinterest-trends] Pinterest token error:', {
-      status: tokenResponse.status,
-      statusText: tokenResponse.statusText,
-      error: errorText,
-      attempt,
-    });
-    if (attempt < 3) {
-      // basic backoff
-      await new Promise((r) => setTimeout(r, attempt * 300));
-      return getAppAccessToken(clientId, clientSecret, attempt + 1);
-    }
-    throw new Error(`Failed to authenticate with Pinterest API (${tokenResponse.status})`);
+// Helper: get Pinterest access token from environment
+function getPinterestAccessToken(): string {
+  const accessToken = Deno.env.get("PINTEREST_ACCESS_TOKEN");
+  if (!accessToken) {
+    throw new Error("PINTEREST_ACCESS_TOKEN is not configured");
   }
-
-  const tokenData = await tokenResponse.json();
-  console.log('[fetch-pinterest-trends] Access token received successfully');
-  return tokenData.access_token as string;
+  console.log('[fetch-pinterest-trends] Access token loaded successfully');
+  return accessToken;
 }
 
 // Helper: fallback summary generator when API fails
@@ -159,39 +133,18 @@ serve(async (req) => {
       return respondWith({ success: true, ...cachedResult }, { 'X-Cache': 'HIT', 'X-Source': 'cache' });
     }
 
-    const clientId = Deno.env.get('PINTEREST_CLIENT_ID');
-    const clientSecret = Deno.env.get('PINTEREST_CLIENT_SECRET');
-    
-    console.log('[fetch-pinterest-trends] Environment check:', {
-      hasClientId: !!clientId,
-      hasClientSecret: !!clientSecret,
-      clientIdLength: clientId?.length || 0,
-    });
-    
-    if (!clientId || !clientSecret) {
-      console.error('[fetch-pinterest-trends] Missing Pinterest credentials');
+    // Get Pinterest access token from environment
+    let access_token = '';
+    try {
+      access_token = getPinterestAccessToken();
+    } catch (e) {
+      console.error('[fetch-pinterest-trends] Failed to get access token:', e);
       return respondWith({ 
         success: false,
-        error: 'Pinterest API credentials not configured. Please contact administrator.',
+        error: 'Pinterest access token not configured. Please add PINTEREST_ACCESS_TOKEN in settings.',
         pins: [],
         ai_context: '',
       }, { 'X-Source': 'config-error' }, 401);
-    }
-
-    // Acquire access token (client credentials) with retry
-    let access_token = '';
-    try {
-      access_token = await getAppAccessToken(clientId, clientSecret);
-    } catch (e) {
-      console.error('[fetch-pinterest-trends] Token acquisition failed after retries:', e);
-      // If we have cached data, return it as fallback
-      const cachedResult2 = getCachedData(cacheKey);
-      if (cachedResult2) {
-        return respondWith({ success: true, ...cachedResult2 }, { 'X-Cache': 'HIT', 'X-Source': 'cache-token-fallback' });
-      }
-      // Last resort: static fallback
-      const { summary } = generateFallbackSummary(query, limit);
-      return respondWith({ success: true, ...summary }, { 'X-Cache': 'MISS', 'X-Source': 'fallback' });
     }
 
 
@@ -224,14 +177,8 @@ serve(async (req) => {
       });
 
       if (status === 401) {
-        console.warn('[fetch-pinterest-trends] Access token likely expired. Attempting to refresh via client credentials...');
-        try {
-          access_token = await getAppAccessToken(clientId, clientSecret);
-          // retry with new token in next loop iteration
-          continue;
-        } catch (e) {
-          console.error('[fetch-pinterest-trends] Token refresh failed:', e);
-        }
+        console.error('[fetch-pinterest-trends] Access token is invalid or expired. Please update PINTEREST_ACCESS_TOKEN.');
+        break; // No point in retrying with same invalid token
       }
 
       // For 5xx or other recoverable errors, wait briefly and retry

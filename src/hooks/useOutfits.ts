@@ -62,7 +62,9 @@ export const useOutfits = () => {
     selectedItem?: any | any[],
     purchaseLinks?: any[],
     weatherData?: any,
-    userPreferences?: any
+    userPreferences?: any,
+    pinterestContext?: string,
+    pinterestPins?: any[]
   ) => {
     try {
       setLoading(true);
@@ -79,7 +81,9 @@ export const useOutfits = () => {
           selectedItem,
           purchaseLinks,
           weatherData,
-          userPreferences
+          userPreferences,
+          pinterestContext,
+          pinterestPins
         },
       });
 

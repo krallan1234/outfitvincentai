@@ -25,6 +25,7 @@ import { OutfitModal } from './OutfitModal';
 import { ClothingItem } from '@/hooks/useClothes';
 import { supabase } from '@/integrations/supabase/client';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { PinterestTrendsPreview } from './PinterestTrendsPreview';
 
 const MOODS = [
   { value: 'casual', label: 'Casual' },
@@ -66,6 +67,7 @@ export const OutfitGenerator = () => {
   const [showPreferences, setShowPreferences] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showOutfitModal, setShowOutfitModal] = useState(false);
+  const [pinterestTrendsPins, setPinterestTrendsPins] = useState<any[]>([]);
   
   const { generateOutfit, loading } = useOutfits();
   const { connectedBoard, getConnectedBoard } = usePinterestBoard();
@@ -213,6 +215,25 @@ export const OutfitGenerator = () => {
         ? `${contextPrompt} (style variation ${Math.floor(Math.random() * 10000)})` 
         : contextPrompt;
       
+      // Fetch Pinterest trends for inspiration
+      let pinterestContext = '';
+      let pinterestPins: any[] = [];
+      try {
+        console.log('Fetching Pinterest trends for:', varietyPrompt);
+        const trendsResponse = await supabase.functions.invoke('fetch-pinterest-trends', {
+          body: { query: varietyPrompt, limit: 20 }
+        });
+        
+        if (trendsResponse.data && !trendsResponse.error) {
+          pinterestContext = trendsResponse.data.ai_context || '';
+          pinterestPins = trendsResponse.data.top_pins || [];
+          setPinterestTrendsPins(pinterestPins);
+          console.log('Pinterest trends fetched:', pinterestPins.length, 'pins');
+        }
+      } catch (err) {
+        console.warn('Failed to fetch Pinterest trends, continuing without:', err);
+      }
+      
       // Filter out empty purchase links
       const validPurchaseLinks = purchaseLinks.filter(link => link.store_name.trim() !== '');
       
@@ -224,7 +245,9 @@ export const OutfitGenerator = () => {
         selectedItems.length > 0 ? selectedItems : undefined,
         validPurchaseLinks.length > 0 ? validPurchaseLinks : undefined,
         weather || undefined,
-        userPreferences || undefined
+        userPreferences || undefined,
+        pinterestContext,
+        pinterestPins
       );
       setGeneratedOutfit(result);
       
@@ -405,6 +428,14 @@ export const OutfitGenerator = () => {
           <PinterestBoardSelector 
             onBoardConnected={(connected) => setEnablePinterestBoard(connected)}
           />
+
+          {/* Pinterest Trends Preview */}
+          {pinterestTrendsPins.length > 0 && (
+            <PinterestTrendsPreview 
+              pins={pinterestTrendsPins} 
+              query={prompt || 'fashion'} 
+            />
+          )}
 
           {/* Selected Items Display */}
           <div className="space-y-2">

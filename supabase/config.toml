@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.fetch-pinterest-board]
 verify_jwt = true
 
+[functions.fetch-pinterest-trends]
+verify_jwt = false
+
 [functions.weather]
 verify_jwt = true
 
@@ -22,4 +25,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.generate-texture-maps]
+verify_jwt = true
+
+[functions.generate-outfit]
+verify_jwt = true
+
+[functions.outfit-recommendations]
 verify_jwt = true

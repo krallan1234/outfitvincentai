@@ -18,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, mood, userId, isPublic = true, pinterestBoardId, selectedItem, purchaseLinks, weatherData, userPreferences } = await req.json();
+    const { prompt, mood, userId, isPublic = true, pinterestBoardId, selectedItem, purchaseLinks, weatherData, userPreferences, pinterestContext, pinterestPins } = await req.json();
 
     if (!prompt || !userId) {
       console.error('Missing required parameters:', { prompt: !!prompt, userId: !!userId });
@@ -172,8 +172,8 @@ serve(async (req) => {
       accessories: clothesByCategory.accessories.length
     });
 
-    // Step 1: Get Pinterest inspiration - either from user's board or search
-    let pinterestTrends = [];
+    // Step 1: Use Pinterest inspiration from frontend or user's board
+    let pinterestTrends = pinterestPins || [];
     let boardInspiration = [];
     
     // If user has connected a Pinterest board, use pins from their board
@@ -200,56 +200,12 @@ serve(async (req) => {
       }
     }
     
-    // Fallback to Pinterest search if no board or as additional inspiration
-    if (pinterestApiKey && boardInspiration.length === 0) {
-      try {
-        // Add scenario-specific keywords for more varied results
-        const scenarioKeywords = {
-          'office': ['professional', 'workwear', 'business'],
-          'casual': ['streetstyle', 'everyday', 'relaxed'],
-          'date': ['romantic', 'elegant', 'datenight'],
-          'summer': ['summervibes', 'lightweight', 'vacation'],
-          'winter': ['cozy', 'layering', 'winterfashion'],
-          'formal': ['formal', 'dresscode', 'sophisticated'],
-          'sporty': ['athletic', 'activewear', 'sporty']
-        };
-        
-        // Detect scenario from prompt and add specific hashtags
-        let additionalKeywords = '';
-        const lowerPrompt = prompt.toLowerCase();
-        for (const [scenario, keywords] of Object.entries(scenarioKeywords)) {
-          if (lowerPrompt.includes(scenario)) {
-            additionalKeywords = keywords[Math.floor(Math.random() * keywords.length)];
-            break;
-          }
-        }
-        
-        // Randomize query to get varied Pinterest results
-        const randomVariations = ['trending', 'inspo', '2025', 'lookbook', 'OOTD'];
-        const randomVariation = randomVariations[Math.floor(Math.random() * randomVariations.length)];
-        
-        const pinterestQuery = `${prompt} ${mood || ''} ${additionalKeywords} ${randomVariation} outfit`.trim();
-        console.log('Pinterest search query:', pinterestQuery);
-        
-        const pinterestResponse = await fetch(`https://api.pinterest.com/v5/search/pins/?query=${encodeURIComponent(pinterestQuery)}&limit=8`, {
-          headers: {
-            'Authorization': `Bearer ${pinterestApiKey}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (pinterestResponse.ok) {
-          const pinterestData = await pinterestResponse.json();
-          // Randomly select 3 from 8 results for variety
-          const allTrends = pinterestData.items || [];
-          pinterestTrends = allTrends
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 3);
-          console.log(`Found ${pinterestTrends.length} Pinterest search results from ${allTrends.length} total`);
-        }
-      } catch (error) {
-        console.warn('Pinterest search failed, continuing without trends:', error);
-      }
+    // Log Pinterest inspiration sources
+    if (pinterestContext) {
+      console.log('Using Pinterest trends context from frontend:', pinterestContext);
+    }
+    if (pinterestTrends.length > 0) {
+      console.log(`Using ${pinterestTrends.length} Pinterest trend pins from frontend`);
     }
 
     // Get recent outfits to avoid repeats
@@ -430,8 +386,8 @@ serve(async (req) => {
       USER REQUEST: "${prompt}" ${mood ? `with a ${mood} mood` : ''}
       
       PINTEREST INSPIRATION: ${pinterestTrends.length > 0 ? 
-        pinterestTrends.map(trend => trend.description || 'trending style').join(', ') : 
-        'classic styling'}
+        pinterestTrends.map(trend => trend.title || trend.description || 'trending style').join(', ') : 
+        pinterestContext || 'classic styling'}
 
       ${attempt > 1 ? 'PREVIOUS ATTEMPT FAILED - Fix: Remove duplicates and select exactly one item per category.' : ''}
 

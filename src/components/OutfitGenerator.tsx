@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Sparkles, Loader2, TrendingUp, Palette, RefreshCw, Link as LinkIcon, CloudRain, Settings } from 'lucide-react';
 import { useOutfits } from '@/hooks/useOutfits';
 import { usePinterestBoard } from '@/hooks/usePinterestBoard';
@@ -68,6 +69,7 @@ export const OutfitGenerator = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showOutfitModal, setShowOutfitModal] = useState(false);
   const [pinterestTrendsPins, setPinterestTrendsPins] = useState<any[]>([]);
+  const [shouldGenerateImage, setShouldGenerateImage] = useState(false);
   
   const { generateOutfit, loading } = useOutfits();
   const { connectedBoard, getConnectedBoard } = usePinterestBoard();
@@ -265,7 +267,8 @@ export const OutfitGenerator = () => {
         weather || undefined,
         userPreferences || undefined,
         pinterestContext,
-        pinterestPins
+        pinterestPins,
+        shouldGenerateImage
       );
       setGeneratedOutfit(result);
       
@@ -543,6 +546,23 @@ export const OutfitGenerator = () => {
           {loading && loadingTip && (
             <OutfitGenerationProgress step={generationStep} tip={loadingTip} />
           )}
+
+          {/* Image Generation Option */}
+          <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg">
+            <Checkbox 
+              id="generate-image" 
+              checked={shouldGenerateImage}
+              onCheckedChange={(checked) => setShouldGenerateImage(checked as boolean)}
+            />
+            <div className="flex-1">
+              <Label htmlFor="generate-image" className="cursor-pointer font-medium">
+                Generera AI-bild av outfit
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Skapar en stiliserad bild av outfiten. Snabbare och billigare utan bild.
+              </p>
+            </div>
+          </div>
 
           <div className="flex gap-2">
             <Button

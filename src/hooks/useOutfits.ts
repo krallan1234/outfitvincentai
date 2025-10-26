@@ -64,7 +64,8 @@ export const useOutfits = () => {
     weatherData?: any,
     userPreferences?: any,
     pinterestContext?: string,
-    pinterestPins?: any[]
+    pinterestPins?: any[],
+    generateImage: boolean = false
   ) => {
     try {
       setLoading(true);
@@ -83,7 +84,8 @@ export const useOutfits = () => {
           weatherData,
           userPreferences,
           pinterestContext,
-          pinterestPins
+          pinterestPins,
+          generateImage
         },
       });
 

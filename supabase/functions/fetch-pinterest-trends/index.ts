@@ -1,9 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 interface PinterestPin {
   id: string;
@@ -15,23 +19,14 @@ interface PinterestPin {
   dominant_color?: string;
 }
 
-// In-memory cache with 6h TTL
-const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
-
-const getCachedData = (key: string) => {
-  const cached = cache.get(key);
-  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-    console.log(`[fetch-pinterest-trends] Using cached data for "${key}"`);
-    return cached.data;
-  }
-  return null;
-};
-
-const setCachedData = (key: string, data: any) => {
-  cache.set(key, { data, timestamp: Date.now() });
-  console.log(`[fetch-pinterest-trends] Cached data for "${key}"`);
-};
+// Helper: Create SHA-256 hash for query
+async function hashQuery(query: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(query);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 // Helper: get Pinterest access token from environment
 function getPinterestAccessToken(): string {
@@ -159,12 +154,32 @@ serve(async (req) => {
     const query = queryParam;
     const limit = isNaN(limitParam) ? 20 : Math.max(1, Math.min(50, limitParam));
 
-    // Check cache first
-    const cacheKey = `${query}_${limit}`;
-    const cachedResult = getCachedData(cacheKey);
-    if (cachedResult) {
-      return respondWith({ success: true, ...cachedResult }, { 'X-Cache': 'HIT', 'X-Source': 'cache' });
+    // Initialize Supabase client
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check database cache first
+    const queryHash = await hashQuery(`${query}_${limit}`);
+    const { data: cachedData, error: cacheError } = await supabase
+      .from('pinterest_trends_cache')
+      .select('*')
+      .eq('query_hash', queryHash)
+      .gt('expires_at', new Date().toISOString())
+      .single();
+
+    if (cachedData && !cacheError) {
+      console.log(`[fetch-pinterest-trends] Cache HIT for "${query}"`);
+      return respondWith({ 
+        success: true, 
+        query: cachedData.query,
+        total_pins: cachedData.pins_data.length,
+        dominant_colors: cachedData.dominant_colors || [],
+        trending_keywords: cachedData.trending_keywords || [],
+        top_pins: cachedData.pins_data,
+        ai_context: cachedData.ai_context
+      }, { 'X-Cache': 'HIT', 'X-Source': 'database' });
     }
+
+    console.log(`[fetch-pinterest-trends] Cache MISS for "${query}" - fetching fresh data`);
 
     // Get Pinterest access token from environment
     let access_token = '';
@@ -225,13 +240,29 @@ serve(async (req) => {
     }
 
     if (!searchResponse || !searchResponse.ok) {
-      // Use cache if we have it
-      const cached = getCachedData(cacheKey);
-      if (cached) {
-        return respondWith({ success: true, ...cached }, { 'X-Cache': 'HIT', 'X-Source': 'cache-search-fallback' });
-      }
       // Fallback to predefined summary
       const { summary } = generateFallbackSummary(query, limit);
+      
+      // Cache fallback data in database
+      try {
+        const queryHash = await hashQuery(`${query}_${limit}`);
+        const expiresAt = new Date(Date.now() + 6 * 60 * 60 * 1000); // 6 hours
+        await supabase
+          .from('pinterest_trends_cache')
+          .upsert({
+            query_hash: queryHash,
+            query: summary.query,
+            pins_data: summary.top_pins,
+            ai_context: summary.ai_context,
+            dominant_colors: summary.dominant_colors,
+            trending_keywords: summary.trending_keywords,
+            expires_at: expiresAt.toISOString()
+          });
+        console.log(`[fetch-pinterest-trends] Cached fallback data for "${query}"`);
+      } catch (cacheErr) {
+        console.warn('[fetch-pinterest-trends] Failed to cache fallback data:', cacheErr);
+      }
+      
       return respondWith({ success: true, ...summary }, { 'X-Cache': 'MISS', 'X-Source': 'fallback' });
     }
 
@@ -276,8 +307,25 @@ serve(async (req) => {
 
     console.log(`Found ${pins.length} trending pins for "${query}"`);
 
-    // Cache the result
-    setCachedData(cacheKey, summary);
+    // Cache the result in database with 6h expiry
+    try {
+      const queryHash = await hashQuery(`${query}_${limit}`);
+      const expiresAt = new Date(Date.now() + 6 * 60 * 60 * 1000); // 6 hours
+      await supabase
+        .from('pinterest_trends_cache')
+        .upsert({
+          query_hash: queryHash,
+          query: summary.query,
+          pins_data: summary.top_pins,
+          ai_context: summary.ai_context,
+          dominant_colors: summary.dominant_colors,
+          trending_keywords: summary.trending_keywords,
+          expires_at: expiresAt.toISOString()
+        });
+      console.log(`[fetch-pinterest-trends] Cached fresh data for "${query}" until ${expiresAt.toISOString()}`);
+    } catch (cacheErr) {
+      console.warn('[fetch-pinterest-trends] Failed to cache data:', cacheErr);
+    }
 
     return respondWith({ success: true, ...summary }, { 'X-Cache': 'MISS', 'X-Source': 'pinterest' });
   } catch (error) {

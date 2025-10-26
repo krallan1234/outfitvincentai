@@ -358,6 +358,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pinterest_trends_cache: {
+        Row: {
+          ai_context: string | null
+          cached_at: string
+          dominant_colors: string[] | null
+          expires_at: string
+          fetch_count: number | null
+          id: string
+          pins_data: Json
+          query: string
+          query_hash: string
+          trending_keywords: string[] | null
+        }
+        Insert: {
+          ai_context?: string | null
+          cached_at?: string
+          dominant_colors?: string[] | null
+          expires_at: string
+          fetch_count?: number | null
+          id?: string
+          pins_data: Json
+          query: string
+          query_hash: string
+          trending_keywords?: string[] | null
+        }
+        Update: {
+          ai_context?: string | null
+          cached_at?: string
+          dominant_colors?: string[] | null
+          expires_at?: string
+          fetch_count?: number | null
+          id?: string
+          pins_data?: Json
+          query?: string
+          query_hash?: string
+          trending_keywords?: string[] | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

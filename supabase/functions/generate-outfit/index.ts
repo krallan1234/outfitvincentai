@@ -1061,6 +1061,7 @@ The outfit conveys: ${outfitRecommendation.description}`;
       }
     } else {
       console.log('Skipping AI image generation (user opted out - saves ~$0.004)');
+    }
 
     // Save outfit to database
     const { data: savedOutfit, error: saveError } = await supabase

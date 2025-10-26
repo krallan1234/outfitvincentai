@@ -15,7 +15,7 @@ interface SearchFiltersProps {
 
 const STYLES = ['casual', 'sporty', 'elegant', 'professional', 'romantic', 'edgy', 'bohemian', 'minimalist'];
 const COLORS = ['red', 'blue', 'green', 'yellow', 'black', 'white', 'gray', 'brown', 'pink', 'purple'];
-const CATEGORIES = ['shirt', 'pants', 'dress', 'jacket', 'shoes', 'accessories', 'ringar', 'kepsar', 'klockor', 'sweatpants', 'sheer', 'long-sleeve', 'bike-shorts', 'workout-leggings', 'workout-top', 'denim-skirt'];
+const CATEGORIES = ['shirt', 'pants', 'dress', 'jacket', 'shoes', 'accessories', 'ringar', 'kepsar', 'klockor', 'sweatpants', 'sheer', 'long-sleeve', 'bike-shorts', 'workout-leggings', 'workout-top', 'denim-skirt', 'shoulder-bag', 'hobo-bag', 'hand-bag'];
 
 export const SearchFilters = ({
   searchTerm,

@@ -88,6 +88,9 @@ const CATEGORIES = [
   'strumpor',
   'sunglasses',
   'bag',
+  'shoulder-bag',
+  'hobo-bag',
+  'hand-bag',
   'tie',
   
   // Underwear & Other

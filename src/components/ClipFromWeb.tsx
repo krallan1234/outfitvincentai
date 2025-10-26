@@ -22,7 +22,10 @@ const CATEGORIES = [
   'bike-shorts',
   'workout-leggings',
   'workout-top',
-  'denim-skirt'
+  'denim-skirt',
+  'shoulder-bag',
+  'hobo-bag',
+  'hand-bag'
 ];
 
 export const ClipFromWeb = () => {

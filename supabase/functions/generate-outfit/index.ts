@@ -649,7 +649,7 @@ Return ONLY valid JSON:
               temperature: 0.4,
             }),
           });
-          if (!response.ok) {
+          if (!res.ok) {
             const txt = await res.text();
             logger.error('Classification API error', undefined, { status: res.status, error: txt });
             if (res.status === 429) throw new Error('AI_RATE_LIMIT');
@@ -740,7 +740,7 @@ Return ONLY valid JSON:
               temperature: 0.4,
             }),
           });
-          if (!response.ok) {
+           if (!res.ok) {
             const txt = await res.text();
             logger.error('Requirements API error', undefined, { status: res.status, error: txt });
             if (res.status === 429) throw new Error('AI_RATE_LIMIT');
@@ -896,7 +896,7 @@ Return ONLY valid JSON array:
               temperature: 0.4,
             }),
           });
-          if (!response.ok) {
+          if (!res.ok) {
             const txt = await res.text();
             logger.error('Outfit generation API error', undefined, { status: res.status, error: txt });
             if (res.status === 429) throw new Error('AI_RATE_LIMIT');

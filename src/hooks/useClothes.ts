@@ -112,32 +112,34 @@ export const useClothes = () => {
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      // Get public URL immediately after upload
-      const { data: { publicUrl } } = supabase.storage
-        .from('clothes')
-        .getPublicUrl(fileName);
+      console.log('Uploaded file:', fileName);
 
-      console.log('Uploaded file, public URL:', publicUrl);
+      // Generate signed URL for texture generation (temporary, 1 hour)
+      const { data: signedUrlData } = await supabase.storage
+        .from('clothes')
+        .createSignedUrl(fileName, 3600);
 
       // Generate texture maps automatically (non-blocking)
       let textureMaps = null;
-      try {
-        console.log('Triggering texture generation for:', metadata.category);
-        const { data: textureData, error: textureError } = await supabase.functions.invoke('generate-texture-maps', {
-          body: { 
-            imageUrl: publicUrl,
-            clothingType: metadata.category 
-          }
-        });
+      if (signedUrlData?.signedUrl) {
+        try {
+          console.log('Triggering texture generation for:', metadata.category);
+          const { data: textureData, error: textureError } = await supabase.functions.invoke('generate-texture-maps', {
+            body: { 
+              imageUrl: signedUrlData.signedUrl,
+              clothingType: metadata.category 
+            }
+          });
         
-        if (!textureError && textureData) {
-          textureMaps = textureData;
-          console.log('✓ Textures generated:', textureMaps);
-        } else {
-          console.warn('Texture generation failed (non-critical):', textureError);
+          if (!textureError && textureData) {
+            textureMaps = textureData;
+            console.log('✓ Textures generated:', textureMaps);
+          } else {
+            console.warn('Texture generation failed (non-critical):', textureError);
+          }
+        } catch (err) {
+          console.warn('Texture generation error (continuing):', err);
         }
-      } catch (err) {
-        console.warn('Texture generation error (continuing):', err);
       }
 
       // Save to database with public URL and textures
@@ -150,7 +152,7 @@ export const useClothes = () => {
         .from('clothes')
         .insert({
           user_id: user.id,
-          image_url: publicUrl, // Store public URL for direct access
+          image_url: fileName, // Store only the path for signed URL generation
           ...finalMetadata,
           texture_maps: textureMaps, // Include generated textures
           ai_detected_metadata: aiDetectedColor ? { color: aiDetectedColor } : null,

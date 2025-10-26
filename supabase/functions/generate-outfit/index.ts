@@ -1331,20 +1331,20 @@ The outfit conveys: ${outfitRecommendation.description}`;
       }
     }
 
-    return successResponse(
-      {
-        outfit: savedOutfit,
-        recommendedClothes: selectedItems,
-        structuredOutfit: outfitRecommendation,
-      },
-      {
-        processingTimeMs: Date.now() - startTime,
-        clothesAnalyzed: clothes.length,
-        pinterestTrendsUsed: pinterestTrends.length > 0 || boardInspiration.length > 0,
-        imageGenerated: !!generatedImageUrl,
-      },
-      corsHeaders
-    );
+    const responsePayload = {
+      outfit: savedOutfit,
+      recommendedClothes: selectedItems,
+      structuredOutfit: outfitRecommendation,
+    };
+    const responseMeta = {
+      processingTimeMs: Date.now() - startTime,
+      clothesAnalyzed: clothes.length,
+      pinterestTrendsUsed: (pinterestTrends.length > 0) || (boardInspiration.length > 0),
+      imageGenerated: !!generatedImageUrl,
+    };
+
+    return successResponse(responsePayload, responseMeta, corsHeaders);
+
 
   } catch (error) {
     logger.error('Unexpected error in generate-outfit function', error, {

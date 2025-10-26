@@ -1,8 +1,31 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') || '*';
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Simple rate limiting
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const MAX_REQUESTS = 30; // 30 requests per minute
+
+const checkRateLimit = (identifier: string): boolean => {
+  const now = Date.now();
+  const record = rateLimitMap.get(identifier);
+  
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(identifier, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return true;
+  }
+  
+  if (record.count >= MAX_REQUESTS) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
 };
 
 const geminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
@@ -10,6 +33,17 @@ const geminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Rate limiting
+  const authHeader = req.headers.get('authorization');
+  const identifier = authHeader || req.headers.get('x-forwarded-for') || 'anonymous';
+  
+  if (!checkRateLimit(identifier)) {
+    return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }), {
+      status: 429,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {

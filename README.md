@@ -60,9 +60,53 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Security & Configuration
+
+### Environment Variables
+
+This project uses hardcoded Supabase configuration in the client code (`src/integrations/supabase/client.ts`). The following are public and safe to commit:
+
+- `VITE_SUPABASE_URL`: Your Supabase project URL
+- `VITE_SUPABASE_PUBLISHABLE_KEY`: Your Supabase anon/public key
+
+**Never commit private keys or secrets to the repository.**
+
+### Secrets Management
+
+Private API keys and secrets should be stored as **Supabase Secrets** and accessed only from Edge Functions:
+
+1. Navigate to your Supabase project dashboard
+2. Go to Settings → Edge Functions
+3. Add your secrets (e.g., `OPENAI_API_KEY`, `PINTEREST_API_KEY`)
+4. Access them in Edge Functions via `Deno.env.get('SECRET_NAME')`
+
+**Example Edge Function with secrets:**
+
+```typescript
+const apiKey = Deno.env.get('OPENAI_API_KEY');
+if (!apiKey) {
+  throw new Error('API key not configured');
+}
+```
+
+### CORS Configuration
+
+Edge Functions are configured to accept requests from your production domain. If you need to allow additional domains, update the `corsHeaders` in each Edge Function:
+
+```typescript
+const corsHeaders = {
+  'Access-Control-Allow-Origin': 'https://your-domain.com',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+```
+
+### Rate Limiting
+
+Edge Functions include basic rate limiting to prevent abuse. If you need to adjust limits, modify the rate limiting logic in individual functions.
+
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/2c95fd08-586c-4e21-9ff9-bea6ea888afc) and click on Share -> Publish.
+Simply open [Lovable](https://lovable.dev/projects/2c95fd08-586c-4e21-9ff9-bea6ea888afc) and click on Share → Publish.
 
 ## Can I connect a custom domain to my Lovable project?
 

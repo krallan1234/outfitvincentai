@@ -31,13 +31,22 @@ export const useSignedUrl = (bucket: string, path: string | null, expiresIn: num
           return;
         }
         
-        const { data, error: signError } = await supabase.storage
-          .from(bucket)
-          .createSignedUrl(storagePath, expiresIn);
+        // Use edge function to get signed URL (requires service role key)
+        const { data, error: signError } = await supabase.functions.invoke('get-signed-urls', {
+          body: { 
+            urls: [storagePath],
+            expiresIn 
+          }
+        });
 
         if (signError) throw signError;
-        setSignedUrl(data.signedUrl);
+        if (data?.signedUrls?.[storagePath]) {
+          setSignedUrl(data.signedUrls[storagePath]);
+        } else {
+          throw new Error('No signed URL returned');
+        }
       } catch (err) {
+        console.error('Failed to get signed URL:', err);
         setError(err instanceof Error ? err : new Error('Failed to get signed URL'));
         setSignedUrl(null);
       } finally {
@@ -75,23 +84,22 @@ export const useSignedUrls = (bucket: string, paths: string[], expiresIn: number
         setLoading(true);
         setError(null);
         
-        const urlMap: Record<string, string> = {};
-        
-        // Create signed URLs for all paths
-        await Promise.all(
-          paths.map(async (path) => {
-            const { data, error: signError } = await supabase.storage
-              .from(bucket)
-              .createSignedUrl(path, expiresIn);
+        // Use edge function to get signed URLs (requires service role key)
+        const { data, error: signError } = await supabase.functions.invoke('get-signed-urls', {
+          body: { 
+            urls: paths,
+            expiresIn 
+          }
+        });
 
-            if (!signError && data) {
-              urlMap[path] = data.signedUrl;
-            }
-          })
-        );
-
-        setSignedUrls(urlMap);
+        if (signError) throw signError;
+        if (data?.signedUrls) {
+          setSignedUrls(data.signedUrls);
+        } else {
+          throw new Error('No signed URLs returned');
+        }
       } catch (err) {
+        console.error('Failed to get signed URLs:', err);
         setError(err instanceof Error ? err : new Error('Failed to get signed URLs'));
         setSignedUrls({});
       } finally {

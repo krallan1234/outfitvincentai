@@ -1,12 +1,15 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Heart, ExternalLink, ShoppingBag, Sparkles, CalendarPlus } from 'lucide-react';
+import { Calendar, Heart, ExternalLink, ShoppingBag, Sparkles, CalendarPlus, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CommentsSection } from '@/components/CommentsSection';
 import { OutfitRemixButton } from '@/components/OutfitRemixButton';
+import { ReplaceItemButton } from '@/components/ReplaceItemButton';
+import { AIStylistExplanation } from '@/components/AIStylistExplanation';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"%3E%3Crect fill="%23ddd" width="400" height="400"/%3E%3C/svg%3E';
@@ -111,6 +114,8 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
   const [userId, setUserId] = useState<string | null>(null);
   const [showCalendarDialog, setShowCalendarDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [userFeedback, setUserFeedback] = useState<'like' | 'dislike' | null>(null);
+  const { toast } = useToast();
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -120,14 +125,42 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
     });
   };
 
-  // Load current user id once
+  // Load current user id and feedback state
   useEffect(() => {
     supabase.auth.getUser().then(({ data, error }) => {
       if (!error) {
         setUserId(data.user?.id ?? null);
       }
     });
-  }, []);
+    
+    // Load saved feedback from localStorage
+    if (outfit?.id) {
+      const savedFeedback = localStorage.getItem(`outfit-feedback-${outfit.id}`);
+      if (savedFeedback) {
+        setUserFeedback(savedFeedback as 'like' | 'dislike');
+      }
+    }
+  }, [outfit?.id]);
+
+  const handleFeedback = (feedback: 'like' | 'dislike') => {
+    if (!outfit) return;
+    
+    const newFeedback = userFeedback === feedback ? null : feedback;
+    setUserFeedback(newFeedback);
+    
+    // Save to localStorage
+    if (newFeedback) {
+      localStorage.setItem(`outfit-feedback-${outfit.id}`, newFeedback);
+      toast({
+        title: newFeedback === 'like' ? '👍 Thanks for your feedback!' : '👎 Feedback noted',
+        description: newFeedback === 'like' 
+          ? 'We\'ll create more outfits like this!' 
+          : 'We\'ll learn from this for future recommendations',
+      });
+    } else {
+      localStorage.removeItem(`outfit-feedback-${outfit.id}`);
+    }
+  };
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -218,7 +251,7 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
   return (
     <Dialog open={isOpen} onOpenChange={onClose} modal>
       <DialogContent 
-        className="max-w-4xl h-[90vh] w-[95vw] xs:w-[90vw] card-elegant border-primary/20 p-0 gap-0 flex flex-col"
+        className="max-w-4xl h-[90vh] w-[95vw] xs:w-[90vw] card-elegant border-primary/20 p-0 gap-0 flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         style={{
           position: 'fixed',
           top: '50%',
@@ -233,6 +266,8 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
             e.preventDefault();
           }
         }}
+        aria-labelledby="outfit-modal-title"
+        aria-describedby="outfit-modal-description"
       >
         <DialogHeader className="space-y-2 flex-shrink-0 px-3 xs:px-4 sm:px-6 pt-3 xs:pt-4 sm:pt-6 pb-3 select-none">
           <DialogTitle className="text-lg xs:text-xl sm:text-2xl font-serif bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent leading-tight">
@@ -299,22 +334,63 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
             {/* Action Buttons */}
             {userId && outfit.user_id === userId && (
-              <div className="flex gap-2 flex-wrap pt-2">
-                <OutfitRemixButton outfit={outfit} variant="outline" />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    // Navigate to calendar page - assuming there's a way to do this
-                    window.location.href = '/calendar';
-                  }}
-                >
-                  <CalendarPlus className="w-4 h-4 mr-2" />
-                  Add to Calendar
-                </Button>
+              <div className="space-y-3 pt-2">
+                {/* Like/Dislike Feedback */}
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium mr-2">Rate this outfit:</p>
+                  <Button
+                    variant={userFeedback === 'like' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleFeedback('like')}
+                    className={cn(
+                      "min-w-[44px] min-h-[44px] touch-manipulation",
+                      userFeedback === 'like' && "bg-green-500 hover:bg-green-600"
+                    )}
+                    aria-label="I like this outfit"
+                    aria-pressed={userFeedback === 'like'}
+                  >
+                    <ThumbsUp className={cn("h-4 w-4", userFeedback === 'like' && "fill-current")} aria-hidden="true" />
+                  </Button>
+                  <Button
+                    variant={userFeedback === 'dislike' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleFeedback('dislike')}
+                    className={cn(
+                      "min-w-[44px] min-h-[44px] touch-manipulation",
+                      userFeedback === 'dislike' && "bg-red-500 hover:bg-red-600"
+                    )}
+                    aria-label="I dislike this outfit"
+                    aria-pressed={userFeedback === 'dislike'}
+                  >
+                    <ThumbsDown className={cn("h-4 w-4", userFeedback === 'dislike' && "fill-current")} aria-hidden="true" />
+                  </Button>
+                </div>
+
+                {/* Other Actions */}
+                <div className="flex gap-2 flex-wrap">
+                  <OutfitRemixButton outfit={outfit} variant="outline" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      window.location.href = '/calendar';
+                    }}
+                    className="min-w-[44px] min-h-[44px] touch-manipulation"
+                    aria-label="Add outfit to calendar"
+                  >
+                    <CalendarPlus className="w-4 h-4 mr-2" aria-hidden="true" />
+                    Add to Calendar
+                  </Button>
+                </div>
               </div>
             )}
           </div>
+
+          {/* AI Stylist Explanation */}
+          <AIStylistExplanation outfit={outfit} />
+
+          {/* AI Stylist Explanation */}
+          <AIStylistExplanation outfit={outfit} />
 
           {/* Outfit Visual */}
           <div className="space-y-3 sm:space-y-4">
@@ -395,19 +471,37 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                             </div>
                           )}
                       </div>
-                      <div className="p-2 sm:p-3 select-none">
-                        <p className="text-xs sm:text-sm font-medium capitalize">{item.category || 'Item'}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{item.color || 'Unknown'}</p>
-                        {item.style && (
-                          <p className="text-xs text-muted-foreground capitalize">{item.style}</p>
-                        )}
-                        {item.item_name && (
-                          <p className="text-xs text-muted-foreground line-clamp-1">{item.item_name}</p>
-                        )}
-                        {item.is_selected && item.reasoning && (
-                          <p className="text-xs text-primary mt-1 italic line-clamp-2">{item.reasoning}</p>
-                        )}
-                      </div>
+                       <div className="p-2 sm:p-3 select-none space-y-2">
+                         <p className="text-xs sm:text-sm font-medium capitalize">{item.category || 'Item'}</p>
+                         <p className="text-xs text-muted-foreground capitalize">{item.color || 'Unknown'}</p>
+                         {item.style && (
+                           <p className="text-xs text-muted-foreground capitalize">{item.style}</p>
+                         )}
+                         {item.item_name && (
+                           <p className="text-xs text-muted-foreground line-clamp-1">{item.item_name}</p>
+                         )}
+                         {item.is_selected && item.reasoning && (
+                           <p className="text-xs text-primary mt-1 italic line-clamp-2">{item.reasoning}</p>
+                         )}
+                         
+                         {/* Replace Item Button */}
+                         {userId && outfit.user_id === userId && (
+                           <ReplaceItemButton
+                             itemToReplace={{
+                               id: item.id,
+                               category: item.category,
+                               color: item.color,
+                               image_url: item.image_url || item.image || item.url,
+                             }}
+                             outfitId={outfit.id}
+                             allOutfitItems={clothesImages}
+                             onReplaceComplete={() => {
+                               // Refresh the clothes images
+                               fetchClothesImages();
+                             }}
+                           />
+                         )}
+                       </div>
                     </div>
                   ))}
                 </div>

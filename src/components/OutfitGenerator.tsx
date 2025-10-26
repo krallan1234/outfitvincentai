@@ -21,6 +21,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { PinterestTrendsPreview } from './PinterestTrendsPreview';
 import { PromptEditor } from './outfit-generator/PromptEditor';
 import { QuickPrompts } from './outfit-generator/QuickPrompts';
+import { ExamplePrompts } from './outfit-generator/ExamplePrompts';
 import { ContextSelectors } from './outfit-generator/ContextSelectors';
 import { ResultPreview } from './outfit-generator/ResultPreview';
 import { ResultControls } from './outfit-generator/ResultControls';
@@ -200,6 +201,16 @@ export const OutfitGenerator = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Example Prompts - Onboarding */}
+          <ExamplePrompts
+            onSelect={(prompt, mood, occasion) => {
+              setPrompt(prompt);
+              if (mood) setMood(mood);
+              if (occasion) setOccasion(occasion);
+            }}
+            disabled={loading}
+          />
+
           {/* Quick Prompts */}
           <QuickPrompts onSelect={setPrompt} disabled={loading} />
 

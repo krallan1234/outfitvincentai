@@ -1,17 +1,12 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Heart, ExternalLink, ShoppingBag, MessageCircle, Sparkles, CalendarPlus, Box, ScanFace, Image as ImageIcon } from 'lucide-react';
+import { Calendar, Heart, ExternalLink, ShoppingBag, Sparkles, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CommentsSection } from '@/components/CommentsSection';
 import { OutfitRemixButton } from '@/components/OutfitRemixButton';
-import { Outfit3DViewer } from '@/components/Outfit3DViewer';
-import { VirtualTryOn } from '@/components/VirtualTryOn';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { use3DCapability } from '@/hooks/use3DCapability';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"%3E%3Crect fill="%23ddd" width="400" height="400"/%3E%3C/svg%3E';
@@ -116,8 +111,6 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
   const [userId, setUserId] = useState<string | null>(null);
   const [showCalendarDialog, setShowCalendarDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [viewMode, setViewMode] = useState<'auto' | '2d' | '3d'>('auto');
-  const deviceCapability = use3DCapability();
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -325,96 +318,38 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
 
           {/* Outfit Visual */}
           <div className="space-y-3 sm:space-y-4">
-            {/* Device capability warning */}
-            {!deviceCapability.supports3D && (
-              <Alert>
-                <ImageIcon className="h-4 w-4" />
-                <AlertDescription>
-                  Your device doesn't support 3D rendering. Showing 2D preview instead.
-                </AlertDescription>
-              </Alert>
-            )}
+            <h3 className="text-base sm:text-lg font-semibold font-serif flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-accent" />
+              Outfit Visualization
+            </h3>
             
-            {deviceCapability.supports3D && deviceCapability.gpuTier === 'low' && (
-              <Alert>
-                <AlertDescription className="text-xs">
-                  For best performance on your device, consider using 2D view.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <Tabs 
-              defaultValue={
-                viewMode === 'auto' 
-                  ? (deviceCapability.supports3D && deviceCapability.gpuTier !== 'low' ? '3d' : '2d')
-                  : viewMode === '3d' ? '3d' : '2d'
-              } 
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="2d">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  2D Image
-                </TabsTrigger>
-                <TabsTrigger value="3d" disabled={!deviceCapability.supports3D}>
-                  <Box className="h-4 w-4 mr-2" />
-                  3D Preview
-                </TabsTrigger>
-                <TabsTrigger value="ar">
-                  <ScanFace className="h-4 w-4 mr-2" />
-                  Try On
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="2d" className="space-y-3 sm:space-y-4">
-                <h3 className="text-base sm:text-lg font-semibold font-serif flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-accent" />
-                  Outfit Visualization
-                </h3>
-                
-                {/* Generated Image */}
-                {outfit.generated_image_url && (
-                  <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 aspect-[3/4] sm:aspect-video flex items-center justify-center">
-                    <img
-                      src={outfit.generated_image_url}
-                      alt={outfit.title}
-                      className="w-full h-full object-contain pointer-events-none select-none transition-none"
-                      loading="eager"
-                      style={{ 
-                        minHeight: '200px',
-                        maxHeight: '50vh',
-                      }}
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        target.style.display = 'none';
-                        const parent = target.parentElement;
-                        if (parent) {
-                          parent.innerHTML = `
-                            <div class="w-full h-full flex items-center justify-center text-muted-foreground">
-                              <span>Image preview unavailable</span>
-                            </div>
-                          `;
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="3d" className="space-y-3 sm:space-y-4">
-                <Outfit3DViewer
-                  imageUrl={outfit.generated_image_url}
-                  clothingItems={clothesImages}
-                  title={outfit.title}
+            {/* Generated Image */}
+            {outfit.generated_image_url && (
+              <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 aspect-[3/4] sm:aspect-video flex items-center justify-center">
+                <img
+                  src={outfit.generated_image_url}
+                  alt={outfit.title}
+                  className="w-full h-full object-contain pointer-events-none select-none transition-none"
+                  loading="eager"
+                  style={{ 
+                    minHeight: '200px',
+                    maxHeight: '50vh',
+                  }}
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.innerHTML = `
+                        <div class="w-full h-full flex items-center justify-center text-muted-foreground">
+                          <span>Image preview unavailable</span>
+                        </div>
+                      `;
+                    }
+                  }}
                 />
-              </TabsContent>
-              
-              <TabsContent value="ar" className="space-y-3 sm:space-y-4">
-                {outfit.generated_image_url && (
-                  <VirtualTryOn outfitImageUrl={outfit.generated_image_url} />
-                )}
-              </TabsContent>
-            </Tabs>
+              </div>
+            )}
 
             {/* Clothes Grid */}
             {loading ? (
@@ -477,7 +412,7 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
                   ))}
                 </div>
               </div>
-) : null}
+            ) : null}
           </div>
 
           {/* AI Analysis */}

@@ -41,6 +41,7 @@ const CATEGORIES = [
   'cardigan',
   'vest',
   'sheer',
+  'rain-jacket',
   
   // Bottoms
   'pants',

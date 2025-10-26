@@ -25,7 +25,8 @@ const CATEGORIES = [
   'denim-skirt',
   'shoulder-bag',
   'hobo-bag',
-  'hand-bag'
+  'hand-bag',
+  'rain-jacket'
 ];
 
 export const ClipFromWeb = () => {

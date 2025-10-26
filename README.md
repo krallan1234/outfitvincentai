@@ -4,6 +4,83 @@
 
 **URL**: https://lovable.dev/projects/2c95fd08-586c-4e21-9ff9-bea6ea888afc
 
+## Code Structure
+
+This project follows a modular architecture with strict TypeScript typing:
+
+### Type Definitions (`src/types/`)
+- `outfit.ts` - Outfit and clothing item types with Zod validation
+- `generator.ts` - Outfit generation parameters and state types
+
+### Custom Hooks (`src/hooks/`)
+- `useOutfitGeneration.ts` - Main outfit generation logic and API calls
+- `useUserPreferences.ts` - User preferences management
+- `usePurchaseLinks.ts` - Purchase links state management
+- `useClothes.ts` - Clothing items data management
+- `useWeather.ts` - Weather data integration
+
+### Components (`src/components/`)
+- `OutfitGenerator.tsx` - Main outfit generator container
+- `outfit-generator/` - Modular sub-components:
+  - `PromptEditor.tsx` - Outfit prompt input
+  - `QuickPrompts.tsx` - Quick prompt selection
+  - `ContextSelectors.tsx` - Mood/occasion/Pinterest selectors
+  - `ResultPreview.tsx` - Generated outfit preview modal
+  - `ResultControls.tsx` - Generation and regeneration controls
+
+## Code Quality & Linting
+
+### ESLint Configuration
+The project uses strict TypeScript ESLint rules:
+- No implicit `any` types
+- Explicit function return types where needed
+- React hooks rules enforcement
+- Unused variables detection
+
+Run linting:
+```bash
+npm run lint
+```
+
+### Prettier Configuration
+Code formatting is enforced with Prettier:
+- Single quotes
+- 2 space indentation
+- 90 character line width
+- Trailing commas
+
+Format code:
+```bash
+npm run format
+```
+
+### Pre-commit Hooks (Setup Required)
+
+To enable automatic linting and formatting before commits:
+
+```bash
+# Install husky
+npm install -D husky
+
+# Initialize husky
+npx husky init
+
+# Create pre-commit hook
+echo "npm run lint && npm run format" > .husky/pre-commit
+chmod +x .husky/pre-commit
+```
+
+Add these scripts to `package.json`:
+```json
+{
+  "scripts": {
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json,css}\"",
+    "type-check": "tsc --noEmit"
+  }
+}
+```
+
 ## How can I edit this code?
 
 There are several ways of editing your application.

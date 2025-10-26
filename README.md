@@ -139,6 +139,37 @@ This project is built with:
 
 ## Security & Configuration
 
+### Edge Functions Best Practices
+
+All Supabase Edge Functions follow production-ready practices:
+
+#### 1. Request Validation
+- **Zod schemas** for strict input validation
+- Type-safe request/response handling
+- Validation error responses with field-level details
+
+#### 2. Authentication & Authorization
+- JWT validation enforced via `verify_jwt = true` in `supabase/config.toml`
+- User authorization checks (authenticated user must match requested user)
+- Proper 401/403 status codes for auth failures
+
+#### 3. Error Handling
+- Proper HTTP status codes (4xx client errors, 5xx server errors)
+- Structured error responses with error codes
+- Specific handling for rate limits, auth errors, validation errors
+
+#### 4. Retry Logic
+- Exponential backoff for transient failures
+- Configurable retry parameters (max 3 retries)
+- Smart retry on specific status codes (408, 429, 500, 502, 503, 504)
+
+#### 5. Structured Logging
+- JSON-formatted logs for easy parsing
+- Log levels: INFO, WARN, ERROR
+- Request tracing with processing time metrics
+
+**Example Edge Function**: See `supabase/functions/generate-outfit/README.md` for detailed implementation.
+
 ### Environment Variables
 
 This project uses hardcoded Supabase configuration in the client code (`src/integrations/supabase/client.ts`). The following are public and safe to commit:

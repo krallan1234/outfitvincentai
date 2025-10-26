@@ -1,12 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { GenerateOutfitRequestSchema } from './schema.ts';
+import { Logger, withRetry, errorResponse, successResponse, getAuthUserId } from './utils.ts';
 
 const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') || '*';
 const corsHeaders = {
   'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const logger = new Logger('generate-outfit');
 
 // Simple rate limiting
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -36,25 +40,132 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 serve(async (req) => {
+  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const startTime = Date.now();
+  logger.info('Outfit generation request received');
 
   // Rate limiting
   const authHeader = req.headers.get('authorization');
   const identifier = authHeader || req.headers.get('x-forwarded-for') || 'anonymous';
   
   if (!checkRateLimit(identifier)) {
-    return new Response(JSON.stringify({ 
-      error: 'Rate limit exceeded. You can only generate 10 outfits per minute. Please wait a moment.' 
-    }), {
-      status: 429,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    logger.warn('Rate limit exceeded', { identifier });
+    return new Response(
+      JSON.stringify({ 
+        ...errorResponse(429, 'Rate limit exceeded. You can only generate 10 outfits per minute.', 'RATE_LIMIT_EXCEEDED'),
+      }), 
+      {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 
   try {
-    const { prompt, mood, userId, isPublic = true, pinterestBoardId, selectedItem, purchaseLinks, weatherData, userPreferences, pinterestContext, pinterestPins, generateImage = false } = await req.json();
+    // Validate JWT authentication (Supabase handles this, but we can add extra validation)
+    const authenticatedUserId = getAuthUserId(req);
+    if (!authenticatedUserId) {
+      logger.error('Unauthenticated request');
+      return new Response(
+        JSON.stringify(errorResponse(401, 'Authentication required', 'UNAUTHENTICATED')),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Parse and validate request body
+    const rawBody = await req.json();
+    
+    logger.info('Validating request body', { 
+      hasPrompt: !!rawBody.prompt,
+      hasUserId: !!rawBody.userId,
+    });
+
+    const validationResult = GenerateOutfitRequestSchema.safeParse(rawBody);
+    
+    if (!validationResult.success) {
+      logger.error('Request validation failed', validationResult.error, {
+        errors: validationResult.error.errors,
+      });
+      
+      return new Response(
+        JSON.stringify(
+          errorResponse(
+            400,
+            'Invalid request data',
+            'VALIDATION_ERROR',
+            {
+              errors: validationResult.error.errors.map(err => ({
+                field: err.path.join('.'),
+                message: err.message,
+              })),
+            }
+          )
+        ),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const { 
+      prompt, 
+      mood, 
+      userId, 
+      isPublic, 
+      pinterestBoardId, 
+      selectedItem, 
+      purchaseLinks, 
+      weatherData, 
+      userPreferences, 
+      pinterestContext, 
+      pinterestPins, 
+      generateImage,
+    } = validationResult.data;
+
+    // Verify user authorization (authenticated user must match requested userId)
+    if (authenticatedUserId !== userId) {
+      logger.error('Authorization failed', undefined, { 
+        authenticatedUserId, 
+        requestedUserId: userId,
+      });
+      
+      return new Response(
+        JSON.stringify(errorResponse(403, 'Not authorized to generate outfits for this user', 'FORBIDDEN')),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Check API key configuration
+    if (!lovableApiKey) {
+      logger.error('Lovable AI key not configured');
+      return new Response(
+        JSON.stringify(errorResponse(500, 'AI service is not configured', 'SERVICE_MISCONFIGURED')),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    logger.info('Request validated successfully', {
+      userId,
+      promptLength: prompt.length,
+      mood,
+      hasWeather: !!weatherData,
+      hasPreferences: !!userPreferences,
+      generateImage,
+    });
 
     // Extract selected item IDs for filtering logic
     const selectedItemIds = selectedItem 
@@ -63,59 +174,45 @@ serve(async (req) => {
           : [selectedItem.id])
       : [];
 
-    if (!prompt || !userId) {
-      console.error('Missing required parameters:', { prompt: !!prompt, userId: !!userId });
-      return new Response(JSON.stringify({ 
-        error: 'Prompt and user ID are required to generate an outfit.' 
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (!lovableApiKey) {
-      console.error('Lovable AI key not configured');
-      return new Response(JSON.stringify({ 
-        error: 'AI service is not configured. Please contact support.' 
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log('Weather data:', weatherData ? `${weatherData.temperature}°C, ${weatherData.condition}` : 'Not provided');
-    console.log('User preferences:', userPreferences ? 'Provided' : 'Not provided');
+    logger.info('Starting outfit generation', {
+      userId,
+      weatherData: weatherData ? `${weatherData.temperature}°C, ${weatherData.condition}` : 'Not provided',
+      userPreferences: userPreferences ? 'Provided' : 'Not provided',
+      selectedItemsCount: selectedItemIds.length,
+    });
 
     // Initialize Supabase client
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get user's clothes
+    // Get user's clothes with error handling
     const { data: clothes, error: clothesError } = await supabase
       .from('clothes')
       .select('*')
       .eq('user_id', userId);
 
     if (clothesError) {
-      console.error('Failed to fetch clothes from database:', clothesError);
-      return new Response(JSON.stringify({ 
-        error: 'Could not load your wardrobe. Please try again.' 
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      logger.error('Failed to fetch clothes from database', clothesError);
+      return new Response(
+        JSON.stringify(errorResponse(500, 'Failed to load wardrobe data', 'DATABASE_ERROR')),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     if (!clothes || clothes.length === 0) {
-      console.log('User has no clothes in wardrobe');
-      return new Response(JSON.stringify({ 
-        error: 'Please upload some clothing items to your wardrobe first.' 
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      logger.warn('User has no clothes in wardrobe', { userId });
+      return new Response(
+        JSON.stringify(errorResponse(400, 'Please upload clothing items to your wardrobe first', 'NO_CLOTHES')),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
-    console.log(`Analyzing ${clothes.length} clothing items for outfit generation`);
+    logger.info(`Analyzing ${clothes.length} clothing items for outfit generation`);
 
     // Prepare clothes analysis with category grouping
     console.log('Preparing clothes analysis and category grouping...');
@@ -677,26 +774,55 @@ serve(async (req) => {
       const outfitPrompt = generateOutfitPrompt(attemptCount, shouldIncludeAccessory);
 
       try {
-        const geminiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${lovableApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [{
-              role: 'user',
-              content: outfitPrompt
-            }],
-            max_tokens: 8000,
-            temperature: 0.8
-          }),
-        });
+        // Use retry logic for AI API call
+        const geminiResponse = await withRetry(
+          async () => {
+            const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${lovableApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'google/gemini-2.5-flash',
+                messages: [{
+                  role: 'user',
+                  content: outfitPrompt
+                }],
+                max_tokens: 8000,
+                temperature: 0.8
+              }),
+            });
 
-        if (!geminiResponse.ok) {
-          const errorData = await geminiResponse.text();
-          console.error('Lovable AI error:', geminiResponse.status, errorData);
+            if (!response.ok) {
+              const errorData = await response.text();
+              logger.error('AI API error', undefined, { 
+                status: response.status, 
+                error: errorData,
+                attempt: attemptCount,
+              });
+              
+              // Handle specific error codes
+              if (response.status === 429) {
+                throw new Error('AI_RATE_LIMIT');
+              } else if (response.status === 402) {
+                throw new Error('AI_CREDITS_EXHAUSTED');
+              }
+              
+              throw response; // Will trigger retry
+            }
+
+            return response;
+          },
+          {
+            maxRetries: 3,
+            initialDelayMs: 1000,
+            maxDelayMs: 10000,
+            logger,
+          }
+        );
+
+        const responseData = await geminiResponse.json();
           
           if (geminiResponse.status === 429) {
             console.log('Rate limit exceeded (429), will retry if attempts remain...');
@@ -1214,24 +1340,66 @@ The outfit conveys: ${outfitRecommendation.description}`;
       }
     }
 
-    return new Response(JSON.stringify({
-      outfit: savedOutfit,
-      recommendedClothes: selectedItems,
-      structuredOutfit: outfitRecommendation // Return new structured format
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify(
+        successResponse(
+          {
+            outfit: savedOutfit,
+            recommendedClothes: selectedItems,
+            structuredOutfit: outfitRecommendation,
+          },
+          {
+            processingTimeMs: Date.now() - startTime,
+            clothesAnalyzed: clothes.length,
+            pinterestTrendsUsed: pinterestTrends.length > 0 || boardInspiration.length > 0,
+            imageGenerated: !!generatedImageUrl,
+          }
+        )
+      ),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
 
   } catch (error) {
-    console.error('Unexpected error in generate-outfit function:', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-    return new Response(JSON.stringify({ 
-      error: errorMessage.includes('Failed to') || errorMessage.includes('Could not') 
-        ? errorMessage 
-        : 'Failed to generate outfit. Please try again.' 
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    logger.error('Unexpected error in generate-outfit function', error, {
+      processingTimeMs: Date.now() - startTime,
     });
+
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.message === 'AI_RATE_LIMIT') {
+        return new Response(
+          JSON.stringify(errorResponse(429, 'AI service rate limit exceeded. Please try again later.', 'AI_RATE_LIMIT')),
+          {
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      
+      if (error.message === 'AI_CREDITS_EXHAUSTED') {
+        return new Response(
+          JSON.stringify(errorResponse(402, 'AI service credits exhausted. Please contact support.', 'AI_CREDITS_EXHAUSTED')),
+          {
+            status: 402,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
+
+    // Generic error response
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+    return new Response(
+      JSON.stringify(errorResponse(500, 'Failed to generate outfit. Please try again.', 'INTERNAL_ERROR', {
+        message: errorMessage,
+      })),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 });

@@ -420,8 +420,11 @@ serve(async (req) => {
       ${attempt > 1 ? '5. PREVIOUS ATTEMPT FAILED: Try a completely different combination than before' : ''}
 
       ${selectedItem ? `
-      CRITICAL REQUIREMENT - SELECTED ITEMS MUST BE INCLUDED:
+      ⚠️ CRITICAL REQUIREMENT - SELECTED ITEMS OVERRIDE ALL STYLE RULES:
       The user has specifically selected ${Array.isArray(selectedItem) ? `${selectedItem.length} items` : '1 item'} to build the outfit around.
+      
+      🔴 IMPORTANT: These selected items MUST be included even if they don't match the ${styleContext} style context.
+      The user's choice ALWAYS takes priority over style guidelines and exclusion rules.
       
       ${Array.isArray(selectedItem) ? 
         `SELECTED ITEMS (ALL MUST BE INCLUDED):
@@ -437,11 +440,11 @@ serve(async (req) => {
         
         MULTI-SELECT REQUIREMENTS:
         1. MANDATORY: Include ALL ${selectedItem.length} selected items in the final outfit (mark each with "is_selected": true)
-        2. Think step-by-step: Analyze each selected item and ensure they work together
-        3. Add complementary pieces from the wardrobe to complete the outfit
-        4. Ensure one item per category rule is maintained (selected items already count toward their categories)
+        2. If selected items conflict with ${styleContext} style, BUILD AROUND THEM ANYWAY
+        3. Select complementary pieces that bridge the gap between selected items and ${styleContext} style
+        4. Think step-by-step: Analyze each selected item and ensure they work together
         5. Add matching accessories, outerwear, or footwear as needed from the rest of the wardrobe
-        6. Explain how the selected items work together and how added pieces complement them
+        6. Explain in your reasoning how you adapted the outfit to include the selected items despite style context
         ` 
         : 
         `SELECTED ITEM:
@@ -454,9 +457,10 @@ serve(async (req) => {
         
         SINGLE ITEM REQUIREMENTS:
         1. ALWAYS include this selected item in the final outfit (mark it with "is_selected": true)
-        2. Build the ENTIRE outfit to complement and highlight this item
-        3. Choose colors, styles, and accessories that work harmoniously with this piece
-        4. Explain in your reasoning how each item complements the selected piece
+        2. If this item conflicts with ${styleContext} style, INCLUDE IT ANYWAY and build around it
+        3. Build the ENTIRE outfit to complement and highlight this item
+        4. Choose colors, styles, and accessories that work harmoniously with this piece
+        5. Explain in your reasoning how you adapted the outfit to include this item despite style context
         `}
       ` : ''}
 
@@ -804,7 +808,8 @@ serve(async (req) => {
             const allSelectedIncluded = selectedItemIds.every(id => outfitItemIds.includes(id));
             
             if (!allSelectedIncluded) {
-              console.log('Selected items not included in outfit, retrying...');
+              console.log('Selected items not included in outfit. Expected IDs:', selectedItemIds, 'Got:', outfitItemIds);
+              console.log('Missing items:', selectedItemIds.filter(id => !outfitItemIds.includes(id)));
               if (attemptCount < maxAttempts) {
                 continue; // Retry
               } else {
@@ -884,17 +889,18 @@ serve(async (req) => {
           }
 
           // Validate style appropriateness - ensure items match the detected style context
-          const outfitItemCategories = outfitRecommendation.items.map(item => 
-            item.item_name?.toLowerCase() || item.category?.toLowerCase() || ''
-          );
-          
-          // Check if any excluded items slipped through
-          const hasExcludedItems = outfitItemCategories.some(itemCat => 
-            contextRules.excluded.some(excluded => itemCat.includes(excluded.toLowerCase()))
-          );
+          // BUT allow user-selected items even if they're excluded for this style
+          const hasExcludedItems = outfitRecommendation.items.some(item => {
+            const itemCat = item.item_name?.toLowerCase() || item.category?.toLowerCase() || '';
+            const isExcluded = contextRules.excluded.some(excluded => itemCat.includes(excluded.toLowerCase()));
+            const isUserSelected = selectedItemIds.includes(item.item_id);
+            
+            // Allow excluded items if they are user-selected
+            return isExcluded && !isUserSelected;
+          });
           
           if (hasExcludedItems) {
-            console.log(`Style validation failed: outfit contains items excluded for ${styleContext} style, retrying...`);
+            console.log(`Style validation failed: outfit contains non-selected items excluded for ${styleContext} style, retrying...`);
             if (attemptCount < maxAttempts) {
               continue; // Retry with stricter prompt
             } else {

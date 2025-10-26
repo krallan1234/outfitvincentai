@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useOutfits, Outfit } from '@/hooks/useOutfits';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Trash2, Loader2, Calendar, ChevronLeft, ChevronRight } from 'lucide-rea
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { OutfitModal } from '@/components/OutfitModal';
 import { OutfitRemixButton } from '@/components/OutfitRemixButton';
+import { OptimizedImage } from '@/components/ui/optimized-image';
 
 export const OutfitGallery = () => {
   const { outfits, loading, deleteOutfit } = useOutfits();
@@ -139,8 +140,6 @@ interface OutfitCardProps {
 }
 
 const OutfitCard = ({ outfit, onDelete, onClick }: OutfitCardProps) => {
-  const [imageLoaded, setImageLoaded] = useState(false);
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -148,6 +147,11 @@ const OutfitCard = ({ outfit, onDelete, onClick }: OutfitCardProps) => {
       year: 'numeric'
     });
   };
+
+  // Simple blur placeholder
+  const blurDataURL = useMemo(() => {
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNjY2MiLz48L3N2Zz4=';
+  }, []);
 
   return (
     <Card 
@@ -166,15 +170,13 @@ const OutfitCard = ({ outfit, onDelete, onClick }: OutfitCardProps) => {
       {/* Generated Image */}
       {outfit.generated_image_url && (
         <div className="aspect-square relative">
-          {!imageLoaded && (
-            <div className="absolute inset-0 bg-muted animate-pulse" aria-hidden="true" />
-          )}
-          <img
+          <OptimizedImage
             src={outfit.generated_image_url}
             alt={`${outfit.title} - ${outfit.prompt}`}
-            className={`w-full h-full object-cover transition-opacity ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-            loading="lazy"
-            onLoad={() => setImageLoaded(true)}
+            className="w-full h-full"
+            blurDataURL={blurDataURL}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            priority={false}
           />
           <div className="absolute top-2 right-2">
             <AlertDialog>

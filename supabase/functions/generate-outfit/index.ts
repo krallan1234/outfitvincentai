@@ -218,6 +218,9 @@ serve(async (req) => {
       const itemCategory = normalizedCategory.toLowerCase();
       const itemStyle = (analysis.style || '').toLowerCase();
       
+      // Check if this item is explicitly selected by the user (mandatory items)
+      const isUserSelected = selected_items?.includes(item.id) || locked_items?.includes(item.id);
+      
       // Check if item is explicitly excluded for this style context
       const isExcluded = contextRules.excluded.some(excluded => 
         itemCategory.includes(excluded.toLowerCase()) || 
@@ -225,8 +228,12 @@ serve(async (req) => {
         itemStyle.includes(excluded.toLowerCase())
       );
       
-      // If explicitly excluded, mark as inappropriate
-      if (isExcluded) {
+      // If explicitly excluded BUT user selected it, keep it and log override
+      if (isExcluded && isUserSelected) {
+        console.log(`Keeping user-selected ${item.category} (${item.color}) despite ${styleContext} context exclusion`);
+      }
+      // If explicitly excluded and NOT user selected, filter it out
+      else if (isExcluded) {
         console.log(`Filtering out ${item.category} (${item.color}) - excluded for ${styleContext} context`);
         return null;
       }

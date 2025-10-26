@@ -743,369 +743,125 @@ serve(async (req) => {
     };
 
     let outfitRecommendation;
-    let attemptCount = 0;
-    const maxAttempts = 3;
-    let shouldIncludeAccessory = false;
 
-    // Helper function for exponential backoff delay
-    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    // Single-attempt generation with retry wrapper (handles transient errors)
+    try {
+      const outfitPrompt = generateOutfitPrompt(1, false);
 
-    while (attemptCount < maxAttempts) {
-      attemptCount++;
-      console.log(`Generating outfit (attempt ${attemptCount}/${maxAttempts})...`);
+      const geminiResponse = await withRetry(
+        async () => {
+          const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${lovableApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash',
+              messages: [{ role: 'user', content: outfitPrompt }],
+              max_tokens: 8000,
+              temperature: 0.8,
+            }),
+          });
 
-      // Add exponential backoff delay for retries (2s, 4s, 8s)
-      if (attemptCount > 1) {
-        const delayMs = Math.pow(2, attemptCount) * 1000; // 2s, 4s, 8s
-        console.log(`Waiting ${delayMs}ms before retry...`);
-        await sleep(delayMs);
+          if (!response.ok) {
+            const txt = await response.text();
+            logger.error('AI API error', undefined, { status: response.status, error: txt });
+            if (response.status === 429) throw new Error('AI_RATE_LIMIT');
+            if (response.status === 402) throw new Error('AI_CREDITS_EXHAUSTED');
+            throw response;
+          }
+
+          return response;
+        },
+        { maxRetries: 3, initialDelayMs: 1000, maxDelayMs: 10000, logger }
+      );
+
+      const geminiData = await geminiResponse.json();
+
+      if (!geminiData.choices || geminiData.choices.length === 0) {
+        return new Response(JSON.stringify({ error: 'AI service returned unexpected response. Please try again.' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
-      const outfitPrompt = generateOutfitPrompt(attemptCount, shouldIncludeAccessory);
-
-      try {
-        // Use retry logic for AI API call
-        const geminiResponse = await withRetry(
-          async () => {
-            const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${lovableApiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'google/gemini-2.5-flash',
-                messages: [{
-                  role: 'user',
-                  content: outfitPrompt
-                }],
-                max_tokens: 8000,
-                temperature: 0.8
-              }),
-            });
-
-            if (!response.ok) {
-              const errorData = await response.text();
-              logger.error('AI API error', undefined, { 
-                status: response.status, 
-                error: errorData,
-                attempt: attemptCount,
-              });
-              
-              // Handle specific error codes
-              if (response.status === 429) {
-                throw new Error('AI_RATE_LIMIT');
-              } else if (response.status === 402) {
-                throw new Error('AI_CREDITS_EXHAUSTED');
-              }
-              
-              throw response; // Will trigger retry
-            }
-
-            return response;
-          },
-          {
-            maxRetries: 3,
-            initialDelayMs: 1000,
-            maxDelayMs: 10000,
-            logger,
-          }
-        );
-
-        const responseData = await geminiResponse.json();
-          
-          if (geminiResponse.status === 429) {
-            console.log('Rate limit exceeded (429), will retry if attempts remain...');
-            if (attemptCount < maxAttempts) {
-              continue; // Retry with backoff
-            }
-            console.error('Rate limit exceeded after all retries');
-            return new Response(JSON.stringify({ 
-              error: 'Rate limit reached. Please wait a moment and try again.' 
-            }), {
-              status: 200,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          } else if (geminiResponse.status === 402) {
-            console.error('Lovable AI payment required');
-            return new Response(JSON.stringify({ 
-              error: 'AI service credits exhausted. Please contact support.' 
-            }), {
-              status: 200,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          } else if (geminiResponse.status === 401) {
-            console.error('Lovable AI authentication failed');
-            return new Response(JSON.stringify({ 
-              error: 'AI service configuration issue. Please contact support.' 
-            }), {
-              status: 200,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          } else {
-            console.error(`Lovable AI error: ${geminiResponse.status}`);
-            if (attemptCount < maxAttempts) {
-              continue; // Retry for other errors
-            }
-            return new Response(JSON.stringify({ 
-              error: `AI service temporarily unavailable. Please try again.` 
-            }), {
-              status: 200,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          }
-        }
-
-        const geminiData = await geminiResponse.json();
-        console.log('Lovable AI request successful');
-        
-        // Handle OpenAI-compatible response structure
-        if (!geminiData.choices || geminiData.choices.length === 0) {
-          console.error('No choices in AI response:', geminiData);
-          if (attemptCount < maxAttempts) {
-            continue; // Retry
-          }
-          return new Response(JSON.stringify({ 
-            error: 'AI service returned unexpected response. Please try again.' 
-          }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        
-        const choice = geminiData.choices[0];
-        
-        // Check for token limit
-        if (choice.finish_reason === 'length') {
-          console.error('AI hit token limit. Response was truncated.');
-          
-          if (choice.message && choice.message.content) {
-            console.log('Attempting to use partial response despite token limit');
-          } else {
-            console.error('No content available after token limit');
-            if (attemptCount < maxAttempts) {
-              console.log('Will retry...');
-              continue; // Retry
-            }
-            return new Response(JSON.stringify({ 
-              error: 'Your wardrobe is too large for this request. Please try with a simpler prompt.' 
-            }), {
-              status: 200,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          }
-        }
-        
-        if (!choice.message || !choice.message.content) {
-          console.error('Invalid choice structure:', choice);
-          if (attemptCount < maxAttempts) {
-            continue; // Retry
-          }
-          return new Response(JSON.stringify({ 
-            error: 'AI service returned invalid response. Please try again.' 
-          }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        
-        const content = choice.message.content;
-        
-        // Log raw response for debugging
-        console.log(`AI response received (attempt ${attemptCount})`);
-        
-        // Parse JSON from potentially markdown-wrapped response
-        try {
-          // Try to extract JSON from markdown code blocks first
-          const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-          if (jsonMatch) {
-            console.log('Found markdown-wrapped JSON, extracting...');
-            outfitRecommendation = JSON.parse(jsonMatch[1].trim());
-          } else {
-            // Fallback to direct parsing
-            console.log('No markdown wrapper found, parsing directly...');
-            outfitRecommendation = JSON.parse(content.trim());
-          }
-
-          // Validate outfit for category duplicates
-          if (!outfitRecommendation.items || !Array.isArray(outfitRecommendation.items)) {
-            throw new Error('Invalid outfit format: missing items array');
-          }
-
-          // Check for category duplicates
-          const categories = outfitRecommendation.items.map(item => item.category);
-          const uniqueCategories = new Set(categories);
-          
-          if (categories.length !== uniqueCategories.size) {
-            console.log('Found duplicate categories, retrying...');
-            if (attemptCount < maxAttempts) {
-              continue; // Retry with fix prompt
-            } else {
-              return new Response(JSON.stringify({ 
-                error: 'Could not generate a valid outfit. Please try again with a different prompt.' 
-              }), {
-                status: 200,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              });
-            }
-          }
-
-          // Validate selected items are included
-          if (selectedItem) {
-            const selectedItemIds = Array.isArray(selectedItem) 
-              ? selectedItem.map((item: any) => item.id)
-              : [selectedItem.id];
-            
-            const outfitItemIds = outfitRecommendation.items.map(item => item.item_id);
-            const allSelectedIncluded = selectedItemIds.every(id => outfitItemIds.includes(id));
-            
-            if (!allSelectedIncluded) {
-              console.log('Selected items not included in outfit. Expected IDs:', selectedItemIds, 'Got:', outfitItemIds);
-              console.log('Missing items:', selectedItemIds.filter(id => !outfitItemIds.includes(id)));
-              if (attemptCount < maxAttempts) {
-                continue; // Retry
-              } else {
-                return new Response(JSON.stringify({ 
-                  error: 'Could not create an outfit with your selected items. Try different items.' 
-                }), {
-                  status: 200,
-                  headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                });
-              }
-            }
-          }
-
-          // Validate minimum outfit requirements (at least top + bottom OR dress)
-          const hasTop = categories.includes('top');
-          const hasBottom = categories.includes('bottom');
-          const hasDress = categories.includes('dress');
-          
-          const isValidOutfit = (hasTop && hasBottom) || hasDress;
-          
-          if (!isValidOutfit) {
-            console.log('Outfit missing essential items (needs top+bottom or dress), retrying...');
-            if (attemptCount < maxAttempts) {
-              continue; // Retry
-            } else {
-              return new Response(JSON.stringify({ 
-                error: 'Could not create a complete outfit with available items. Try adding more clothes.' 
-              }), {
-                status: 200,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              });
-            }
-          }
-
-          // Validate layering logic
-          const validateLayering = (items: any[]) => {
-            const baseLayers = ['t-shirt', 'tank-top', 'blouse', 'shirt', 'long-sleeve'];
-            const warmLayers = ['sweater', 'hoodie', 'cardigan'];
-            
-            const itemCategories = items.map(item => item.item_name?.toLowerCase() || item.category?.toLowerCase());
-            
-            // Count warm layers
-            const sweaterCount = itemCategories.filter(c => c && c.includes('sweater')).length;
-            const hoodieCount = itemCategories.filter(c => c && c.includes('hoodie')).length;
-            const hasBaseLayer = itemCategories.some(c => baseLayers.some(base => c && c.includes(base)));
-            
-            // Two sweaters or two hoodies = fail
-            if (sweaterCount > 1) {
-              return { valid: false, reason: 'Multiple sweaters detected (not allowed)' };
-            }
-            if (hoodieCount > 1) {
-              return { valid: false, reason: 'Multiple hoodies detected (not allowed)' };
-            }
-            
-            // Sweater + hoodie without base layer = fail
-            if (sweaterCount >= 1 && hoodieCount >= 1 && !hasBaseLayer) {
-              return { valid: false, reason: 'Sweater and hoodie combined without base layer (too warm!)' };
-            }
-            
-            return { valid: true };
-          };
-
-          // Validate the layering
-          const layeringValidation = validateLayering(outfitRecommendation.items);
-          if (!layeringValidation.valid) {
-            console.log(`Invalid layering: ${layeringValidation.reason}, retrying...`);
-            if (attemptCount < maxAttempts) {
-              continue; // Retry
-            } else {
-              return new Response(JSON.stringify({ 
-                error: 'Could not create a valid outfit combination. Please try again.' 
-              }), {
-                status: 200,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              });
-            }
-          }
-
-          // Validate style appropriateness - ensure items match the detected style context
-          // BUT allow user-selected items even if they're excluded for this style
-          const hasExcludedItems = outfitRecommendation.items.some(item => {
-            const itemCat = item.item_name?.toLowerCase() || item.category?.toLowerCase() || '';
-            const isExcluded = contextRules.excluded.some(excluded => itemCat.includes(excluded.toLowerCase()));
-            const isUserSelected = selectedItemIds.includes(item.item_id);
-            
-            // Allow excluded items if they are user-selected
-            return isExcluded && !isUserSelected;
-          });
-          
-          if (hasExcludedItems) {
-            console.log(`Style validation failed: outfit contains non-selected items excluded for ${styleContext} style, retrying...`);
-            if (attemptCount < maxAttempts) {
-              continue; // Retry with stricter prompt
-            } else {
-              return new Response(JSON.stringify({ 
-                error: `Could not generate a suitable ${styleContext} outfit. Please try a different style or add more appropriate items.` 
-              }), {
-                status: 200,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              });
-            }
-          }
-
-          // Check if accessories should be included (50% chance initially, then force on retry)
-          const hasAccessories = categories.includes('accessories');
-          const accessoriesAvailable = clothesByCategory.accessories.length > 0;
-          
-          // Increase accessory inclusion from 20-30% to 50% chance initially
-          if (!hasAccessories && accessoriesAvailable && !shouldIncludeAccessory && attemptCount < maxAttempts && Math.random() < 0.5) {
-            console.log('No accessories included. Re-prompting with accessory suggestion...');
-            shouldIncludeAccessory = true;
-            continue; // Retry with accessory preference
-          }
-
-          console.log('Valid outfit generated successfully');
-          break; // Success, exit loop
-
-        } catch (parseError) {
-          console.error(`Parse error on attempt ${attemptCount}:`, parseError);
-          console.error('Content that failed to parse:', content);
-          
-          if (attemptCount >= maxAttempts) {
-            return new Response(JSON.stringify({ 
-              error: 'AI service returned unexpected format. Please try again.' 
-            }), {
-              status: 200,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          }
-          // Continue to retry
-        }
-      } catch (fetchError) {
-        console.error(`Network error on attempt ${attemptCount}:`, fetchError);
-        if (attemptCount >= maxAttempts) {
-          return new Response(JSON.stringify({ 
-            error: 'Connection to AI service failed. Please check your internet and try again.' 
-          }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        // Continue to retry
+      const choice = geminiData.choices[0];
+      const content = choice?.message?.content;
+      if (!content) {
+        return new Response(JSON.stringify({ error: 'AI service returned invalid response. Please try again.' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
+
+      // Extract JSON (supports markdown-wrapped JSON)
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      const jsonText = jsonMatch ? jsonMatch[1].trim() : content.trim();
+      outfitRecommendation = JSON.parse(jsonText);
+
+      // Validate structure
+      if (!outfitRecommendation.items || !Array.isArray(outfitRecommendation.items)) {
+        return new Response(JSON.stringify({ error: 'Could not generate a valid outfit. Please try again.' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const categories = outfitRecommendation.items.map((i: any) => i.category);
+      const uniqueCategories = new Set(categories);
+      if (categories.length !== uniqueCategories.size) {
+        return new Response(JSON.stringify({ error: 'Could not generate a valid outfit. Please try again with a different prompt.' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (selectedItem) {
+        const selectedItemIds = Array.isArray(selectedItem) ? selectedItem.map((i: any) => i.id) : [selectedItem.id];
+        const outfitItemIds = outfitRecommendation.items.map((i: any) => i.item_id);
+        const allSelectedIncluded = selectedItemIds.every((id: string) => outfitItemIds.includes(id));
+        if (!allSelectedIncluded) {
+          return new Response(JSON.stringify({ error: 'Could not create an outfit with your selected items. Try different items.' }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      const hasTop = categories.includes('top');
+      const hasBottom = categories.includes('bottom');
+      const hasDress = categories.includes('dress');
+      if (!(hasTop && hasBottom) && !hasDress) {
+        return new Response(JSON.stringify({ error: 'Could not create a complete outfit with available items. Try adding more clothes.' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Basic layering validation
+      const itemNames = outfitRecommendation.items.map((i: any) => (i.item_name || i.category || '').toLowerCase());
+      const sweaterCount = itemNames.filter((c: string) => c.includes('sweater')).length;
+      const hoodieCount = itemNames.filter((c: string) => c.includes('hoodie')).length;
+      const hasBaseLayer = itemNames.some((c: string) => ['t-shirt','tank-top','blouse','shirt','long-sleeve'].some(b => c.includes(b)));
+      if (sweaterCount > 1 || hoodieCount > 1 || (sweaterCount >= 1 && hoodieCount >= 1 && !hasBaseLayer)) {
+        return new Response(JSON.stringify({ error: 'Could not create a valid outfit combination. Please try again.' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg === 'AI_RATE_LIMIT') {
+        return errorResponse(429, 'AI service rate limit exceeded. Please try again later.', 'AI_RATE_LIMIT', undefined, corsHeaders);
+      }
+      if (msg === 'AI_CREDITS_EXHAUSTED') {
+        return errorResponse(402, 'AI service credits exhausted. Please contact support.', 'AI_CREDITS_EXHAUSTED', undefined, corsHeaders);
+      }
+      return errorResponse(500, 'AI service temporarily unavailable. Please try again.', 'AI_UNAVAILABLE', { message: msg }, corsHeaders);
     }
+
 
     // Generate outfit visualization from new structured format
     const selectedItems = validClothes.filter(item => 

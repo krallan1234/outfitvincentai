@@ -233,6 +233,42 @@ export type Database = {
           },
         ]
       }
+      outfit_generation_cache: {
+        Row: {
+          cache_key: string
+          created_at: string | null
+          expires_at: string
+          hit_count: number | null
+          id: string
+          mood: string | null
+          outfit_data: Json
+          prompt: string
+          user_id: string
+        }
+        Insert: {
+          cache_key: string
+          created_at?: string | null
+          expires_at: string
+          hit_count?: number | null
+          id?: string
+          mood?: string | null
+          outfit_data: Json
+          prompt: string
+          user_id: string
+        }
+        Update: {
+          cache_key?: string
+          created_at?: string | null
+          expires_at?: string
+          hit_count?: number | null
+          id?: string
+          mood?: string | null
+          outfit_data?: Json
+          prompt?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       outfit_likes: {
         Row: {
           created_at: string
@@ -477,7 +513,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      clean_expired_outfit_cache: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

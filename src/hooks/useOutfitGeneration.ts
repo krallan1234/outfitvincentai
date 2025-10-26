@@ -264,6 +264,15 @@ export const useOutfitGeneration = () => {
       setState((prev) => ({ ...prev, loading: false, step: 1, tip: '' }));
       clearInterval(progressInterval);
 
+      // Show cache notification if result came from cache
+      if (result && (result as any).fromCache) {
+        toast({
+          title: '⚡ Instant Result',
+          description: 'This outfit was retrieved from cache - no AI cost incurred!',
+          duration: 3000,
+        });
+      }
+
       return result;
     } catch (error) {
       const errorMessage =

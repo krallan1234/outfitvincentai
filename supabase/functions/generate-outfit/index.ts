@@ -15,7 +15,7 @@ const logger = new Logger('generate-outfit');
 // Simple rate limiting
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const MAX_REQUESTS = 10; // 10 outfit generations per minute
+const MAX_REQUESTS = 5; // 5 outfit generations per minute (stricter limit)
 
 const checkRateLimit = (identifier: string): boolean => {
   const now = Date.now();
@@ -32,6 +32,17 @@ const checkRateLimit = (identifier: string): boolean => {
   
   record.count++;
   return true;
+};
+
+// Generate cache key from prompt, userId, and mood
+const generateCacheKey = async (prompt: string, userId: string, mood?: string): Promise<string> => {
+  const cacheString = `${prompt.trim().toLowerCase()}:${userId}:${mood || 'none'}`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(cacheString);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
 };
 
 const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
@@ -56,7 +67,7 @@ serve(async (req) => {
     logger.warn('Rate limit exceeded', { identifier });
     return errorResponse(
       429,
-      'Rate limit exceeded. You can only generate 10 outfits per minute.',
+      'Rate limit exceeded. You can only generate 5 outfits per minute. Please wait before trying again.',
       'RATE_LIMIT_EXCEEDED',
       undefined,
       corsHeaders
@@ -134,6 +145,57 @@ serve(async (req) => {
         undefined,
         corsHeaders
       );
+    }
+
+    // Initialize Supabase client
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Generate cache key
+    const cacheKey = await generateCacheKey(prompt, userId, mood);
+    logger.info('Cache key generated', { cacheKey: cacheKey.substring(0, 16) + '...' });
+
+    // Check cache first (only if no specific items are selected)
+    if (!selectedItem) {
+      logger.info('Checking cache for existing outfit...');
+      const { data: cachedOutfit, error: cacheError } = await supabase
+        .from('outfit_generation_cache')
+        .select('*')
+        .eq('cache_key', cacheKey)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+
+      if (!cacheError && cachedOutfit) {
+        logger.info('Cache hit! Returning cached outfit', { 
+          cacheAge: Date.now() - new Date(cachedOutfit.created_at).getTime(),
+          hitCount: cachedOutfit.hit_count 
+        });
+
+        // Increment hit count
+        await supabase
+          .from('outfit_generation_cache')
+          .update({ hit_count: cachedOutfit.hit_count + 1 })
+          .eq('id', cachedOutfit.id);
+
+        // Return cached result
+        const cachedResponse = cachedOutfit.outfit_data as any;
+        return successResponse(
+          {
+            ...cachedResponse,
+            fromCache: true,
+            cacheAge: Date.now() - new Date(cachedOutfit.created_at).getTime(),
+          },
+          {
+            processingTimeMs: Date.now() - startTime,
+            fromCache: true,
+            cacheHitCount: cachedOutfit.hit_count + 1,
+          },
+          corsHeaders
+        );
+      }
+
+      logger.info('Cache miss, proceeding with AI generation');
+    } else {
+      logger.info('Cache skipped due to selected items');
     }
 
     // Check API key configuration
@@ -1082,6 +1144,44 @@ The outfit conveys: ${bestOutfit.outfit.description}`;
 
     console.log('Outfit generated and saved successfully');
 
+    // Save to cache (only if no specific items were selected)
+    if (!selectedItem) {
+      logger.info('Saving outfit to cache...');
+      try {
+        const cacheExpiry = new Date();
+        cacheExpiry.setHours(cacheExpiry.getHours() + 24); // Cache for 24 hours
+
+        const { error: cacheInsertError } = await supabase
+          .from('outfit_generation_cache')
+          .insert({
+            cache_key: cacheKey,
+            user_id: userId,
+            prompt: prompt,
+            mood: mood || null,
+            outfit_data: {
+              outfit: savedOutfit,
+              recommendedClothes: selectedItems,
+              structuredOutfit: bestOutfit.outfit,
+              reasoning: bestOutfit.reasoning,
+              score: bestOutfit.score,
+              score_breakdown: bestOutfit.score_breakdown,
+              classification: classification,
+              requirements: requirements,
+            },
+            expires_at: cacheExpiry.toISOString(),
+          });
+
+        if (cacheInsertError) {
+          // Log but don't fail the request if cache insertion fails
+          logger.error('Failed to save to cache', cacheInsertError);
+        } else {
+          logger.info('Outfit saved to cache successfully', { expiresAt: cacheExpiry.toISOString() });
+        }
+      } catch (cacheError) {
+        logger.error('Exception while saving to cache', cacheError);
+      }
+    }
+
     // Trigger automatic texture generation for all clothes items (async, don't wait)
     if (legacyRecommendedItems && legacyRecommendedItems.length > 0) {
       console.log('Starting automatic texture generation for', legacyRecommendedItems.length, 'outfit items');
@@ -1158,7 +1258,9 @@ The outfit conveys: ${bestOutfit.outfit.description}`;
       pinterestTrendsUsed: (pinterestTrends.length > 0) || (boardInspiration.length > 0),
       imageGenerated: !!generatedImageUrl,
       pipelineSteps: 4,
-      candidatesGenerated: candidates.length
+      candidatesGenerated: candidates.length,
+      fromCache: false,
+      cached: !selectedItem, // Indicates if this result was saved to cache
     };
 
     return successResponse(responsePayload, responseMeta, corsHeaders);

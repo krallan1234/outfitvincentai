@@ -18,6 +18,8 @@ export const UserPreferencesSchema = z.object({
   style_preferences: z.string().optional(),
   favorite_colors: z.string().optional(),
   location: z.string().optional(),
+  gender: z.string().optional(),
+  skin_tone: z.string().optional(),
 });
 
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;

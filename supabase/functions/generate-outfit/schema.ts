@@ -15,6 +15,9 @@ export const UserPreferencesSchema = z.object({
   body_type: z.string().optional(),
   style_preferences: z.union([z.string(), z.any()]).optional(),
   favorite_colors: z.union([z.string(), z.any()]).optional(),
+  gender: z.string().optional(),
+  skin_tone: z.string().optional(),
+  location: z.string().optional(),
 }).optional();
 
 // Pinterest pin schema

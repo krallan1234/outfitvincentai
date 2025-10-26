@@ -21,7 +21,7 @@ export const useUserPreferences = () => {
 
       const { data, error: fetchError } = await supabase
         .from('profiles')
-        .select('body_type, style_preferences, favorite_colors, location')
+        .select('body_type, style_preferences, favorite_colors, location, gender, skin_tone')
         .eq('user_id', user.id)
         .single();
 

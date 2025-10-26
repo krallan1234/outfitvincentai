@@ -25,13 +25,13 @@ export const useWeather = (location?: string) => {
       setLoading(true);
       setError(null);
 
-      // Call our edge function which will handle the API key securely
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/weather`, {
+      // Call our Open-Meteo edge function which handles geocoding and weather fetching
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-weather-open-meteo`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ city }),
+        body: JSON.stringify({ location: city }),
       });
 
       if (!response.ok) {

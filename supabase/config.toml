@@ -30,6 +30,9 @@ verify_jwt = true
 [functions.generate-texture-maps]
 verify_jwt = true
 
+[functions.fetch-weather-open-meteo]
+verify_jwt = true
+
 [functions.generate-outfit]
 verify_jwt = true
 

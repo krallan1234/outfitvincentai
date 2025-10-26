@@ -157,6 +157,86 @@ serve(async (req) => {
       generateImage,
     });
 
+    // Fetch user profile from database to get complete preferences
+    console.log('Fetching user profile from database...');
+    const { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('body_type, style_preferences, favorite_colors, location, gender, skin_tone')
+      .eq('user_id', userId)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      logger.error('Failed to fetch user profile', profileError);
+    }
+
+    // Merge user preferences from request with database profile
+    const completeUserPreferences = {
+      ...(userPreferences || {}),
+      ...(userProfile || {})
+    };
+
+    logger.info('User profile loaded', {
+      hasBodyType: !!completeUserPreferences.body_type,
+      hasGender: !!completeUserPreferences.gender,
+      hasSkinTone: !!completeUserPreferences.skin_tone,
+      hasStylePreferences: !!completeUserPreferences.style_preferences,
+      hasFavoriteColors: !!completeUserPreferences.favorite_colors,
+      hasLocation: !!completeUserPreferences.location,
+    });
+
+    // Fetch user's liked outfits for personalization
+    console.log('Fetching previously liked outfits...');
+    const { data: likedOutfits, error: likesError } = await supabase
+      .from('outfit_likes')
+      .select(`
+        outfit_id,
+        outfits (
+          id,
+          mood,
+          ai_analysis,
+          recommended_clothes
+        )
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (likesError) {
+      logger.error('Failed to fetch liked outfits', likesError);
+    }
+
+    const likedOutfitAnalysis = likedOutfits?.map((like: any) => ({
+      mood: like.outfits?.mood,
+      style_context: like.outfits?.ai_analysis?.style_context,
+      colors: like.outfits?.ai_analysis?.color_harmony,
+      occasion: like.outfits?.ai_analysis?.occasion,
+    })).filter((item: any) => item.mood || item.style_context) || [];
+
+    logger.info(`Found ${likedOutfitAnalysis.length} liked outfits for personalization`);
+
+    // Fetch weather data from Open-Meteo if location is available and no weather provided
+    let finalWeatherData = weatherData;
+    if (!finalWeatherData && completeUserPreferences.location) {
+      console.log('Fetching weather from Open-Meteo for location:', completeUserPreferences.location);
+      try {
+        const weatherResponse = await supabase.functions.invoke('fetch-weather-open-meteo', {
+          body: { location: completeUserPreferences.location }
+        });
+
+        if (weatherResponse.error) {
+          logger.error('Failed to fetch weather from Open-Meteo', weatherResponse.error);
+        } else if (weatherResponse.data) {
+          finalWeatherData = weatherResponse.data;
+          logger.info('Weather data fetched from Open-Meteo', {
+            temperature: finalWeatherData?.temperature,
+            condition: finalWeatherData?.condition
+          });
+        }
+      } catch (weatherError) {
+        logger.error('Exception fetching weather', weatherError);
+      }
+    }
+
     // Extract selected item IDs for filtering logic
     const selectedItemIds = selectedItem 
       ? (Array.isArray(selectedItem) 
@@ -166,9 +246,10 @@ serve(async (req) => {
 
     logger.info('Starting outfit generation', {
       userId,
-      weatherData: weatherData ? `${weatherData.temperature}°C, ${weatherData.condition}` : 'Not provided',
-      userPreferences: userPreferences ? 'Provided' : 'Not provided',
+      weatherData: finalWeatherData ? `${finalWeatherData.temperature}°C, ${finalWeatherData.condition}` : 'Not provided',
+      userPreferences: completeUserPreferences ? 'Provided' : 'Not provided',
       selectedItemsCount: selectedItemIds.length,
+      likedOutfitsCount: likedOutfitAnalysis.length,
     });
 
     // Initialize Supabase client
@@ -464,15 +545,24 @@ serve(async (req) => {
 
 USER REQUEST: "${prompt}"
 MOOD: ${mood || 'not specified'}
-${weatherData ? `WEATHER: ${weatherData.temperature}°C, ${weatherData.condition}` : ''}
+${finalWeatherData ? `WEATHER: ${finalWeatherData.temperature}°C, ${finalWeatherData.condition}` : ''}
+
+USER PROFILE:
+${completeUserPreferences.gender ? `- Gender: ${completeUserPreferences.gender}` : ''}
+${completeUserPreferences.body_type ? `- Body Type: ${completeUserPreferences.body_type}` : ''}
+${completeUserPreferences.skin_tone ? `- Skin Tone: ${completeUserPreferences.skin_tone}` : ''}
+
+STYLE HISTORY (Previously liked outfits):
+${likedOutfitAnalysis.length > 0 ? JSON.stringify(likedOutfitAnalysis.slice(0, 5)) : 'No previous likes'}
 
 Classify this request into:
 1. OCCASION: (casual, formal, business, athletic, date, party, travel, other)
 2. STYLE: (elegant, sporty, minimalist, bohemian, edgy, romantic, streetwear, professional)
 3. SEASON: (spring, summer, fall, winter, all-season)
 4. FORMALITY_LEVEL: (very_casual, casual, smart_casual, semi_formal, formal, very_formal)
-5. COLOR_PREFERENCE: Infer from prompt if any colors mentioned
+5. COLOR_PREFERENCE: Infer from prompt if any colors mentioned, also consider user's favorite colors
 6. WEATHER_CONSIDERATION: How important is weather (low, medium, high)
+7. PERSONALIZATION_NOTES: Based on user's profile and style history, what should be emphasized
 
 Return ONLY valid JSON:
 {
@@ -481,7 +571,8 @@ Return ONLY valid JSON:
   "season": "...",
   "formality_level": "...",
   "color_preference": ["color1", "color2"] or null,
-  "weather_consideration": "..."
+  "weather_consideration": "...",
+  "personalization_notes": "..."
 }`;
 
       const response = await withRetry(
@@ -520,23 +611,33 @@ Return ONLY valid JSON:
 
     // STEP 2: Generate outfit requirements specification
     const generateRequirements = async (classification: any) => {
-      const requirementsPrompt = `You are a fashion requirements expert. Based on the classification, create a detailed requirements specification.
+      const requirementsPrompt = `You are a fashion requirements expert. Based on the classification and user profile, create a detailed requirements specification.
 
 CLASSIFICATION:
 ${JSON.stringify(classification, null, 2)}
 
 USER REQUEST: "${prompt}"
-${weatherData ? `WEATHER: ${weatherData.temperature}°C, ${weatherData.condition}, ${weatherData.humidity}% humidity` : ''}
-${userPreferences ? `USER PREFERENCES: ${JSON.stringify(userPreferences)}` : ''}
+${finalWeatherData ? `WEATHER: ${finalWeatherData.temperature}°C, ${finalWeatherData.condition}, ${finalWeatherData.humidity}% humidity` : ''}
+
+USER PROFILE:
+${completeUserPreferences.gender ? `- Gender: ${completeUserPreferences.gender}` : ''}
+${completeUserPreferences.body_type ? `- Body Type: ${completeUserPreferences.body_type}` : ''}
+${completeUserPreferences.skin_tone ? `- Skin Tone: ${completeUserPreferences.skin_tone}` : ''}
+${completeUserPreferences.style_preferences ? `- Style Preferences: ${JSON.stringify(completeUserPreferences.style_preferences)}` : ''}
+${completeUserPreferences.favorite_colors ? `- Favorite Colors: ${JSON.stringify(completeUserPreferences.favorite_colors)}` : ''}
+
+STYLE HISTORY (What user has liked before):
+${likedOutfitAnalysis.length > 0 ? JSON.stringify(likedOutfitAnalysis) : 'No previous style history'}
 
 Create a detailed requirements specification for the outfit including:
 1. REQUIRED_CATEGORIES: Which clothing categories must be included (top, bottom, dress, outerwear, footwear, accessories)
 2. OPTIONAL_CATEGORIES: Which categories are optional but recommended
-3. COLOR_PALETTE: Recommended colors based on season, occasion, and user preferences
+3. COLOR_PALETTE: Recommended colors based on season, occasion, user preferences, and skin tone
 4. MATERIAL_REQUIREMENTS: Fabric types suitable for weather and occasion
-5. STYLE_RULES: Specific styling guidelines for this classification
+5. STYLE_RULES: Specific styling guidelines for this classification and user's body type
 6. LAYERING_STRATEGY: How to layer clothes based on weather
 7. FORMALITY_CONSTRAINTS: What to avoid or prioritize
+8. PERSONALIZATION: How to adapt to user's gender, body type, and style preferences
 
 Return ONLY valid JSON:
 {
@@ -545,7 +646,8 @@ Return ONLY valid JSON:
   "color_palette": {
     "primary": ["color1", "color2"],
     "accent": ["color1"],
-    "avoid": ["color1"]
+    "avoid": ["color1"],
+    "skin_tone_recommendations": "colors that complement user's skin tone"
   },
   "material_requirements": {
     "preferred": ["material1", "material2"],
@@ -556,6 +658,11 @@ Return ONLY valid JSON:
   "formality_constraints": {
     "must_include": ["item1"],
     "must_avoid": ["item1"]
+  },
+  "personalization": {
+    "body_type_tips": "fit recommendations",
+    "gender_considerations": "styling notes",
+    "style_history_influence": "what to emphasize based on likes"
   }
 }`;
 
@@ -606,8 +713,17 @@ ${JSON.stringify(requirements, null, 2)}
 
 USER REQUEST: "${prompt}"
 ${mood ? `MOOD: ${mood}` : ''}
-${weatherData ? `WEATHER: ${weatherData.temperature}°C, ${weatherData.condition}` : ''}
-${userPreferences ? `USER PREFERENCES: ${JSON.stringify(userPreferences)}` : ''}
+${finalWeatherData ? `WEATHER: ${finalWeatherData.temperature}°C, ${finalWeatherData.condition}` : ''}
+
+USER PROFILE:
+${completeUserPreferences.gender ? `- Gender: ${completeUserPreferences.gender}` : ''}
+${completeUserPreferences.body_type ? `- Body Type: ${completeUserPreferences.body_type} - Consider flattering fits` : ''}
+${completeUserPreferences.skin_tone ? `- Skin Tone: ${completeUserPreferences.skin_tone} - Choose colors that complement` : ''}
+${completeUserPreferences.style_preferences ? `- Preferred Styles: ${JSON.stringify(completeUserPreferences.style_preferences)}` : ''}
+${completeUserPreferences.favorite_colors ? `- Favorite Colors: ${JSON.stringify(completeUserPreferences.favorite_colors)} - Try to incorporate` : ''}
+
+STYLE HISTORY (Previously liked):
+${likedOutfitAnalysis.length > 0 ? `User tends to like: ${JSON.stringify(likedOutfitAnalysis.slice(0, 3))}` : 'No previous style preferences'}
 
 ${selectedItem ? `
 CRITICAL: User selected items MUST be included:

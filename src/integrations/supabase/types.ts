@@ -406,9 +406,11 @@ export type Database = {
           favorite_colors: Json | null
           followers_count: number
           following_count: number
+          gender: string | null
           id: string
           location: string | null
           privacy_settings: Json | null
+          skin_tone: string | null
           style_preferences: Json | null
           updated_at: string
           user_id: string
@@ -421,9 +423,11 @@ export type Database = {
           favorite_colors?: Json | null
           followers_count?: number
           following_count?: number
+          gender?: string | null
           id?: string
           location?: string | null
           privacy_settings?: Json | null
+          skin_tone?: string | null
           style_preferences?: Json | null
           updated_at?: string
           user_id: string
@@ -436,9 +440,11 @@ export type Database = {
           favorite_colors?: Json | null
           followers_count?: number
           following_count?: number
+          gender?: string | null
           id?: string
           location?: string | null
           privacy_settings?: Json | null
+          skin_tone?: string | null
           style_preferences?: Json | null
           updated_at?: string
           user_id?: string

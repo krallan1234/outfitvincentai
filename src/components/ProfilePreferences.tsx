@@ -18,6 +18,23 @@ const BODY_TYPES = [
   { value: 'average', label: 'Average' }
 ];
 
+const GENDER_OPTIONS = [
+  { value: 'prefer-not-to-say', label: 'Prefer not to say' },
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'non-binary', label: 'Non-binary' },
+  { value: 'other', label: 'Other' }
+];
+
+const SKIN_TONE_OPTIONS = [
+  { value: 'fair', label: 'Fair' },
+  { value: 'light', label: 'Light' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'olive', label: 'Olive' },
+  { value: 'tan', label: 'Tan' },
+  { value: 'deep', label: 'Deep' }
+];
+
 const STYLE_PREFERENCES = [
   'Casual', 'Sporty', 'Elegant', 'Professional', 'Romantic', 
   'Edgy', 'Bohemian', 'Minimalist', 'Streetwear', 'Vintage'
@@ -30,6 +47,8 @@ const COLOR_OPTIONS = [
 
 export const ProfilePreferences = () => {
   const [bodyType, setBodyType] = useState('');
+  const [gender, setGender] = useState('');
+  const [skinTone, setSkinTone] = useState('');
   const [location, setLocation] = useState('');
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
@@ -47,7 +66,7 @@ export const ProfilePreferences = () => {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('body_type, location, style_preferences, favorite_colors')
+        .select('body_type, gender, skin_tone, location, style_preferences, favorite_colors')
         .eq('user_id', user.id)
         .single();
 
@@ -55,6 +74,8 @@ export const ProfilePreferences = () => {
 
       if (data) {
         setBodyType(data.body_type || '');
+        setGender(data.gender || '');
+        setSkinTone(data.skin_tone || '');
         setLocation(data.location || '');
         setSelectedStyles(Array.isArray(data.style_preferences) ? data.style_preferences as string[] : []);
         setSelectedColors(Array.isArray(data.favorite_colors) ? data.favorite_colors as string[] : []);
@@ -74,6 +95,8 @@ export const ProfilePreferences = () => {
         .from('profiles')
         .update({
           body_type: bodyType || null,
+          gender: gender || null,
+          skin_tone: skinTone || null,
           location: location || null,
           style_preferences: selectedStyles,
           favorite_colors: selectedColors
@@ -126,6 +149,26 @@ export const ProfilePreferences = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Gender */}
+        <div className="space-y-2">
+          <Label htmlFor="gender">Gender</Label>
+          <Select value={gender} onValueChange={setGender}>
+            <SelectTrigger id="gender">
+              <SelectValue placeholder="Select your gender" />
+            </SelectTrigger>
+            <SelectContent>
+              {GENDER_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Helps personalize outfit recommendations
+          </p>
+        </div>
+
         {/* Body Type */}
         <div className="space-y-2">
           <Label htmlFor="body-type">Body Type</Label>
@@ -144,6 +187,27 @@ export const ProfilePreferences = () => {
           </Select>
           <p className="text-xs text-muted-foreground">
             Helps AI suggest outfits with better fit recommendations
+          </p>
+        </div>
+
+        {/* Skin Tone */}
+        <div className="space-y-2">
+          <Label htmlFor="skin-tone">Skin Tone</Label>
+          <Select value={skinTone} onValueChange={setSkinTone}>
+            <SelectTrigger id="skin-tone">
+              <SelectValue placeholder="Select your skin tone" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Prefer not to say</SelectItem>
+              {SKIN_TONE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Used for color harmony and complementary color suggestions
           </p>
         </div>
 

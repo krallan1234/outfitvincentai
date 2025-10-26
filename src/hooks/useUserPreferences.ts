@@ -39,6 +39,15 @@ export const useUserPreferences = () => {
       }
     } catch (err) {
       console.error('Error loading user preferences:', err);
+      // Set default preferences if validation fails
+      setPreferences({
+        body_type: null,
+        style_preferences: null,
+        favorite_colors: null,
+        location: null,
+        gender: null,
+        skin_tone: null,
+      });
       setError(err instanceof Error ? err.message : 'Failed to load preferences');
     } finally {
       setLoading(false);

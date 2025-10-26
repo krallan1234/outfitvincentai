@@ -14,12 +14,12 @@ export type WeatherData = z.infer<typeof WeatherDataSchema>;
 
 // User preferences schema
 export const UserPreferencesSchema = z.object({
-  body_type: z.string().optional(),
-  style_preferences: z.string().optional(),
-  favorite_colors: z.string().optional(),
-  location: z.string().optional(),
-  gender: z.string().optional(),
-  skin_tone: z.string().optional(),
+  body_type: z.string().optional().nullable(),
+  style_preferences: z.union([z.array(z.string()), z.string()]).optional().nullable(),
+  favorite_colors: z.union([z.array(z.string()), z.string()]).optional().nullable(),
+  location: z.string().optional().nullable(),
+  gender: z.string().optional().nullable(),
+  skin_tone: z.string().optional().nullable(),
 });
 
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;

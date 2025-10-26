@@ -12,12 +12,12 @@ export const WeatherDataSchema = z.object({
 
 // User preferences schema
 export const UserPreferencesSchema = z.object({
-  body_type: z.string().optional(),
-  style_preferences: z.union([z.string(), z.any()]).optional(),
-  favorite_colors: z.union([z.string(), z.any()]).optional(),
-  gender: z.string().optional(),
-  skin_tone: z.string().optional(),
-  location: z.string().optional(),
+  body_type: z.string().optional().nullable(),
+  style_preferences: z.union([z.string(), z.array(z.string()), z.any()]).optional().nullable(),
+  favorite_colors: z.union([z.string(), z.array(z.string()), z.any()]).optional().nullable(),
+  gender: z.string().optional().nullable(),
+  skin_tone: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
 }).optional();
 
 // Pinterest pin schema

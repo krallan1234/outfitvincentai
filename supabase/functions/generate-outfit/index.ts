@@ -1346,7 +1346,8 @@ The outfit conveys: ${outfitRecommendation.description}`;
     return successResponse(responsePayload, responseMeta, corsHeaders);
 
 
-  } catch (error) {
+  } catch (e) {
+    const error = e as unknown as Error;
     logger.error('Unexpected error in generate-outfit function', error, {
       processingTimeMs: Date.now() - startTime,
     });

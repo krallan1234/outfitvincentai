@@ -458,299 +458,35 @@ serve(async (req) => {
     
     console.log(`Avoiding ${recentItemIds.length} recently used items for variety`);
 
-    // Step 2: Use Gemini 2.5 Pro to generate outfit recommendations with enhanced thinking
-    const generateOutfitPrompt = (attempt = 1, shouldIncludeAccessory = false) => {
-      // Determine accessory type based on mood/prompt for smarter selection
-      const lowerPrompt = `${prompt} ${mood || ''}`.toLowerCase();
-      const suggestedAccessory = 
-        lowerPrompt.includes('casual') || lowerPrompt.includes('summer') || lowerPrompt.includes('sporty') ? 'kepsar (caps)' :
-        lowerPrompt.includes('elegant') || lowerPrompt.includes('formal') || lowerPrompt.includes('office') ? 'ringar (rings) or klockor (watches)' :
-        'any appropriate accessory';
-      
-      return `
-      You are a professional fashion stylist with expertise in creating logical, category-based outfit combinations.
-      
-      CRITICAL STYLE CONTEXT: ${styleContext.toUpperCase()}
-      This outfit MUST match the "${styleContext}" style. The clothes have been pre-filtered to match this context.
-      
-      STRICT STYLE REQUIREMENTS FOR ${styleContext.toUpperCase()}:
-      - Priority styles: ${contextRules.priority.join(', ')}
-      - ONLY use items that fit: ${contextRules.allowed.join(', ')}
-      - NEVER include: ${contextRules.excluded.join(', ')}
-      - Context keywords: ${contextRules.keywords.join(', ')}
-      
-      ${styleContext === 'business' ? `
-      BUSINESS STYLE RULES:
-      - MUST include: Blazer OR dress shirt/blouse with dress pants/skirt
-      - Footwear: ONLY loafers, oxfords, heels, or dress shoes
-      - Colors: Professional colors (navy, gray, black, white, beige)
-      - NO casual items like sneakers, hoodies, or athletic wear
-      - Accessories: Watch, belt, or subtle jewelry only
-      ` : ''}
-      
-      ${styleContext === 'formal' ? `
-      FORMAL STYLE RULES:
-      - MUST include: Suit, dress, or formal gown
-      - Footwear: ONLY heels, pumps, or dress shoes
-      - NO jeans, sneakers, or casual tops
-      - Elegant accessories: Jewelry, clutch, tie
-      - Sophisticated color palette
-      ` : ''}
-      
-      ${styleContext === 'athletic' ? `
-      ATHLETIC STYLE RULES:
-      - MUST include: Athletic wear (joggers, sports top, athletic shorts)
-      - Footwear: ONLY sneakers or athletic shoes
-      - NO formal wear, dresses, or business attire
-      - Functional accessories: Cap, sports watch
-      ` : ''}
-      
-      ${styleContext === 'date' ? `
-      DATE NIGHT STYLE RULES:
-      - MUST be stylish and elegant
-      - Avoid overly casual items (no sweatpants, athletic wear)
-      - Balance sophistication with comfort
-      - Appropriate accessories to elevate the look
-      ` : ''}
-      
-      ${weatherData ? `
-      CURRENT WEATHER CONDITIONS:
-      - Temperature: ${weatherData.temperature}°C
-      - Condition: ${weatherData.condition} (${weatherData.description})
-      - Humidity: ${weatherData.humidity}%
-      - Wind Speed: ${weatherData.windSpeed} m/s
-      
-      WEATHER-BASED LAYERING REQUIREMENTS:
-      ${weatherData.temperature > 20 ? '- HOT WEATHER (>20°C): Use ONLY ONE light layer (t-shirt or tank-top). NO warm layers like sweater/hoodie. Outer jacket only if needed for style.' : ''}
-      ${weatherData.temperature >= 10 && weatherData.temperature <= 20 ? '- MILD WEATHER (10-20°C): Use base layer + ONE warm layer (sweater OR hoodie). Outer jacket optional.' : ''}
-      ${weatherData.temperature < 10 ? '- COLD WEATHER (<10°C): Layering allowed: base + warm + outer (e.g., t-shirt + sweater + coat).' : ''}
-      ${weatherData.condition.toLowerCase().includes('rain') ? '- RAINY: Prioritize waterproof outerwear (rain-jacket) if available. Suggest practical footwear.' : ''}
-      ${weatherData.condition.toLowerCase().includes('snow') ? '- SNOWY: Include warm boots and heavy outerwear. Base + warm + outer layers essential.' : ''}
-      ` : ''}
+    // STEP 1: Classify user prompt
+    const classifyPrompt = async () => {
+      const classificationPrompt = `You are a fashion classification expert. Analyze the following user request and classify it.
 
-      ${userPreferences ? `
-      USER PROFILE & PREFERENCES:
-      ${userPreferences.body_type ? `- Body Type: ${userPreferences.body_type} - Consider fit recommendations for this body type` : ''}
-      ${userPreferences.style_preferences && userPreferences.style_preferences.length > 0 ? `- Preferred Styles: ${userPreferences.style_preferences.join(', ')} - Try to match these style preferences when possible` : ''}
-      ${userPreferences.favorite_colors && userPreferences.favorite_colors.length > 0 ? `- Favorite Colors: ${userPreferences.favorite_colors.join(', ')} - Prioritize these colors when creating color harmony` : ''}
-      ` : ''}
-      
-      DIVERSITY & CREATIVITY INSTRUCTIONS:
-      1. AVOID RECENTLY USED ITEMS: These item IDs were used in recent outfits, try to select different items: ${recentItemIds.slice(0, 10).join(', ') || 'none'}
-      2. EXPLORE THE WARDROBE: Don't always pick the "safest" items - mix unexpected combinations that still follow fashion rules
-      3. VARY YOUR SELECTIONS: Even for similar prompts, select different color combinations and styles
-      4. BE CREATIVE: Use the Pinterest trends as inspiration but interpret them uniquely with available clothes
-      ${attempt > 1 ? '5. PREVIOUS ATTEMPT FAILED: Try a completely different combination than before' : ''}
+USER REQUEST: "${prompt}"
+MOOD: ${mood || 'not specified'}
+${weatherData ? `WEATHER: ${weatherData.temperature}°C, ${weatherData.condition}` : ''}
 
-      ${selectedItem ? `
-      ⚠️ CRITICAL REQUIREMENT - SELECTED ITEMS OVERRIDE ALL STYLE RULES:
-      The user has specifically selected ${Array.isArray(selectedItem) ? `${selectedItem.length} items` : '1 item'} to build the outfit around.
-      
-      🔴 IMPORTANT: These selected items MUST be included even if they don't match the ${styleContext} style context.
-      The user's choice ALWAYS takes priority over style guidelines and exclusion rules.
-      
-      ${Array.isArray(selectedItem) ? 
-        `SELECTED ITEMS (ALL MUST BE INCLUDED):
-        ${selectedItem.map((item: any, idx: number) => `
-        Item ${idx + 1}:
-        - Category: ${item.category}
-        - Color: ${item.color || 'Not specified'}
-        - Style: ${item.style || 'Not specified'}
-        - Brand: ${item.brand || 'Not specified'}
-        - Image URL: ${item.image_url}
-        - Item ID: ${item.id}
-        `).join('\n')}
-        
-        MULTI-SELECT REQUIREMENTS:
-        1. MANDATORY: Include ALL ${selectedItem.length} selected items in the final outfit (mark each with "is_selected": true)
-        2. If selected items conflict with ${styleContext} style, BUILD AROUND THEM ANYWAY
-        3. Select complementary pieces that bridge the gap between selected items and ${styleContext} style
-        4. Think step-by-step: Analyze each selected item and ensure they work together
-        5. Add matching accessories, outerwear, or footwear as needed from the rest of the wardrobe
-        6. Explain in your reasoning how you adapted the outfit to include the selected items despite style context
-        ` 
-        : 
-        `SELECTED ITEM:
-        - Category: ${selectedItem.category}
-        - Color: ${selectedItem.color || 'Not specified'}
-        - Style: ${selectedItem.style || 'Not specified'}
-        - Brand: ${selectedItem.brand || 'Not specified'}
-        - Image URL: ${selectedItem.image_url}
-        - Item ID: ${selectedItem.id}
-        
-        SINGLE ITEM REQUIREMENTS:
-        1. ALWAYS include this selected item in the final outfit (mark it with "is_selected": true)
-        2. If this item conflicts with ${styleContext} style, INCLUDE IT ANYWAY and build around it
-        3. Build the ENTIRE outfit to complement and highlight this item
-        4. Choose colors, styles, and accessories that work harmoniously with this piece
-        5. Explain in your reasoning how you adapted the outfit to include this item despite style context
-        `}
-      ` : ''}
+Classify this request into:
+1. OCCASION: (casual, formal, business, athletic, date, party, travel, other)
+2. STYLE: (elegant, sporty, minimalist, bohemian, edgy, romantic, streetwear, professional)
+3. SEASON: (spring, summer, fall, winter, all-season)
+4. FORMALITY_LEVEL: (very_casual, casual, smart_casual, semi_formal, formal, very_formal)
+5. COLOR_PREFERENCE: Infer from prompt if any colors mentioned
+6. WEATHER_CONSIDERATION: How important is weather (low, medium, high)
 
-      ${boardInspiration.length > 0 ? `
-      PINTEREST BOARD ANALYSIS (User's Personal Board):
-      The user has connected their personal Pinterest board. Analyze these pins for style preferences:
-      ${JSON.stringify(boardInspiration.map((pin: any) => ({
-        title: pin.title,
-        description: pin.description,
-        imageUrl: pin.imageUrl,
-        dominantColor: pin.dominantColor
-      })))}
-      
-      INSTRUCTIONS FOR BOARD-INSPIRED OUTFITS:
-      - Identify common themes, colors, and styles from the board pins
-      - Match the aesthetic and vibe shown in the Pinterest images
-      - Use the dominant colors and style patterns as guidance
-      - Create an outfit that reflects the user's Pinterest taste using their actual wardrobe
-      ` : ''}
+Return ONLY valid JSON:
+{
+  "occasion": "...",
+  "style": "...",
+  "season": "...",
+  "formality_level": "...",
+  "color_preference": ["color1", "color2"] or null,
+  "weather_consideration": "..."
+}`;
 
-      ANALYZE AND COMBINE:
-      1. ${boardInspiration.length > 0 ? 'Start by analyzing the Pinterest board pins to understand user preferences' : 'Review available clothes by colors, styles, and categories'}
-      2. ${pinterestTrends.length > 0 || boardInspiration.length > 0 ? 'Use Pinterest data for inspiration but interpret creatively' : 'Focus on creating harmonious combinations'}
-      3. Select exactly one item per category for a harmonious outfit
-      4. Prioritize items NOT in the recent list for freshness
-
-      CRITICAL LAYERING RULES - YOU MUST FOLLOW THESE EXACTLY:
-
-      CATEGORY RULES:
-      1. TOPS - You can select MULTIPLE tops if they follow layering logic:
-         - Base layers: t-shirt, tank-top, blouse, shirt, long-sleeve (lightweight)
-         - Warm layers: sweater, hoodie, cardigan (medium warmth)
-         - You can combine: base + warm (e.g., t-shirt + sweater) ✅
-         - You can combine: base + warm + outer (e.g., t-shirt + hoodie + jacket) ✅
-         
-      2. OUTERWEAR - Can be combined with tops:
-         - Outer layers: jacket, coat, blazer, rain-jacket, vest
-         - You can combine: warm layer + outer (e.g., sweater + coat) ✅
-         - You can combine: base + outer (e.g., t-shirt + jacket) ✅
-
-      FORBIDDEN COMBINATIONS (CRITICAL):
-      ❌ NEVER: sweater + hoodie without a base layer underneath (too warm!)
-      ❌ NEVER: two sweaters or two hoodies
-      ❌ NEVER: multiple items of the exact same type (e.g., two t-shirts)
-
-      CORRECT LAYERING EXAMPLES:
-      ✅ t-shirt + sweater
-      ✅ t-shirt + hoodie
-      ✅ t-shirt + sweater + jacket
-      ✅ t-shirt + hoodie + coat
-      ✅ sweater + jacket (OK without base in cold weather)
-      ✅ hoodie + coat (OK without base in cold weather)
-
-      3. OTHER CATEGORIES:
-         - Select AT MOST ONE: bottom, dress, footwear
-         - Can select multiple accessories
-
-      4. MINIMUM REQUIREMENTS:
-         - Must have: (1 base/warm layer + 1 bottom) OR (1 dress)
-         - Optional: outerwear, footwear, accessories
-         
-      5. ACCESSORY PRIORITY: ${shouldIncludeAccessory ? `MUST include at least one accessory (prefer ${suggestedAccessory}) if available in wardrobe` : `Include accessories in 50% of outfits, preferring ${suggestedAccessory} based on the mood/scenario`}
-
-      AVAILABLE CLOTHES BY CATEGORY:
-      TOPS: ${JSON.stringify(clothesByCategory.top.map(item => ({
-        id: item.id,
-        name: item.category,
-        color: item.analysis.color,
-        style: item.analysis.style,
-        image_url: item.image_url
-      })))}
-      
-      BOTTOMS: ${JSON.stringify(clothesByCategory.bottom.map(item => ({
-        id: item.id,
-        name: item.category,
-        color: item.analysis.color,
-        style: item.analysis.style,
-        image_url: item.image_url
-      })))}
-      
-      DRESSES: ${JSON.stringify(clothesByCategory.dress.map(item => ({
-        id: item.id,
-        name: item.category,
-        color: item.analysis.color,
-        style: item.analysis.style,
-        image_url: item.image_url
-      })))}
-      
-      OUTERWEAR: ${JSON.stringify(clothesByCategory.outerwear.map(item => ({
-        id: item.id,
-        name: item.category,
-        color: item.analysis.color,
-        style: item.analysis.style,
-        image_url: item.image_url
-      })))}
-      
-      FOOTWEAR: ${JSON.stringify(clothesByCategory.footwear.map(item => ({
-        id: item.id,
-        name: item.category,
-        color: item.analysis.color,
-        style: item.analysis.style,
-        image_url: item.image_url
-      })))}
-      
-      ACCESSORIES: ${JSON.stringify(clothesByCategory.accessories.map(item => ({
-        id: item.id,
-        name: item.category,
-        color: item.analysis.color,
-        style: item.analysis.style,
-        image_url: item.image_url
-      })))}
-
-      USER REQUEST: "${prompt}" ${mood ? `with a ${mood} mood` : ''}
-      
-      PINTEREST INSPIRATION: ${pinterestTrends.length > 0 ? 
-        pinterestTrends.map(trend => trend.title || trend.description || 'trending style').join(', ') : 
-        pinterestContext || 'classic styling'}
-
-      ${attempt > 1 ? 'PREVIOUS ATTEMPT FAILED - Fix: Remove duplicates and select exactly one item per category.' : ''}
-
-      CREATIVE STYLING INSTRUCTIONS:
-      1. Use your fashion expertise to choose items that complement each other in color, style, and mood
-      2. Draw inspiration from Pinterest trends to create modern, trendy combinations
-      3. Consider color harmony (complementary, analogous, or monochromatic schemes)
-      4. CRITICAL: Match formality levels strictly - ${styleContext} items ONLY
-      5. Ensure the outfit is appropriate for the requested mood/occasion: "${prompt}"
-      6. ACCESSORY MATCHING: For casual moods, prefer kepsar/caps; for elegant/formal moods, prefer ringar/rings or klockor/watches
-      7. Be creative and confident in your choices - select items that create a cohesive, stylish look
-      8. If Pinterest trends suggest specific accessory combinations, incorporate them
-      9. RANDOMIZE WITHIN STYLE RULES: Don't default to safe combinations - explore colors while respecting ${styleContext} rules
-      10. SURPRISE ME: Take calculated fashion risks that still follow ${styleContext} guidelines
-      11. VALIDATE EACH ITEM: Before selecting, ask "Does this fit ${styleContext} style?" If no, skip it.
-      12. NO STYLE MIXING: Don't mix athletic with formal, casual with business unless explicitly requested
-
-      REQUIRED JSON FORMAT - NO MARKDOWN WRAPPER:
-      {
-        "title": "Creative outfit name",
-        "description": "2-3 sentence description explaining why this combination works",
-        "color_harmony": "Description of color scheme and harmony",
-        "items": [
-          {
-            "category": "top",
-            "item_id": "actual_item_id",
-            "item_name": "Black Shirt",
-            "color": "black",
-            "style": "casual",
-            "image_url": "supabase_storage_url"
-          }
-        ],
-        "perfect_for": ["occasion1", "occasion2"],
-        "styling_tips": ["tip1", "tip2", "tip3"]
-      }
-
-      ${boardInspiration.length > 0 ? 'PINTEREST BOARD ATTRIBUTION: Add "Inspired by your Pinterest board" to the description' : ''}
-      ${!shouldIncludeAccessory && clothesByCategory.accessories.length > 0 ? 'IMPORTANT: If no accessories are selected, add "Consider adding a keps or ring for extra style!" to styling_tips.' : ''}
-    `;
-    };
-
-    let outfitRecommendation;
-
-    // Single-attempt generation with retry wrapper (handles transient errors)
-    try {
-      const outfitPrompt = generateOutfitPrompt(1, false);
-
-      const geminiResponse = await withRetry(
+      const response = await withRetry(
         async () => {
-          const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${lovableApiKey}`,
@@ -758,161 +494,355 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               model: 'google/gemini-2.5-flash',
-              messages: [{ role: 'user', content: outfitPrompt }],
-              max_tokens: 8000,
-              temperature: 0.8,
+              messages: [{ role: 'user', content: classificationPrompt }],
+              max_tokens: 500,
+              temperature: 0.4,
             }),
           });
-
           if (!response.ok) {
-            const txt = await response.text();
-            logger.error('AI API error', undefined, { status: response.status, error: txt });
-            if (response.status === 429) throw new Error('AI_RATE_LIMIT');
-            if (response.status === 402) throw new Error('AI_CREDITS_EXHAUSTED');
-            throw response;
+            const txt = await res.text();
+            logger.error('Classification API error', undefined, { status: res.status, error: txt });
+            if (res.status === 429) throw new Error('AI_RATE_LIMIT');
+            if (res.status === 402) throw new Error('AI_CREDITS_EXHAUSTED');
+            throw res;
           }
-
-          return response;
+          return res;
         },
         { maxRetries: 3, initialDelayMs: 1000, maxDelayMs: 10000, logger }
       );
 
-      const geminiData = await geminiResponse.json();
-
-      if (!geminiData.choices || geminiData.choices.length === 0) {
-        return new Response(JSON.stringify({ error: 'AI service returned unexpected response. Please try again.' }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      const choice = geminiData.choices[0];
-      const content = choice?.message?.content;
-      if (!content) {
-        return new Response(JSON.stringify({ error: 'AI service returned invalid response. Please try again.' }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Extract JSON (supports markdown-wrapped JSON)
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '{}';
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
       const jsonText = jsonMatch ? jsonMatch[1].trim() : content.trim();
-      outfitRecommendation = JSON.parse(jsonText);
+      return JSON.parse(jsonText);
+    };
 
-      // Validate structure
-      if (!outfitRecommendation.items || !Array.isArray(outfitRecommendation.items)) {
-        return new Response(JSON.stringify({ error: 'Could not generate a valid outfit. Please try again.' }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+    // STEP 2: Generate outfit requirements specification
+    const generateRequirements = async (classification: any) => {
+      const requirementsPrompt = `You are a fashion requirements expert. Based on the classification, create a detailed requirements specification.
 
-      const categories = outfitRecommendation.items.map((i: any) => i.category);
-      const uniqueCategories = new Set(categories);
-      if (categories.length !== uniqueCategories.size) {
-        return new Response(JSON.stringify({ error: 'Could not generate a valid outfit. Please try again with a different prompt.' }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+CLASSIFICATION:
+${JSON.stringify(classification, null, 2)}
 
-      if (selectedItem) {
-        const selectedItemIds = Array.isArray(selectedItem) ? selectedItem.map((i: any) => i.id) : [selectedItem.id];
-        const outfitItemIds = outfitRecommendation.items.map((i: any) => i.item_id);
-        const allSelectedIncluded = selectedItemIds.every((id: string) => outfitItemIds.includes(id));
-        if (!allSelectedIncluded) {
-          return new Response(JSON.stringify({ error: 'Could not create an outfit with your selected items. Try different items.' }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+USER REQUEST: "${prompt}"
+${weatherData ? `WEATHER: ${weatherData.temperature}°C, ${weatherData.condition}, ${weatherData.humidity}% humidity` : ''}
+${userPreferences ? `USER PREFERENCES: ${JSON.stringify(userPreferences)}` : ''}
+
+Create a detailed requirements specification for the outfit including:
+1. REQUIRED_CATEGORIES: Which clothing categories must be included (top, bottom, dress, outerwear, footwear, accessories)
+2. OPTIONAL_CATEGORIES: Which categories are optional but recommended
+3. COLOR_PALETTE: Recommended colors based on season, occasion, and user preferences
+4. MATERIAL_REQUIREMENTS: Fabric types suitable for weather and occasion
+5. STYLE_RULES: Specific styling guidelines for this classification
+6. LAYERING_STRATEGY: How to layer clothes based on weather
+7. FORMALITY_CONSTRAINTS: What to avoid or prioritize
+
+Return ONLY valid JSON:
+{
+  "required_categories": ["category1", "category2"],
+  "optional_categories": ["category1"],
+  "color_palette": {
+    "primary": ["color1", "color2"],
+    "accent": ["color1"],
+    "avoid": ["color1"]
+  },
+  "material_requirements": {
+    "preferred": ["material1", "material2"],
+    "avoid": ["material1"]
+  },
+  "style_rules": ["rule1", "rule2"],
+  "layering_strategy": "description",
+  "formality_constraints": {
+    "must_include": ["item1"],
+    "must_avoid": ["item1"]
+  }
+}`;
+
+      const response = await withRetry(
+        async () => {
+          const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${lovableApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash',
+              messages: [{ role: 'user', content: requirementsPrompt }],
+              max_tokens: 1000,
+              temperature: 0.4,
+            }),
           });
+          if (!response.ok) {
+            const txt = await res.text();
+            logger.error('Requirements API error', undefined, { status: res.status, error: txt });
+            if (res.status === 429) throw new Error('AI_RATE_LIMIT');
+            if (res.status === 402) throw new Error('AI_CREDITS_EXHAUSTED');
+            throw res;
+          }
+          return res;
+        },
+        { maxRetries: 3, initialDelayMs: 1000, maxDelayMs: 10000, logger }
+      );
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '{}';
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      const jsonText = jsonMatch ? jsonMatch[1].trim() : content.trim();
+      return JSON.parse(jsonText);
+    };
+
+    // STEP 3: Generate and score outfit candidates
+    const generateAndScoreOutfits = async (classification: any, requirements: any) => {
+      const generateOutfitPrompt = `
+You are a professional fashion stylist. Generate 3 different outfit candidates based on requirements.
+
+CLASSIFICATION:
+${JSON.stringify(classification, null, 2)}
+
+REQUIREMENTS:
+${JSON.stringify(requirements, null, 2)}
+
+USER REQUEST: "${prompt}"
+${mood ? `MOOD: ${mood}` : ''}
+${weatherData ? `WEATHER: ${weatherData.temperature}°C, ${weatherData.condition}` : ''}
+${userPreferences ? `USER PREFERENCES: ${JSON.stringify(userPreferences)}` : ''}
+
+${selectedItem ? `
+CRITICAL: User selected items MUST be included:
+${JSON.stringify(selectedItem, null, 2)}
+` : ''}
+
+${pinterestTrends.length > 0 ? `
+PINTEREST INSPIRATION:
+${JSON.stringify(pinterestTrends.slice(0, 3))}
+` : ''}
+
+AVOID RECENT ITEMS: ${recentItemIds.slice(0, 10).join(', ') || 'none'}
+
+AVAILABLE WARDROBE:
+TOPS: ${JSON.stringify(clothesByCategory.top.map(item => ({
+  id: item.id,
+  category: item.category,
+  color: item.analysis.color,
+  style: item.analysis.style
+})))}
+
+BOTTOMS: ${JSON.stringify(clothesByCategory.bottom.map(item => ({
+  id: item.id,
+  category: item.category,
+  color: item.analysis.color,
+  style: item.analysis.style
+})))}
+
+DRESSES: ${JSON.stringify(clothesByCategory.dress.map(item => ({
+  id: item.id,
+  category: item.category,
+  color: item.analysis.color,
+  style: item.analysis.style
+})))}
+
+OUTERWEAR: ${JSON.stringify(clothesByCategory.outerwear.map(item => ({
+  id: item.id,
+  category: item.category,
+  color: item.analysis.color,
+  style: item.analysis.style
+})))}
+
+FOOTWEAR: ${JSON.stringify(clothesByCategory.footwear.map(item => ({
+  id: item.id,
+  category: item.category,
+  color: item.analysis.color,
+  style: item.analysis.style
+})))}
+
+ACCESSORIES: ${JSON.stringify(clothesByCategory.accessories.map(item => ({
+  id: item.id,
+  category: item.category,
+  color: item.analysis.color,
+  style: item.analysis.style
+})))}
+
+Generate 3 DIFFERENT outfit candidates. For each candidate, provide reasoning and scoring.
+
+Return ONLY valid JSON array:
+[
+  {
+    "outfit": {
+      "title": "Outfit name",
+      "items": [
+        {
+          "item_id": "uuid",
+          "category": "top",
+          "item_name": "Item name",
+          "color": "color",
+          "style": "style"
         }
+      ],
+      "description": "Why this works",
+      "color_harmony": "Color analysis",
+      "styling_tips": ["tip1", "tip2"]
+    },
+    "reasoning": "Detailed explanation: Why each item was chosen, how they work together, weather considerations, style matching",
+    "score": 0.0,
+    "score_breakdown": {
+      "style_match": 0.0,
+      "weather_appropriateness": 0.0,
+      "color_harmony": 0.0,
+      "requirements_fulfillment": 0.0
+    }
+  }
+]`;
+
+      const response = await withRetry(
+        async () => {
+          const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${lovableApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash',
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are an expert fashion stylist. Follow these rules:
+1. COLOR MATCHING: Use complementary, analogous, or monochromatic color schemes
+2. WEATHER: Cold (<10°C) = layers; Mild (10-20°C) = light layers; Hot (>20°C) = single light layer
+3. STYLE CONSISTENCY: All items must match the formality level and style context
+4. LAYERING: Base → Warm → Outer. Never double warm layers without base.
+5. SCORING: Be critical and realistic. Perfect match = 0.9+, Good = 0.7-0.9, Acceptable = 0.5-0.7, Poor = <0.5`
+                },
+                { role: 'user', content: generateOutfitPrompt }
+              ],
+              max_tokens: 8000,
+              temperature: 0.4,
+            }),
+          });
+          if (!response.ok) {
+            const txt = await res.text();
+            logger.error('Outfit generation API error', undefined, { status: res.status, error: txt });
+            if (res.status === 429) throw new Error('AI_RATE_LIMIT');
+            if (res.status === 402) throw new Error('AI_CREDITS_EXHAUSTED');
+            throw res;
+          }
+          return res;
+        },
+        { maxRetries: 3, initialDelayMs: 1000, maxDelayMs: 10000, logger }
+      );
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '[]';
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      const jsonText = jsonMatch ? jsonMatch[1].trim() : content.trim();
+      return JSON.parse(jsonText);
+    };
+
+    // STEP 4: Select best outfit
+    logger.info('Starting flerstegs-pipeline...');
+    
+    let classification, requirements, candidates, bestOutfit;
+    
+    try {
+      // Step 1: Classify
+      logger.info('Step 1: Klassificerar prompt...');
+      classification = await classifyPrompt();
+      logger.info('Classification:', classification);
+
+      // Step 2: Requirements
+      logger.info('Step 2: Genererar kravspecifikation...');
+      requirements = await generateRequirements(classification);
+      logger.info('Requirements:', requirements);
+
+      // Step 3: Generate and score candidates
+      logger.info('Step 3: Genererar och scorear outfit-kandidater...');
+      candidates = await generateAndScoreOutfits(classification, requirements);
+      
+      if (!candidates || !Array.isArray(candidates) || candidates.length === 0) {
+        throw new Error('No valid outfit candidates generated');
+      }
+      
+      logger.info(`Generated ${candidates.length} candidates`);
+
+      // Step 4: Select best based on score
+      bestOutfit = candidates.reduce((best, current) => 
+        (current.score || 0) > (best.score || 0) ? current : best
+      );
+      
+      logger.info('Best outfit selected:', { 
+        score: bestOutfit.score,
+        title: bestOutfit.outfit?.title 
+      });
+
+      // Validate best outfit structure
+      if (!bestOutfit.outfit?.items || !Array.isArray(bestOutfit.outfit.items)) {
+        throw new Error('Best outfit has invalid structure');
       }
 
-      const hasTop = categories.includes('top');
-      const hasBottom = categories.includes('bottom');
-      const hasDress = categories.includes('dress');
-      if (!(hasTop && hasBottom) && !hasDress) {
-        return new Response(JSON.stringify({ error: 'Could not create a complete outfit with available items. Try adding more clothes.' }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Basic layering validation
-      const itemNames = outfitRecommendation.items.map((i: any) => (i.item_name || i.category || '').toLowerCase());
-      const sweaterCount = itemNames.filter((c: string) => c.includes('sweater')).length;
-      const hoodieCount = itemNames.filter((c: string) => c.includes('hoodie')).length;
-      const hasBaseLayer = itemNames.some((c: string) => ['t-shirt','tank-top','blouse','shirt','long-sleeve'].some(b => c.includes(b)));
-      if (sweaterCount > 1 || hoodieCount > 1 || (sweaterCount >= 1 && hoodieCount >= 1 && !hasBaseLayer)) {
-        return new Response(JSON.stringify({ error: 'Could not create a valid outfit combination. Please try again.' }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      // Validate selected items are included if any
+      if (selectedItem) {
+        const selectedIds = Array.isArray(selectedItem) 
+          ? selectedItem.map((i: any) => i.id) 
+          : [selectedItem.id];
+        const outfitIds = bestOutfit.outfit.items.map((i: any) => i.item_id);
+        const allIncluded = selectedIds.every((id: string) => outfitIds.includes(id));
+        
+        if (!allIncluded) {
+          return errorResponse(
+            400,
+            'Could not create outfit with selected items',
+            'SELECTED_ITEMS_NOT_INCLUDED',
+            undefined,
+            corsHeaders
+          );
+        }
       }
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      logger.error('Pipeline error', err);
+      
       if (msg === 'AI_RATE_LIMIT') {
-        return errorResponse(429, 'AI service rate limit exceeded. Please try again later.', 'AI_RATE_LIMIT', undefined, corsHeaders);
+        return errorResponse(429, 'AI service rate limit exceeded.', 'AI_RATE_LIMIT', undefined, corsHeaders);
       }
       if (msg === 'AI_CREDITS_EXHAUSTED') {
-        return errorResponse(402, 'AI service credits exhausted. Please contact support.', 'AI_CREDITS_EXHAUSTED', undefined, corsHeaders);
+        return errorResponse(402, 'AI service credits exhausted.', 'AI_CREDITS_EXHAUSTED', undefined, corsHeaders);
       }
-      return errorResponse(500, 'AI service temporarily unavailable. Please try again.', 'AI_UNAVAILABLE', { message: msg }, corsHeaders);
+      
+      return errorResponse(
+        500, 
+        'Failed to generate outfit. Please try again.', 
+        'PIPELINE_ERROR',
+        { error: msg },
+        corsHeaders
+      );
     }
 
 
     // Generate outfit visualization from new structured format
     const selectedItems = validClothes.filter(item => 
-      outfitRecommendation.items.some(outfitItem => outfitItem.item_id === item.id)
+      bestOutfit.outfit.items.some(outfitItem => outfitItem.item_id === item.id)
     );
     
     const outfitVisualization = {
-      items: selectedItems.map(item => {
-        // Calculate style_score based on style context match
-        const itemCategory = (item.category || '').toLowerCase();
-        const itemStyle = (item.analysis?.style || '').toLowerCase();
-        
-        // Calculate score based on how well item matches the style context
-        let styleScore = 0.5; // Default
-        
-        // Check if item is in allowed list
-        const isAllowed = contextRules.allowed.some(allowed => 
-          itemCategory.includes(allowed.toLowerCase()) || 
-          itemStyle.includes(allowed.toLowerCase())
-        );
-        
-        // Check if item matches priority styles
-        const matchesPriority = contextRules.priority.some(priority => 
-          itemStyle.includes(priority.toLowerCase())
-        );
-        
-        if (isAllowed && matchesPriority) {
-          styleScore = 0.9; // Perfect match
-        } else if (isAllowed) {
-          styleScore = 0.7; // Good match
-        } else if (matchesPriority) {
-          styleScore = 0.6; // Style match but not explicitly allowed
-        }
-        
-        return {
-          id: item.id,
-          category: item.category,
-          main_category: item.analysis.main_category,
-          color: item.analysis.color,
-          image_url: item.image_url,
-          style_score: styleScore
-        };
-      }),
+      items: selectedItems.map(item => ({
+        id: item.id,
+        category: item.category,
+        main_category: item.analysis.main_category,
+        color: item.analysis.color,
+        image_url: item.image_url,
+        style_score: bestOutfit.score_breakdown?.style_match || 0.5
+      })),
       description: `${selectedItems.map(item => 
         `${item.analysis.color} ${item.category}`
       ).join(' + ')}`,
-      color_scheme: outfitRecommendation.color_harmony || 'harmonious color combination'
+      color_scheme: bestOutfit.outfit.color_harmony || 'harmonious color combination'
     };
 
     // Convert new format to legacy format for database compatibility
-    const legacyRecommendedItems = outfitRecommendation.items.map(item => item.item_id);
+    const legacyRecommendedItems = bestOutfit.outfit.items.map(item => item.item_id);
 
     // Step 3: Generate AI Hero Image (only if requested)
     let generatedImageUrl = null;
@@ -930,7 +860,7 @@ The outfit should look elegant and well-styled. Studio lighting with soft shadow
 front-facing 3/4 view. The mannequin should have a neutral pose showing off the complete outfit. 
 High fashion photography style, editorial quality, 4K resolution. 
 Mood: ${mood || 'stylish and modern'}. 
-The outfit conveys: ${outfitRecommendation.description}`;
+The outfit conveys: ${bestOutfit.outfit.description}`;
 
         console.log('Image generation prompt:', imagePrompt);
 
@@ -996,23 +926,28 @@ The outfit conveys: ${outfitRecommendation.description}`;
       .from('outfits')
       .insert({
         user_id: userId,
-        title: outfitRecommendation.title,
+        title: bestOutfit.outfit.title,
         prompt,
         mood,
         is_public: isPublic,
         generated_image_url: generatedImageUrl,
-        description: outfitRecommendation.description,
+        description: bestOutfit.outfit.description,
         recommended_clothes: legacyRecommendedItems,
         purchase_links: purchaseLinks || [],
         ai_analysis: {
-          styling_tips: outfitRecommendation.styling_tips,
-          occasion: outfitRecommendation.perfect_for,
-          color_harmony: outfitRecommendation.color_harmony,
+          styling_tips: bestOutfit.outfit.styling_tips,
+          occasion: bestOutfit.outfit.perfect_for || classification.occasion,
+          color_harmony: bestOutfit.outfit.color_harmony,
           pinterest_trends: pinterestTrends.slice(0, 2),
           clothes_analysis: validClothes,
           outfit_visualization: outfitVisualization,
-          structured_items: outfitRecommendation.items, // New structured format
-          style_context: styleContext,
+          structured_items: bestOutfit.outfit.items,
+          style_context: classification.style,
+          classification: classification,
+          requirements: requirements,
+          reasoning: bestOutfit.reasoning,
+          score: bestOutfit.score,
+          score_breakdown: bestOutfit.score_breakdown,
           used_pinterest_trends: (pinterestTrends.length > 0 || boardInspiration.length > 0)
         }
       })
@@ -1089,13 +1024,25 @@ The outfit conveys: ${outfitRecommendation.description}`;
     const responsePayload = {
       outfit: savedOutfit,
       recommendedClothes: selectedItems,
-      structuredOutfit: outfitRecommendation,
+      structuredOutfit: bestOutfit.outfit,
+      reasoning: bestOutfit.reasoning,
+      score: bestOutfit.score,
+      score_breakdown: bestOutfit.score_breakdown,
+      classification: classification,
+      requirements: requirements,
+      all_candidates: candidates.map(c => ({
+        title: c.outfit.title,
+        score: c.score,
+        reasoning: c.reasoning
+      }))
     };
     const responseMeta = {
       processingTimeMs: Date.now() - startTime,
       clothesAnalyzed: clothes.length,
       pinterestTrendsUsed: (pinterestTrends.length > 0) || (boardInspiration.length > 0),
       imageGenerated: !!generatedImageUrl,
+      pipelineSteps: 4,
+      candidatesGenerated: candidates.length
     };
 
     return successResponse(responsePayload, responseMeta, corsHeaders);

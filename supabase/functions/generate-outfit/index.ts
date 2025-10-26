@@ -63,7 +63,6 @@ serve(async (req) => {
     );
   }
 
-  try {
     // Validate JWT authentication (Supabase handles this, but we can add extra validation)
     const authenticatedUserId = getAuthUserId(req);
     if (!authenticatedUserId) {
@@ -1346,43 +1345,4 @@ The outfit conveys: ${outfitRecommendation.description}`;
     return successResponse(responsePayload, responseMeta, corsHeaders);
 
 
-  } catch (e) {
-    const error = e as unknown as Error;
-    logger.error('Unexpected error in generate-outfit function', error, {
-      processingTimeMs: Date.now() - startTime,
-    });
-
-    // Handle specific error types
-    if (error instanceof Error) {
-      if (error.message === 'AI_RATE_LIMIT') {
-        return errorResponse(
-          429, 
-          'AI service rate limit exceeded. Please try again later.', 
-          'AI_RATE_LIMIT',
-          undefined,
-          corsHeaders
-        );
-      }
-      
-      if (error.message === 'AI_CREDITS_EXHAUSTED') {
-        return errorResponse(
-          402, 
-          'AI service credits exhausted. Please contact support.', 
-          'AI_CREDITS_EXHAUSTED',
-          undefined,
-          corsHeaders
-        );
-      }
-    }
-
-    // Generic error response
-    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-    return errorResponse(
-      500, 
-      'Failed to generate outfit. Please try again.', 
-      'INTERNAL_ERROR', 
-      { message: errorMessage },
-      corsHeaders
-    );
-  }
 });

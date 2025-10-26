@@ -81,7 +81,7 @@ serve(async (req) => {
     const categoryMappings = {
       'top': ['shirt', 'blouse', 't-shirt', 'sweater', 'tank top', 'crop top', 'tank-top', 'crop-top'],
       'bottom': ['pants', 'jeans', 'skirt', 'shorts', 'trousers', 'leggings'],
-      'outerwear': ['jacket', 'coat', 'blazer', 'cardigan', 'hoodie', 'vest'],
+      'outerwear': ['jacket', 'coat', 'blazer', 'cardigan', 'hoodie', 'vest', 'rain-jacket'],
       'dress': ['dress', 'suit', 'jumpsuit'],
       'footwear': ['shoes', 'boots', 'sneakers', 'sandals', 'heels', 'slippers'],
       'accessories': [
@@ -94,6 +94,13 @@ serve(async (req) => {
         // Other
         'gloves', 'socks', 'strumpor', 'sunglasses', 'tie'
       ]
+    };
+
+    // Define layering categories for better logic
+    const layeringCategories = {
+      'base_layers': ['t-shirt', 'tank-top', 'blouse', 'shirt', 'long-sleeve'],
+      'warm_layers': ['sweater', 'hoodie', 'cardigan'],
+      'outer_layers': ['jacket', 'coat', 'blazer', 'rain-jacket', 'vest']
     };
 
     // Define style compatibility rules based on formality and context
@@ -376,12 +383,12 @@ serve(async (req) => {
       - Humidity: ${weatherData.humidity}%
       - Wind Speed: ${weatherData.windSpeed} m/s
       
-      WEATHER-BASED REQUIREMENTS:
-      ${weatherData.temperature < 10 ? '- COLD WEATHER: Include warm layers (outerwear, long sleeves, pants). Suggest waterproof options if rainy.' : ''}
-      ${weatherData.temperature >= 10 && weatherData.temperature < 20 ? '- MILD WEATHER: Light layers recommended. Consider a light jacket or cardigan.' : ''}
-      ${weatherData.temperature >= 20 ? '- WARM WEATHER: Light, breathable fabrics. Shorts, skirts, or light pants suitable.' : ''}
-      ${weatherData.condition.toLowerCase().includes('rain') ? '- RAINY: Prioritize waterproof outerwear if available. Suggest practical footwear.' : ''}
-      ${weatherData.condition.toLowerCase().includes('snow') ? '- SNOWY: Include warm boots and heavy outerwear. Multiple warm layers essential.' : ''}
+      WEATHER-BASED LAYERING REQUIREMENTS:
+      ${weatherData.temperature > 20 ? '- HOT WEATHER (>20°C): Use ONLY ONE light layer (t-shirt or tank-top). NO warm layers like sweater/hoodie. Outer jacket only if needed for style.' : ''}
+      ${weatherData.temperature >= 10 && weatherData.temperature <= 20 ? '- MILD WEATHER (10-20°C): Use base layer + ONE warm layer (sweater OR hoodie). Outer jacket optional.' : ''}
+      ${weatherData.temperature < 10 ? '- COLD WEATHER (<10°C): Layering allowed: base + warm + outer (e.g., t-shirt + sweater + coat).' : ''}
+      ${weatherData.condition.toLowerCase().includes('rain') ? '- RAINY: Prioritize waterproof outerwear (rain-jacket) if available. Suggest practical footwear.' : ''}
+      ${weatherData.condition.toLowerCase().includes('snow') ? '- SNOWY: Include warm boots and heavy outerwear. Base + warm + outer layers essential.' : ''}
       ` : ''}
 
       ${userPreferences ? `
@@ -462,11 +469,41 @@ serve(async (req) => {
       3. Select exactly one item per category for a harmonious outfit
       4. Prioritize items NOT in the recent list for freshness
 
-      CRITICAL RULES - YOU MUST FOLLOW THESE EXACTLY:
-      1. Select AT MOST ONE item per category: top, bottom, dress, outerwear, footwear, accessories
-      2. NEVER select multiple items from the same main category (e.g., no two tops, no two bottoms)
-      3. Minimum outfit must have: (1 top + 1 bottom) OR (1 dress)
-      4. Optional additions: 1 outerwear + 1 footwear + 1 accessory
+      CRITICAL LAYERING RULES - YOU MUST FOLLOW THESE EXACTLY:
+
+      CATEGORY RULES:
+      1. TOPS - You can select MULTIPLE tops if they follow layering logic:
+         - Base layers: t-shirt, tank-top, blouse, shirt, long-sleeve (lightweight)
+         - Warm layers: sweater, hoodie, cardigan (medium warmth)
+         - You can combine: base + warm (e.g., t-shirt + sweater) ✅
+         - You can combine: base + warm + outer (e.g., t-shirt + hoodie + jacket) ✅
+         
+      2. OUTERWEAR - Can be combined with tops:
+         - Outer layers: jacket, coat, blazer, rain-jacket, vest
+         - You can combine: warm layer + outer (e.g., sweater + coat) ✅
+         - You can combine: base + outer (e.g., t-shirt + jacket) ✅
+
+      FORBIDDEN COMBINATIONS (CRITICAL):
+      ❌ NEVER: sweater + hoodie without a base layer underneath (too warm!)
+      ❌ NEVER: two sweaters or two hoodies
+      ❌ NEVER: multiple items of the exact same type (e.g., two t-shirts)
+
+      CORRECT LAYERING EXAMPLES:
+      ✅ t-shirt + sweater
+      ✅ t-shirt + hoodie
+      ✅ t-shirt + sweater + jacket
+      ✅ t-shirt + hoodie + coat
+      ✅ sweater + jacket (OK without base in cold weather)
+      ✅ hoodie + coat (OK without base in cold weather)
+
+      3. OTHER CATEGORIES:
+         - Select AT MOST ONE: bottom, dress, footwear
+         - Can select multiple accessories
+
+      4. MINIMUM REQUIREMENTS:
+         - Must have: (1 base/warm layer + 1 bottom) OR (1 dress)
+         - Optional: outerwear, footwear, accessories
+         
       5. ACCESSORY PRIORITY: ${shouldIncludeAccessory ? `MUST include at least one accessory (prefer ${suggestedAccessory}) if available in wardrobe` : `Include accessories in 50% of outfits, preferring ${suggestedAccessory} based on the mood/scenario`}
 
       AVAILABLE CLOTHES BY CATEGORY:
@@ -781,6 +818,50 @@ serve(async (req) => {
             } else {
               return new Response(JSON.stringify({ 
                 error: 'Could not create a complete outfit with available items. Try adding more clothes.' 
+              }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+          }
+
+          // Validate layering logic
+          const validateLayering = (items: any[]) => {
+            const baseLayers = ['t-shirt', 'tank-top', 'blouse', 'shirt', 'long-sleeve'];
+            const warmLayers = ['sweater', 'hoodie', 'cardigan'];
+            
+            const itemCategories = items.map(item => item.item_name?.toLowerCase() || item.category?.toLowerCase());
+            
+            // Count warm layers
+            const sweaterCount = itemCategories.filter(c => c && c.includes('sweater')).length;
+            const hoodieCount = itemCategories.filter(c => c && c.includes('hoodie')).length;
+            const hasBaseLayer = itemCategories.some(c => baseLayers.some(base => c && c.includes(base)));
+            
+            // Two sweaters or two hoodies = fail
+            if (sweaterCount > 1) {
+              return { valid: false, reason: 'Multiple sweaters detected (not allowed)' };
+            }
+            if (hoodieCount > 1) {
+              return { valid: false, reason: 'Multiple hoodies detected (not allowed)' };
+            }
+            
+            // Sweater + hoodie without base layer = fail
+            if (sweaterCount >= 1 && hoodieCount >= 1 && !hasBaseLayer) {
+              return { valid: false, reason: 'Sweater and hoodie combined without base layer (too warm!)' };
+            }
+            
+            return { valid: true };
+          };
+
+          // Validate the layering
+          const layeringValidation = validateLayering(outfitRecommendation.items);
+          if (!layeringValidation.valid) {
+            console.log(`Invalid layering: ${layeringValidation.reason}, retrying...`);
+            if (attemptCount < maxAttempts) {
+              continue; // Retry
+            } else {
+              return new Response(JSON.stringify({ 
+                error: 'Could not create a valid outfit combination. Please try again.' 
               }), {
                 status: 200,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },

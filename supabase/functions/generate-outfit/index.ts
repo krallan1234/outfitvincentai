@@ -314,9 +314,6 @@ serve(async (req) => {
       likedOutfitsCount: likedOutfitAnalysis.length,
     });
 
-    // Initialize Supabase client
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     // Get user's clothes with error handling
     const { data: clothes, error: clothesError } = await supabase
       .from('clothes')

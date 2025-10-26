@@ -54,14 +54,12 @@ serve(async (req) => {
   
   if (!checkRateLimit(identifier)) {
     logger.warn('Rate limit exceeded', { identifier });
-    return new Response(
-      JSON.stringify({ 
-        ...errorResponse(429, 'Rate limit exceeded. You can only generate 10 outfits per minute.', 'RATE_LIMIT_EXCEEDED'),
-      }), 
-      {
-        status: 429,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+    return errorResponse(
+      429,
+      'Rate limit exceeded. You can only generate 10 outfits per minute.',
+      'RATE_LIMIT_EXCEEDED',
+      undefined,
+      corsHeaders
     );
   }
 
@@ -70,12 +68,12 @@ serve(async (req) => {
     const authenticatedUserId = getAuthUserId(req);
     if (!authenticatedUserId) {
       logger.error('Unauthenticated request');
-      return new Response(
-        JSON.stringify(errorResponse(401, 'Authentication required', 'UNAUTHENTICATED')),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+      return errorResponse(
+        401, 
+        'Authentication required', 
+        'UNAUTHENTICATED',
+        undefined,
+        corsHeaders
       );
     }
 
@@ -94,24 +92,17 @@ serve(async (req) => {
         errors: validationResult.error.errors,
       });
       
-      return new Response(
-        JSON.stringify(
-          errorResponse(
-            400,
-            'Invalid request data',
-            'VALIDATION_ERROR',
-            {
-              errors: validationResult.error.errors.map(err => ({
-                field: err.path.join('.'),
-                message: err.message,
-              })),
-            }
-          )
-        ),
+      return errorResponse(
+        400,
+        'Invalid request data',
+        'VALIDATION_ERROR',
         {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+          errors: validationResult.error.errors.map(err => ({
+            field: err.path.join('.'),
+            message: err.message,
+          })),
+        },
+        corsHeaders
       );
     }
 
@@ -137,24 +128,24 @@ serve(async (req) => {
         requestedUserId: userId,
       });
       
-      return new Response(
-        JSON.stringify(errorResponse(403, 'Not authorized to generate outfits for this user', 'FORBIDDEN')),
-        {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+      return errorResponse(
+        403, 
+        'Not authorized to generate outfits for this user', 
+        'FORBIDDEN',
+        undefined,
+        corsHeaders
       );
     }
 
     // Check API key configuration
     if (!lovableApiKey) {
       logger.error('Lovable AI key not configured');
-      return new Response(
-        JSON.stringify(errorResponse(500, 'AI service is not configured', 'SERVICE_MISCONFIGURED')),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+      return errorResponse(
+        500, 
+        'AI service is not configured', 
+        'SERVICE_MISCONFIGURED',
+        undefined,
+        corsHeaders
       );
     }
 
@@ -192,23 +183,23 @@ serve(async (req) => {
 
     if (clothesError) {
       logger.error('Failed to fetch clothes from database', clothesError);
-      return new Response(
-        JSON.stringify(errorResponse(500, 'Failed to load wardrobe data', 'DATABASE_ERROR')),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+      return errorResponse(
+        500, 
+        'Failed to load wardrobe data', 
+        'DATABASE_ERROR',
+        undefined,
+        corsHeaders
       );
     }
 
     if (!clothes || clothes.length === 0) {
       logger.warn('User has no clothes in wardrobe', { userId });
-      return new Response(
-        JSON.stringify(errorResponse(400, 'Please upload clothing items to your wardrobe first', 'NO_CLOTHES')),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+      return errorResponse(
+        400, 
+        'Please upload clothing items to your wardrobe first', 
+        'NO_CLOTHES',
+        undefined,
+        corsHeaders
       );
     }
 
@@ -1340,26 +1331,19 @@ The outfit conveys: ${outfitRecommendation.description}`;
       }
     }
 
-    return new Response(
-      JSON.stringify(
-        successResponse(
-          {
-            outfit: savedOutfit,
-            recommendedClothes: selectedItems,
-            structuredOutfit: outfitRecommendation,
-          },
-          {
-            processingTimeMs: Date.now() - startTime,
-            clothesAnalyzed: clothes.length,
-            pinterestTrendsUsed: pinterestTrends.length > 0 || boardInspiration.length > 0,
-            imageGenerated: !!generatedImageUrl,
-          }
-        )
-      ),
+    return successResponse(
       {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+        outfit: savedOutfit,
+        recommendedClothes: selectedItems,
+        structuredOutfit: outfitRecommendation,
+      },
+      {
+        processingTimeMs: Date.now() - startTime,
+        clothesAnalyzed: clothes.length,
+        pinterestTrendsUsed: pinterestTrends.length > 0 || boardInspiration.length > 0,
+        imageGenerated: !!generatedImageUrl,
+      },
+      corsHeaders
     );
 
   } catch (error) {
@@ -1370,36 +1354,34 @@ The outfit conveys: ${outfitRecommendation.description}`;
     // Handle specific error types
     if (error instanceof Error) {
       if (error.message === 'AI_RATE_LIMIT') {
-        return new Response(
-          JSON.stringify(errorResponse(429, 'AI service rate limit exceeded. Please try again later.', 'AI_RATE_LIMIT')),
-          {
-            status: 429,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
+        return errorResponse(
+          429, 
+          'AI service rate limit exceeded. Please try again later.', 
+          'AI_RATE_LIMIT',
+          undefined,
+          corsHeaders
         );
       }
       
       if (error.message === 'AI_CREDITS_EXHAUSTED') {
-        return new Response(
-          JSON.stringify(errorResponse(402, 'AI service credits exhausted. Please contact support.', 'AI_CREDITS_EXHAUSTED')),
-          {
-            status: 402,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
+        return errorResponse(
+          402, 
+          'AI service credits exhausted. Please contact support.', 
+          'AI_CREDITS_EXHAUSTED',
+          undefined,
+          corsHeaders
         );
       }
     }
 
     // Generic error response
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-    return new Response(
-      JSON.stringify(errorResponse(500, 'Failed to generate outfit. Please try again.', 'INTERNAL_ERROR', {
-        message: errorMessage,
-      })),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+    return errorResponse(
+      500, 
+      'Failed to generate outfit. Please try again.', 
+      'INTERNAL_ERROR', 
+      { message: errorMessage },
+      corsHeaders
     );
   }
 });

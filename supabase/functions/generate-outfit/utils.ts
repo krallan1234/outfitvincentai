@@ -101,7 +101,8 @@ export function errorResponse(
   status: number,
   message: string,
   code?: string,
-  details?: Record<string, any>
+  details?: Record<string, any>,
+  headers?: Record<string, string>
 ) {
   return new Response(
     JSON.stringify({
@@ -114,13 +115,20 @@ export function errorResponse(
     }),
     {
       status,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...headers,
+      },
     }
   );
 }
 
 // Success response helper
-export function successResponse<T>(data: T, meta?: Record<string, any>) {
+export function successResponse<T>(
+  data: T, 
+  meta?: Record<string, any>,
+  headers?: Record<string, string>
+) {
   return new Response(
     JSON.stringify({
       success: true,
@@ -130,7 +138,10 @@ export function successResponse<T>(data: T, meta?: Record<string, any>) {
     }),
     {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...headers,
+      },
     }
   );
 }

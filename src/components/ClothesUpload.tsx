@@ -31,6 +31,8 @@ const CATEGORIES = [
   'hoodie',
   'tank-top',
   'crop-top',
+  'long-sleeve',
+  'workout-top',
   
   // Outerwear
   'jacket',
@@ -38,14 +40,19 @@ const CATEGORIES = [
   'blazer',
   'cardigan',
   'vest',
+  'sheer',
   
   // Bottoms
   'pants',
   'jeans',
   'shorts',
   'skirt',
+  'denim-skirt',
   'leggings',
   'trousers',
+  'sweatpants',
+  'bike-shorts',
+  'workout-leggings',
   
   // Dresses & Suits
   'dress',

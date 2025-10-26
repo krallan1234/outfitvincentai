@@ -15,7 +15,14 @@ const CATEGORIES = [
   'dresses',
   'outerwear',
   'shoes',
-  'accessories'
+  'accessories',
+  'sweatpants',
+  'sheer',
+  'long-sleeve',
+  'bike-shorts',
+  'workout-leggings',
+  'workout-top',
+  'denim-skirt'
 ];
 
 export const ClipFromWeb = () => {

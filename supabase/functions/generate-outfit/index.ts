@@ -20,6 +20,13 @@ serve(async (req) => {
   try {
     const { prompt, mood, userId, isPublic = true, pinterestBoardId, selectedItem, purchaseLinks, weatherData, userPreferences, pinterestContext, pinterestPins, generateImage = false } = await req.json();
 
+    // Extract selected item IDs for filtering logic
+    const selectedItemIds = selectedItem 
+      ? (Array.isArray(selectedItem) 
+          ? selectedItem.map((item: any) => item.id)
+          : [selectedItem.id])
+      : [];
+
     if (!prompt || !userId) {
       console.error('Missing required parameters:', { prompt: !!prompt, userId: !!userId });
       return new Response(JSON.stringify({ 
@@ -219,7 +226,7 @@ serve(async (req) => {
       const itemStyle = (analysis.style || '').toLowerCase();
       
       // Check if this item is explicitly selected by the user (mandatory items)
-      const isUserSelected = selected_items?.includes(item.id) || locked_items?.includes(item.id);
+      const isUserSelected = selectedItemIds.includes(item.id);
       
       // Check if item is explicitly excluded for this style context
       const isExcluded = contextRules.excluded.some(excluded => 

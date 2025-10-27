@@ -29,12 +29,12 @@ export const PinterestPinSchema = z.object({
   link: z.string().url().optional(),
 });
 
-// Selected item schema
+// Selected item schema - accepts both full URLs and storage paths
 export const SelectedItemSchema = z.object({
   id: z.string().uuid(),
   category: z.string(),
   color: z.string(),
-  image_url: z.string().url().optional(),
+  image_url: z.string().optional(), // Can be full URL or storage path
 });
 
 // Purchase link schema

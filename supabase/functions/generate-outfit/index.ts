@@ -796,7 +796,14 @@ ${JSON.stringify(pinterestTrends.slice(0, 3))}
 
 AVOID RECENT ITEMS: ${recentItemIds.slice(0, 10).join(', ') || 'none'}
 
-AVAILABLE WARDROBE:
+🚨 CRITICAL RULES - YOU MUST FOLLOW THESE STRICTLY:
+1. You can ONLY use items from the AVAILABLE WARDROBE lists below
+2. NEVER invent, suggest, or create new clothing items
+3. Every item_id in your response MUST match an id from the lists below
+4. If you cannot find a suitable item for a category (e.g., no jacket exists), mark it as "missing_item_type" in your response
+5. DO NOT fill gaps with imaginary items - only use what exists in the wardrobe
+
+AVAILABLE WARDROBE (These are the ONLY items you can use):
 TOPS: ${JSON.stringify(clothesByCategory.top.map(item => ({
   id: item.id,
   category: item.category,
@@ -839,7 +846,8 @@ ACCESSORIES: ${JSON.stringify(clothesByCategory.accessories.map(item => ({
   style: item.analysis.style
 })))}
 
-Generate 3 DIFFERENT outfit candidates. For each candidate, provide reasoning and scoring.
+Generate 3 DIFFERENT outfit candidates using ONLY items from the available wardrobe above. 
+If a required category is missing (e.g., no shoes available), include "missing_categories" field.
 
 Return ONLY valid JSON array:
 [
@@ -884,11 +892,16 @@ Return ONLY valid JSON array:
                 {
                   role: 'system',
                   content: `You are an expert fashion stylist. Follow these rules:
-1. COLOR MATCHING: Use complementary, analogous, or monochromatic color schemes
-2. WEATHER: Cold (<10°C) = layers; Mild (10-20°C) = light layers; Hot (>20°C) = single light layer
-3. STYLE CONSISTENCY: All items must match the formality level and style context
-4. LAYERING: Base → Warm → Outer. Never double warm layers without base.
-5. SCORING: Be critical and realistic. Perfect match = 0.9+, Good = 0.7-0.9, Acceptable = 0.5-0.7, Poor = <0.5`
+1. WARDROBE CONSTRAINT: You can ONLY use clothing items from the "AVAILABLE WARDROBE" lists provided. NEVER create, invent, or suggest items not in those lists.
+2. ITEM_ID REQUIREMENT: Every item you select MUST use the exact "id" from the available wardrobe lists as "item_id" in your response.
+3. MISSING ITEMS: If you cannot find a suitable item for a required category (e.g., no shoes available), include a "missing_categories" array listing what's missing - DO NOT invent items to fill gaps.
+4. COLOR MATCHING: Use complementary, analogous, or monochromatic color schemes.
+5. WEATHER: Cold (<10°C) = layers; Mild (10-20°C) = light layers; Hot (>20°C) = single light layer.
+6. STYLE CONSISTENCY: All items must match the formality level and style context.
+7. LAYERING: Base → Warm → Outer. Never double warm layers without base.
+8. SCORING: Be critical and realistic. Perfect match = 0.9+, Good = 0.7-0.9, Acceptable = 0.5-0.7, Poor = <0.5
+
+🚨 CRITICAL: Validate that every item_id in your response exists in the available wardrobe before responding.`
                 },
                 { role: 'user', content: generateOutfitPrompt }
               ],
@@ -974,6 +987,55 @@ Return ONLY valid JSON array:
           );
         }
       }
+
+      // CRITICAL VALIDATION: Verify all item_id values exist in user's wardrobe
+      logger.info('Validating outfit items against user wardrobe...');
+      const validItemIds = new Set(validClothes.map(item => item.id));
+      const invalidItems: any[] = [];
+      const validatedItems: any[] = [];
+      
+      bestOutfit.outfit.items.forEach((item: any) => {
+        if (!item.item_id || !validItemIds.has(item.item_id)) {
+          logger.warn('AI returned invalid item_id', { item_id: item.item_id, category: item.category });
+          invalidItems.push(item);
+        } else {
+          validatedItems.push(item);
+        }
+      });
+
+      // If AI returned invalid items, log and remove them
+      if (invalidItems.length > 0) {
+        logger.error('AI generated outfit with non-existent items', { 
+          invalidCount: invalidItems.length,
+          invalidItems: invalidItems.map(i => ({ id: i.item_id, category: i.category }))
+        });
+        
+        // Replace items list with only valid ones
+        bestOutfit.outfit.items = validatedItems;
+      }
+
+      // Check if we have enough items after validation
+      if (validatedItems.length === 0) {
+        return errorResponse(
+          500,
+          'AI generated outfit with no valid items from your wardrobe. Please try again.',
+          'NO_VALID_ITEMS',
+          undefined,
+          corsHeaders
+        );
+      }
+
+      // Check for missing categories if AI flagged them
+      if (bestOutfit.outfit.missing_categories && bestOutfit.outfit.missing_categories.length > 0) {
+        logger.info('AI identified missing categories', { missing: bestOutfit.outfit.missing_categories });
+        // Include this info in the response but don't fail
+      }
+
+      logger.info('Validation complete', { 
+        totalItems: bestOutfit.outfit.items.length,
+        invalidItemsRemoved: invalidItems.length,
+        missingCategories: bestOutfit.outfit.missing_categories || []
+      });
 
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

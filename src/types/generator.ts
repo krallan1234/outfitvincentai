@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Outfit } from '@/hooks/useOutfits';
 
 // Weather data schema
 export const WeatherDataSchema = z.object({
@@ -54,16 +55,9 @@ export interface OutfitGenerationParams {
 
 // Generation result
 export interface OutfitGenerationResult {
-  outfit: {
-    id: string;
-    prompt: string;
-    mood?: string;
-    recommended_clothes: string[];
-    outfit_image_url?: string;
-    reasoning?: string;
-    style_notes?: string;
-    ai_generated_image_url?: string;
-  };
+  outfit: Outfit;
+  recommendedClothes?: any[];
+  fromCache?: boolean;
   message?: string;
 }
 

@@ -78,9 +78,22 @@ export const OutfitGenerator = () => {
       selectedItems
     );
 
+    console.log('✅ Generation result received in OutfitGenerator:', {
+      hasResult: !!result,
+      hasOutfit: !!result?.outfit,
+      outfitType: result?.outfit ? typeof result.outfit : 'undefined',
+      outfitId: result?.outfit?.id,
+      outfitTitle: result?.outfit?.title,
+      outfitKeys: result?.outfit ? Object.keys(result.outfit) : [],
+      fullResult: result
+    });
+
     if (result) {
+      console.log('✅ Setting generated outfit and showing modal');
       setGeneratedOutfit(result);
       setShowOutfitModal(true);
+    } else {
+      console.log('❌ No result returned, modal will not show');
     }
   };
 

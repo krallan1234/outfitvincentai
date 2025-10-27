@@ -95,6 +95,16 @@ export const useOutfits = () => {
         throw new Error(data.error);
       }
 
+      console.log('✅ Edge function response:', {
+        hasOutfit: !!data.outfit,
+        outfitKeys: data.outfit ? Object.keys(data.outfit) : [],
+        outfitId: data.outfit?.id,
+        outfitTitle: data.outfit?.title,
+        hasRecommendedClothes: !!data.recommendedClothes,
+        recommendedClothesCount: data.recommendedClothes?.length,
+        fullData: data
+      });
+
       // Add the new outfit to the list
       setOutfits(prev => [data.outfit, ...prev]);
       

@@ -1,8 +1,8 @@
 import { OutfitModal } from '@/components/OutfitModal';
-import { OutfitItem } from '@/types/outfit';
+import { Outfit } from '@/hooks/useOutfits';
 
 interface ResultPreviewProps {
-  outfit: OutfitItem | null;
+  outfit: Outfit | null;
   isOpen: boolean;
   onClose: () => void;
 }

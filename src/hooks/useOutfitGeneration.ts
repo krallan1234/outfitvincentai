@@ -261,6 +261,16 @@ export const useOutfitGeneration = () => {
         params.shouldGenerateImage
       );
 
+      console.log('✅ Outfit generation API result:', {
+        hasOutfit: !!result?.outfit,
+        outfitId: result?.outfit?.id,
+        outfitTitle: result?.outfit?.title,
+        hasRecommendedClothes: !!result?.recommendedClothes,
+        recommendedClothesCount: result?.recommendedClothes?.length,
+        fromCache: (result as any)?.fromCache,
+        fullResult: result
+      });
+
       setState((prev) => ({ ...prev, loading: false, step: 1, tip: '' }));
       clearInterval(progressInterval);
 

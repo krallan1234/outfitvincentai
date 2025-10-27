@@ -1025,6 +1025,91 @@ Return ONLY valid JSON array:
         );
       }
 
+      // 🚨 CRITICAL: Validate outfit logic
+      const itemCategories = validatedItems.map((item: any) => {
+        const clothesItem = validClothes.find(c => c.id === item.item_id);
+        return clothesItem?.analysis?.main_category || 'other';
+      });
+
+      const hasDress = itemCategories.includes('dress');
+      const hasTop = itemCategories.includes('top');
+      const hasBottom = itemCategories.includes('bottom');
+      const hasFootwear = itemCategories.includes('footwear');
+
+      // Rule: NEVER dress + top/bottom
+      if (hasDress && (hasTop || hasBottom)) {
+        logger.error('Invalid outfit: dress combined with top/bottom - removing conflicting items');
+        // Keep dress, remove top/bottom
+        bestOutfit.outfit.items = validatedItems.filter((item: any) => {
+          const clothesItem = validClothes.find(c => c.id === item.item_id);
+          const mainCat = clothesItem?.analysis?.main_category;
+          return mainCat !== 'top' && mainCat !== 'bottom';
+        });
+      }
+
+      // Rule: ALWAYS include footwear if available
+      const availableFootwear = clothesByCategory.footwear || [];
+      if (!hasFootwear && availableFootwear.length > 0) {
+        logger.warn('Outfit missing footwear - adding automatically');
+        
+        // Choose footwear that matches the outfit style
+        const outfitFormality = classification?.formality || 'casual';
+        const outfitStyle = classification?.style || 'casual';
+        
+        // Sort footwear by style match
+        const sortedFootwear = availableFootwear.sort((a, b) => {
+          const aFormality = a.analysis?.formality || 'casual';
+          const bFormality = b.analysis?.formality || 'casual';
+          const aStyle = a.analysis?.style || 'casual';
+          const bStyle = b.analysis?.style || 'casual';
+          
+          // Prioritize formality match
+          const aFormalityMatch = aFormality === outfitFormality ? 2 : (Math.abs(
+            ['casual', 'semi-formal', 'formal'].indexOf(aFormality) - 
+            ['casual', 'semi-formal', 'formal'].indexOf(outfitFormality)
+          ) === 1 ? 1 : 0);
+          
+          const bFormalityMatch = bFormality === outfitFormality ? 2 : (Math.abs(
+            ['casual', 'semi-formal', 'formal'].indexOf(bFormality) - 
+            ['casual', 'semi-formal', 'formal'].indexOf(outfitFormality)
+          ) === 1 ? 1 : 0);
+          
+          // Then style match
+          const aStyleMatch = aStyle === outfitStyle ? 1 : 0;
+          const bStyleMatch = bStyle === outfitStyle ? 1 : 0;
+          
+          return (bFormalityMatch + bStyleMatch) - (aFormalityMatch + aStyleMatch);
+        });
+        
+        const suitableShoe = sortedFootwear[0];
+        if (suitableShoe) {
+          bestOutfit.outfit.items.push({
+            item_id: suitableShoe.id,
+            category: suitableShoe.category,
+            item_name: suitableShoe.category,
+            color: suitableShoe.analysis.color,
+            style: suitableShoe.analysis.style
+          });
+          logger.info('Added footwear to complete outfit', { 
+            footwear_id: suitableShoe.id,
+            footwear_style: suitableShoe.analysis.style,
+            outfit_style: outfitStyle
+          });
+        }
+      }
+
+      // Rule: Non-dress outfits need top AND bottom
+      if (!hasDress && (!hasTop || !hasBottom)) {
+        logger.error('Invalid outfit: missing top or bottom for non-dress outfit');
+        return errorResponse(
+          500,
+          'Could not create a complete outfit. Please ensure you have both tops and bottoms in your wardrobe, or add a dress.',
+          'INCOMPLETE_OUTFIT',
+          undefined,
+          corsHeaders
+        );
+      }
+
       // Check for missing categories if AI flagged them
       if (bestOutfit.outfit.missing_categories && bestOutfit.outfit.missing_categories.length > 0) {
         logger.info('AI identified missing categories', { missing: bestOutfit.outfit.missing_categories });
@@ -1034,6 +1119,10 @@ Return ONLY valid JSON array:
       logger.info('Validation complete', { 
         totalItems: bestOutfit.outfit.items.length,
         invalidItemsRemoved: invalidItems.length,
+        hasDress,
+        hasTop,
+        hasBottom,
+        hasFootwear,
         missingCategories: bestOutfit.outfit.missing_categories || []
       });
 

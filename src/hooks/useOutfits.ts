@@ -91,22 +91,33 @@ export const useOutfits = () => {
 
       if (error) throw error;
 
-      if (data.error) {
-        throw new Error(data.error);
+      // Handle edge function envelope: { success, data, meta }
+      const success = (data as any)?.success ?? false;
+      const payload = (data as any)?.data ?? data;
+      const meta = (data as any)?.meta ?? {};
+
+      if (!success && (data as any)?.error?.message) {
+        throw new Error((data as any).error.message);
       }
 
       console.log('✅ Edge function response:', {
-        hasOutfit: !!data.outfit,
-        outfitKeys: data.outfit ? Object.keys(data.outfit) : [],
-        outfitId: data.outfit?.id,
-        outfitTitle: data.outfit?.title,
-        hasRecommendedClothes: !!data.recommendedClothes,
-        recommendedClothesCount: data.recommendedClothes?.length,
+        success,
+        hasOutfit: !!payload?.outfit,
+        outfitKeys: payload?.outfit ? Object.keys(payload.outfit) : [],
+        outfitId: payload?.outfit?.id,
+        outfitTitle: payload?.outfit?.title,
+        hasRecommendedClothes: !!payload?.recommendedClothes,
+        recommendedClothesCount: payload?.recommendedClothes?.length,
+        meta,
         fullData: data
       });
 
+      if (!payload?.outfit) {
+        throw new Error('Outfit was not returned by the generator.');
+      }
+
       // Add the new outfit to the list
-      setOutfits(prev => [data.outfit, ...prev]);
+      setOutfits(prev => [payload.outfit, ...prev]);
       
       toast({
         title: 'Success',
@@ -114,8 +125,9 @@ export const useOutfits = () => {
       });
 
       return {
-        outfit: data.outfit,
-        recommendedClothes: data.recommendedClothes
+        outfit: payload.outfit,
+        recommendedClothes: payload.recommendedClothes,
+        fromCache: meta?.fromCache ?? payload?.fromCache ?? false,
       };
     } catch (error) {
       console.error('Error generating outfit:', error);

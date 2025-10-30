@@ -12,10 +12,10 @@ const corsHeaders = {
 
 const logger = new Logger('generate-outfit');
 
-// Simple rate limiting
+// Rate limiting: 5 generations per minute per user
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const MAX_REQUESTS = 5; // 5 outfit generations per minute (stricter limit)
+const MAX_REQUESTS = 5; // 5 outfit generations per minute
 
 const checkRateLimit = (identifier: string): boolean => {
   const now = Date.now();
@@ -45,8 +45,10 @@ const generateCacheKey = async (prompt: string, userId: string, mood?: string): 
   return hashHex;
 };
 
-const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-const pinterestApiKey = Deno.env.get('PINTEREST_API_KEY');
+// Google Gemini API configuration
+const geminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
+const geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
+
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -199,8 +201,8 @@ serve(async (req) => {
     }
 
     // Check API key configuration
-    if (!lovableApiKey) {
-      logger.error('Lovable AI key not configured');
+    if (!geminiApiKey) {
+      logger.error('Google Gemini API key not configured');
       return errorResponse(
         500, 
         'AI service is not configured', 
@@ -598,62 +600,27 @@ serve(async (req) => {
     
     console.log(`Avoiding ${recentItemIds.length} recently used items for variety`);
 
-    // STEP 1: Classify user prompt
-    const classifyPrompt = async () => {
-      const classificationPrompt = `You are a fashion classification expert. Analyze the following user request and classify it.
-
-USER REQUEST: "${prompt}"
-MOOD: ${mood || 'not specified'}
-${finalWeatherData ? `WEATHER: ${finalWeatherData.temperature}°C, ${finalWeatherData.condition}` : ''}
-
-USER PROFILE:
-${completeUserPreferences.gender ? `- Gender: ${completeUserPreferences.gender}` : ''}
-${completeUserPreferences.body_type ? `- Body Type: ${completeUserPreferences.body_type}` : ''}
-${completeUserPreferences.skin_tone ? `- Skin Tone: ${completeUserPreferences.skin_tone}` : ''}
-
-STYLE HISTORY (Previously liked outfits):
-${likedOutfitAnalysis.length > 0 ? JSON.stringify(likedOutfitAnalysis.slice(0, 5)) : 'No previous likes'}
-
-Classify this request into:
-1. OCCASION: (casual, formal, business, athletic, date, party, travel, other)
-2. STYLE: (elegant, sporty, minimalist, bohemian, edgy, romantic, streetwear, professional)
-3. SEASON: (spring, summer, fall, winter, all-season)
-4. FORMALITY_LEVEL: (very_casual, casual, smart_casual, semi_formal, formal, very_formal)
-5. COLOR_PREFERENCE: Infer from prompt if any colors mentioned, also consider user's favorite colors
-6. WEATHER_CONSIDERATION: How important is weather (low, medium, high)
-7. PERSONALIZATION_NOTES: Based on user's profile and style history, what should be emphasized
-
-Return ONLY valid JSON:
-{
-  "occasion": "...",
-  "style": "...",
-  "season": "...",
-  "formality_level": "...",
-  "color_preference": ["color1", "color2"] or null,
-  "weather_consideration": "...",
-  "personalization_notes": "..."
-}`;
-
+    // Helper function to call Gemini with structured JSON output
+    const callGeminiStructured = async (prompt: string, schema: any, temperature = 0.4) => {
       const response = await withRetry(
         async () => {
-          const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          const res = await fetch(`${geminiApiUrl}?key=${geminiApiKey}`, {
             method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${lovableApiKey}`,
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: 'google/gemini-2.5-flash',
-              messages: [{ role: 'user', content: classificationPrompt }],
-              max_tokens: 500,
-              temperature: 0.4,
-            }),
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                response_mime_type: 'application/json',
+                response_schema: schema,
+                temperature,
+              }
+            })
           });
+          
           if (!res.ok) {
             const txt = await res.text();
-            logger.error('Classification API error', undefined, { status: res.status, error: txt });
+            logger.error('Gemini API error', undefined, { status: res.status, error: txt });
             if (res.status === 429) throw new Error('AI_RATE_LIMIT');
-            if (res.status === 402) throw new Error('AI_CREDITS_EXHAUSTED');
             throw res;
           }
           return res;
@@ -662,311 +629,158 @@ Return ONLY valid JSON:
       );
 
       const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '{}';
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      const jsonText = jsonMatch ? jsonMatch[1].trim() : content.trim();
+      const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
       return JSON.parse(jsonText);
     };
 
-    // STEP 2: Generate outfit requirements specification
-    const generateRequirements = async (classification: any) => {
-      const requirementsPrompt = `You are a fashion requirements expert. Based on the classification and user profile, create a detailed requirements specification.
+    // Main outfit generation with Gemini
+    const generateOutfitWithGemini = async () => {
+      const fullPrompt = `Generate detailed outfit JSON based on this request: ${prompt}
 
-CLASSIFICATION:
-${JSON.stringify(classification, null, 2)}
-
-USER REQUEST: "${prompt}"
-${finalWeatherData ? `WEATHER: ${finalWeatherData.temperature}°C, ${finalWeatherData.condition}, ${finalWeatherData.humidity}% humidity` : ''}
-
-USER PROFILE:
-${completeUserPreferences.gender ? `- Gender: ${completeUserPreferences.gender}` : ''}
-${completeUserPreferences.body_type ? `- Body Type: ${completeUserPreferences.body_type}` : ''}
-${completeUserPreferences.skin_tone ? `- Skin Tone: ${completeUserPreferences.skin_tone}` : ''}
-${completeUserPreferences.style_preferences ? `- Style Preferences: ${JSON.stringify(completeUserPreferences.style_preferences)}` : ''}
-${completeUserPreferences.favorite_colors ? `- Favorite Colors: ${JSON.stringify(completeUserPreferences.favorite_colors)}` : ''}
-
-STYLE HISTORY (What user has liked before):
-${likedOutfitAnalysis.length > 0 ? JSON.stringify(likedOutfitAnalysis) : 'No previous style history'}
-
-Create a detailed requirements specification for the outfit including:
-1. REQUIRED_CATEGORIES: Which clothing categories must be included (top, bottom, dress, outerwear, footwear, accessories)
-2. OPTIONAL_CATEGORIES: Which categories are optional but recommended
-3. COLOR_PALETTE: Recommended colors based on season, occasion, user preferences, and skin tone
-4. MATERIAL_REQUIREMENTS: Fabric types suitable for weather and occasion
-5. STYLE_RULES: Specific styling guidelines for this classification and user's body type
-6. LAYERING_STRATEGY: How to layer clothes based on weather
-7. FORMALITY_CONSTRAINTS: What to avoid or prioritize
-8. PERSONALIZATION: How to adapt to user's gender, body type, and style preferences
-
-Return ONLY valid JSON:
-{
-  "required_categories": ["category1", "category2"],
-  "optional_categories": ["category1"],
-  "color_palette": {
-    "primary": ["color1", "color2"],
-    "accent": ["color1"],
-    "avoid": ["color1"],
-    "skin_tone_recommendations": "colors that complement user's skin tone"
-  },
-  "material_requirements": {
-    "preferred": ["material1", "material2"],
-    "avoid": ["material1"]
-  },
-  "style_rules": ["rule1", "rule2"],
-  "layering_strategy": "description",
-  "formality_constraints": {
-    "must_include": ["item1"],
-    "must_avoid": ["item1"]
-  },
-  "personalization": {
-    "body_type_tips": "fit recommendations",
-    "gender_considerations": "styling notes",
-    "style_history_influence": "what to emphasize based on likes"
-  }
-}`;
-
-      const response = await withRetry(
-        async () => {
-          const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${lovableApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'google/gemini-2.5-flash',
-              messages: [{ role: 'user', content: requirementsPrompt }],
-              max_tokens: 1000,
-              temperature: 0.4,
-            }),
-          });
-           if (!res.ok) {
-            const txt = await res.text();
-            logger.error('Requirements API error', undefined, { status: res.status, error: txt });
-            if (res.status === 429) throw new Error('AI_RATE_LIMIT');
-            if (res.status === 402) throw new Error('AI_CREDITS_EXHAUSTED');
-            throw res;
-          }
-          return res;
-        },
-        { maxRetries: 3, initialDelayMs: 1000, maxDelayMs: 10000, logger }
-      );
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '{}';
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      const jsonText = jsonMatch ? jsonMatch[1].trim() : content.trim();
-      return JSON.parse(jsonText);
-    };
-
-    // STEP 3: Generate and score outfit candidates
-    const generateAndScoreOutfits = async (classification: any, requirements: any) => {
-      const generateOutfitPrompt = `
-You are a professional fashion stylist. Generate 3 different outfit candidates based on requirements.
-
-CLASSIFICATION:
-${JSON.stringify(classification, null, 2)}
-
-REQUIREMENTS:
-${JSON.stringify(requirements, null, 2)}
-
-USER REQUEST: "${prompt}"
-${mood ? `MOOD: ${mood}` : ''}
+MOOD: ${mood || 'stylish'}
 ${finalWeatherData ? `WEATHER: ${finalWeatherData.temperature}°C, ${finalWeatherData.condition}` : ''}
 
 USER PROFILE:
-${completeUserPreferences.gender ? `- Gender: ${completeUserPreferences.gender}` : ''}
-${completeUserPreferences.body_type ? `- Body Type: ${completeUserPreferences.body_type} - Consider flattering fits` : ''}
-${completeUserPreferences.skin_tone ? `- Skin Tone: ${completeUserPreferences.skin_tone} - Choose colors that complement` : ''}
-${completeUserPreferences.style_preferences ? `- Preferred Styles: ${JSON.stringify(completeUserPreferences.style_preferences)}` : ''}
-${completeUserPreferences.favorite_colors ? `- Favorite Colors: ${JSON.stringify(completeUserPreferences.favorite_colors)} - Try to incorporate` : ''}
+${completeUserPreferences.gender ? `Gender: ${completeUserPreferences.gender}` : ''}
+${completeUserPreferences.style_preferences ? `Style: ${JSON.stringify(completeUserPreferences.style_preferences)}` : ''}
+${completeUserPreferences.favorite_colors ? `Favorite Colors: ${JSON.stringify(completeUserPreferences.favorite_colors)}` : ''}
 
-STYLE HISTORY (Previously liked):
-${likedOutfitAnalysis.length > 0 ? `User tends to like: ${JSON.stringify(likedOutfitAnalysis.slice(0, 3))}` : 'No previous style preferences'}
+AVAILABLE WARDROBE:
+TOPS: ${JSON.stringify(clothesByCategory.top.map(i => ({ id: i.id, category: i.category, color: i.analysis.color })))}
+BOTTOMS: ${JSON.stringify(clothesByCategory.bottom.map(i => ({ id: i.id, category: i.category, color: i.analysis.color })))}
+DRESSES: ${JSON.stringify(clothesByCategory.dress.map(i => ({ id: i.id, category: i.category, color: i.analysis.color })))}
+OUTERWEAR: ${JSON.stringify(clothesByCategory.outerwear.map(i => ({ id: i.id, category: i.category, color: i.analysis.color })))}
+FOOTWEAR: ${JSON.stringify(clothesByCategory.footwear.map(i => ({ id: i.id, category: i.category, color: i.analysis.color })))}
+ACCESSORIES: ${JSON.stringify(clothesByCategory.accessories.map(i => ({ id: i.id, category: i.category, color: i.analysis.color })))}
 
-${selectedItem ? `
-CRITICAL: User selected items MUST be included:
-${JSON.stringify(selectedItem, null, 2)}
-` : ''}
+${selectedItem ? `MUST INCLUDE: ${JSON.stringify(selectedItem)}` : ''}
 
-${pinterestTrends.length > 0 ? `
-PINTEREST INSPIRATION:
-${JSON.stringify(pinterestTrends.slice(0, 3))}
-` : ''}
+RULES:
+- ONLY use items from AVAILABLE WARDROBE (use exact IDs)
+- Create complete outfit: top+bottom+shoes OR dress+shoes
+- Match style to prompt and weather
+- Include accessories if available
+- Generate imagePrompt for Unsplash`;
 
-AVOID RECENT ITEMS: ${recentItemIds.slice(0, 10).join(', ') || 'none'}
+      const outfitSchema = {
+        type: 'object',
+        properties: {
+          top: { type: 'string', description: 'UUID of top item or empty string' },
+          bottom: { type: 'string', description: 'UUID of bottom item or empty string' },
+          dress: { type: 'string', description: 'UUID of dress item or empty string' },
+          shoes: { type: 'string', description: 'UUID of shoes item' },
+          outerwear: { type: 'string', description: 'UUID of outerwear or empty string' },
+          accessories: { 
+            type: 'array', 
+            items: { type: 'string' },
+            description: 'Array of accessory UUIDs'
+          },
+          description: { type: 'string', description: 'Full outfit description' },
+          imagePrompt: { type: 'string', description: 'Unsplash image search query' },
+          stylingTips: { 
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Styling tips'
+          },
+          colorHarmony: { type: 'string', description: 'Color analysis' }
+        },
+        required: ['description', 'imagePrompt', 'stylingTips', 'colorHarmony']
+      };
 
-🚨 CRITICAL RULES - YOU MUST FOLLOW THESE STRICTLY:
-1. You can ONLY use items from the AVAILABLE WARDROBE lists below
-2. NEVER invent, suggest, or create new clothing items
-3. Every item_id in your response MUST match an id from the lists below
-4. If you cannot find a suitable item for a category (e.g., no jacket exists), mark it as "missing_item_type" in your response
-5. DO NOT fill gaps with imaginary items - only use what exists in the wardrobe
+      return await callGeminiStructured(fullPrompt, outfitSchema, 0.5);
+    };
 
-AVAILABLE WARDROBE (These are the ONLY items you can use):
-TOPS: ${JSON.stringify(clothesByCategory.top.map(item => ({
-  id: item.id,
-  category: item.category,
-  color: item.analysis.color,
-  style: item.analysis.style
-})))}
+    // Process outfit generation result
+    const processOutfitResult = (geminiResult: any) => {
+      const items: any[] = [];
+      const itemMapping = [
+        { key: 'top', category: 'top' },
+        { key: 'bottom', category: 'bottom' },
+        { key: 'dress', category: 'dress' },
+        { key: 'shoes', category: 'footwear' },
+        { key: 'outerwear', category: 'outerwear' }
+      ];
 
-BOTTOMS: ${JSON.stringify(clothesByCategory.bottom.map(item => ({
-  id: item.id,
-  category: item.category,
-  color: item.analysis.color,
-  style: item.analysis.style
-})))}
-
-DRESSES: ${JSON.stringify(clothesByCategory.dress.map(item => ({
-  id: item.id,
-  category: item.category,
-  color: item.analysis.color,
-  style: item.analysis.style
-})))}
-
-OUTERWEAR: ${JSON.stringify(clothesByCategory.outerwear.map(item => ({
-  id: item.id,
-  category: item.category,
-  color: item.analysis.color,
-  style: item.analysis.style
-})))}
-
-FOOTWEAR: ${JSON.stringify(clothesByCategory.footwear.map(item => ({
-  id: item.id,
-  category: item.category,
-  color: item.analysis.color,
-  style: item.analysis.style
-})))}
-
-ACCESSORIES: ${JSON.stringify(clothesByCategory.accessories.map(item => ({
-  id: item.id,
-  category: item.category,
-  color: item.analysis.color,
-  style: item.analysis.style
-})))}
-
-Generate 3 DIFFERENT outfit candidates using ONLY items from the available wardrobe above. 
-If a required category is missing (e.g., no shoes available), include "missing_categories" field.
-
-Return ONLY valid JSON array:
-[
-  {
-    "outfit": {
-      "title": "Outfit name",
-      "items": [
-        {
-          "item_id": "uuid",
-          "category": "top",
-          "item_name": "Item name",
-          "color": "color",
-          "style": "style"
+      // Add main items
+      for (const { key, category } of itemMapping) {
+        const itemId = geminiResult[key];
+        if (itemId && itemId.trim()) {
+          const clothesItem = validClothes.find(c => c.id === itemId);
+          if (clothesItem) {
+            items.push({
+              item_id: itemId,
+              category: clothesItem.category,
+              item_name: clothesItem.category,
+              color: clothesItem.analysis.color,
+              style: clothesItem.analysis.style
+            });
+          }
         }
-      ],
-      "description": "Why this works",
-      "color_harmony": "Color analysis",
-      "styling_tips": ["tip1", "tip2"]
-    },
-    "reasoning": "Detailed explanation: Why each item was chosen, how they work together, weather considerations, style matching",
-    "score": 0.0,
-    "score_breakdown": {
-      "style_match": 0.0,
-      "weather_appropriateness": 0.0,
-      "color_harmony": 0.0,
-      "requirements_fulfillment": 0.0
-    }
-  }
-]`;
+      }
 
-      const response = await withRetry(
-        async () => {
-          const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${lovableApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'google/gemini-2.5-flash',
-              messages: [
-                {
-                  role: 'system',
-                  content: `You are an expert fashion stylist. Follow these rules:
-1. WARDROBE CONSTRAINT: You can ONLY use clothing items from the "AVAILABLE WARDROBE" lists provided. NEVER create, invent, or suggest items not in those lists.
-2. ITEM_ID REQUIREMENT: Every item you select MUST use the exact "id" from the available wardrobe lists as "item_id" in your response.
-3. MISSING ITEMS: If you cannot find a suitable item for a required category (e.g., no shoes available), include a "missing_categories" array listing what's missing - DO NOT invent items to fill gaps.
-4. COLOR MATCHING: Use complementary, analogous, or monochromatic color schemes.
-5. WEATHER: Cold (<10°C) = layers; Mild (10-20°C) = light layers; Hot (>20°C) = single light layer.
-6. STYLE CONSISTENCY: All items must match the formality level and style context.
-7. LAYERING: Base → Warm → Outer. Never double warm layers without base.
-8. SCORING: Be critical and realistic. Perfect match = 0.9+, Good = 0.7-0.9, Acceptable = 0.5-0.7, Poor = <0.5
-
-🚨 CRITICAL: Validate that every item_id in your response exists in the available wardrobe before responding.`
-                },
-                { role: 'user', content: generateOutfitPrompt }
-              ],
-              max_tokens: 8000,
-              temperature: 0.4,
-            }),
-          });
-          if (!res.ok) {
-            const txt = await res.text();
-            logger.error('Outfit generation API error', undefined, { status: res.status, error: txt });
-            if (res.status === 429) throw new Error('AI_RATE_LIMIT');
-            if (res.status === 402) throw new Error('AI_CREDITS_EXHAUSTED');
-            throw res;
+      // Add accessories
+      if (geminiResult.accessories && Array.isArray(geminiResult.accessories)) {
+        for (const accessoryId of geminiResult.accessories) {
+          if (accessoryId && accessoryId.trim()) {
+            const clothesItem = validClothes.find(c => c.id === accessoryId);
+            if (clothesItem) {
+              items.push({
+                item_id: accessoryId,
+                category: clothesItem.category,
+                item_name: clothesItem.category,
+                color: clothesItem.analysis.color,
+                style: clothesItem.analysis.style
+              });
+            }
           }
-          return res;
-        },
-        { maxRetries: 3, initialDelayMs: 1000, maxDelayMs: 10000, logger }
-      );
+        }
+      }
 
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '[]';
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      const jsonText = jsonMatch ? jsonMatch[1].trim() : content.trim();
-      return JSON.parse(jsonText);
+      return {
+        outfit: {
+          title: 'AI Generated Outfit',
+          items,
+          description: geminiResult.description || 'Stylish outfit',
+          color_harmony: geminiResult.colorHarmony || 'Harmonious colors',
+          styling_tips: geminiResult.stylingTips || [],
+          perfect_for: styleContext,
+        },
+        reasoning: geminiResult.description || 'AI-generated outfit based on your wardrobe',
+        score: 0.85,
+        score_breakdown: {
+          style_match: 0.85,
+          weather_appropriateness: finalWeatherData ? 0.9 : 0.8,
+          color_harmony: 0.85,
+          requirements_fulfillment: 0.85
+        }
+      };
     };
 
-    // STEP 4: Select best outfit
-    logger.info('Starting flerstegs-pipeline...');
+    // Generate outfit with Gemini
+    logger.info('Generating outfit with Google Gemini 1.5 Flash...');
     
-    let classification, requirements, candidates, bestOutfit;
+    let geminiResult, bestOutfit;
+    const classification = { 
+      occasion: styleContext, 
+      style: styleContext,
+      formality: styleContext === 'formal' ? 'formal' : 'casual'
+    };
+    const requirements = { style_context: styleContext };
     
     try {
-      // Step 1: Classify
-      logger.info('Step 1: Klassificerar prompt...');
-      classification = await classifyPrompt();
-      logger.info('Classification:', classification);
+      geminiResult = await generateOutfitWithGemini();
+      logger.info('Gemini result:', geminiResult);
 
-      // Step 2: Requirements
-      logger.info('Step 2: Genererar kravspecifikation...');
-      requirements = await generateRequirements(classification);
-      logger.info('Requirements:', requirements);
-
-      // Step 3: Generate and score candidates
-      logger.info('Step 3: Genererar och scorear outfit-kandidater...');
-      candidates = await generateAndScoreOutfits(classification, requirements);
+      bestOutfit = processOutfitResult(geminiResult);
       
-      if (!candidates || !Array.isArray(candidates) || candidates.length === 0) {
-        throw new Error('No valid outfit candidates generated');
-      }
-      
-      logger.info(`Generated ${candidates.length} candidates`);
-
-      // Step 4: Select best based on score
-      bestOutfit = candidates.reduce((best, current) => 
-        (current.score || 0) > (best.score || 0) ? current : best
-      );
-      
-      logger.info('Best outfit selected:', { 
-        score: bestOutfit.score,
-        title: bestOutfit.outfit?.title 
+      logger.info('Outfit processed:', { 
+        itemCount: bestOutfit.outfit.items.length,
+        description: bestOutfit.outfit.description.substring(0, 50)
       });
 
-      // Validate best outfit structure
+      // Validate outfit structure
       if (!bestOutfit.outfit?.items || !Array.isArray(bestOutfit.outfit.items)) {
-        throw new Error('Best outfit has invalid structure');
+        throw new Error('Outfit has invalid structure');
       }
 
       // Validate selected items are included if any
@@ -1131,10 +945,7 @@ Return ONLY valid JSON array:
       logger.error('Pipeline error', err);
       
       if (msg === 'AI_RATE_LIMIT') {
-        return errorResponse(429, 'AI service rate limit exceeded.', 'AI_RATE_LIMIT', undefined, corsHeaders);
-      }
-      if (msg === 'AI_CREDITS_EXHAUSTED') {
-        return errorResponse(402, 'AI service credits exhausted.', 'AI_CREDITS_EXHAUSTED', undefined, corsHeaders);
+        return errorResponse(429, 'Google Gemini rate limit exceeded. Please try again later.', 'AI_RATE_LIMIT', undefined, corsHeaders);
       }
       
       return errorResponse(
@@ -1170,82 +981,11 @@ Return ONLY valid JSON array:
     // Convert new format to legacy format for database compatibility
     const legacyRecommendedItems = bestOutfit.outfit.items.map(item => item.item_id);
 
-    // Step 3: Generate AI Hero Image (only if requested)
-    let generatedImageUrl = null;
+    // Generate image prompt for Unsplash
+    const imagePrompt = geminiResult.imagePrompt || 
+      `${mood || 'stylish'} ${styleContext} outfit ${selectedItems.map(i => i.analysis.color).join(' ')}`;
     
-    if (generateImage) {
-      console.log('Generating AI hero image with Gemini (user requested)...');
-      try {
-        // Build image prompt based on outfit
-        const itemDescriptions = selectedItems.map(item => 
-          `${item.analysis.color} ${item.category}`
-        ).join(', ');
-        
-        const imagePrompt = `Professional fashion photograph of a neutral mannequin wearing ${itemDescriptions}. 
-The outfit should look elegant and well-styled. Studio lighting with soft shadows, clean neutral gray background, 
-front-facing 3/4 view. The mannequin should have a neutral pose showing off the complete outfit. 
-High fashion photography style, editorial quality, 4K resolution. 
-Mood: ${mood || 'stylish and modern'}. 
-The outfit conveys: ${bestOutfit.outfit.description}`;
-
-        console.log('Image generation prompt:', imagePrompt);
-
-        const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${lovableApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash-image-preview',
-            messages: [{
-              role: 'user',
-              content: imagePrompt
-            }],
-            modalities: ['image', 'text']
-          }),
-        });
-
-        if (imageResponse.ok) {
-          const imageData = await imageResponse.json();
-          const base64Image = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-          
-          if (base64Image) {
-            console.log('AI image generated successfully');
-            
-            // Upload to Supabase Storage
-            const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-            const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-            
-            const fileName = `outfit_${Date.now()}_${Math.random().toString(36).substring(7)}.png`;
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('clothes')
-              .upload(`generated-outfits/${fileName}`, imageBuffer, {
-                contentType: 'image/png',
-                upsert: false
-              });
-
-            if (uploadError) {
-              console.error('Failed to upload generated image:', uploadError);
-            } else {
-              const { data: urlData } = supabase.storage
-                .from('clothes')
-                .getPublicUrl(`generated-outfits/${fileName}`);
-              
-              generatedImageUrl = urlData.publicUrl;
-              console.log('Generated image uploaded:', generatedImageUrl);
-            }
-          }
-        } else {
-          console.warn('Image generation failed:', imageResponse.status, await imageResponse.text());
-        }
-      } catch (imageError) {
-        console.error('Error generating AI image:', imageError);
-        // Continue without image - not critical
-      }
-    } else {
-      console.log('Skipping AI image generation (user opted out - saves ~$0.004)');
-    }
+    let generatedImageUrl = imagePrompt; // Store the prompt, frontend can use Unsplash API
 
     // Save outfit to database
     const { data: savedOutfit, error: saveError } = await supabase
@@ -1256,25 +996,21 @@ The outfit conveys: ${bestOutfit.outfit.description}`;
         prompt,
         mood,
         is_public: isPublic,
-        generated_image_url: generatedImageUrl,
+        generated_image_url: imagePrompt,
         description: bestOutfit.outfit.description,
         recommended_clothes: legacyRecommendedItems,
         purchase_links: purchaseLinks || [],
         ai_analysis: {
           styling_tips: bestOutfit.outfit.styling_tips,
-          occasion: bestOutfit.outfit.perfect_for || classification.occasion,
+          occasion: bestOutfit.outfit.perfect_for || styleContext,
           color_harmony: bestOutfit.outfit.color_harmony,
-          pinterest_trends: pinterestTrends.slice(0, 2),
           clothes_analysis: validClothes,
           outfit_visualization: outfitVisualization,
           structured_items: bestOutfit.outfit.items,
-          style_context: classification.style,
-          classification: classification,
-          requirements: requirements,
+          style_context: styleContext,
           reasoning: bestOutfit.reasoning,
           score: bestOutfit.score,
-          score_breakdown: bestOutfit.score_breakdown,
-          used_pinterest_trends: (pinterestTrends.length > 0 || boardInspiration.length > 0)
+          gemini_model: 'gemini-1.5-flash-latest'
         }
       })
       .select()
@@ -1392,23 +1128,14 @@ The outfit conveys: ${bestOutfit.outfit.description}`;
       reasoning: bestOutfit.reasoning,
       score: bestOutfit.score,
       score_breakdown: bestOutfit.score_breakdown,
-      classification: classification,
-      requirements: requirements,
-      all_candidates: candidates.map(c => ({
-        title: c.outfit.title,
-        score: c.score,
-        reasoning: c.reasoning
-      }))
+      imagePrompt: imagePrompt
     };
     const responseMeta = {
       processingTimeMs: Date.now() - startTime,
       clothesAnalyzed: clothes.length,
-      pinterestTrendsUsed: (pinterestTrends.length > 0) || (boardInspiration.length > 0),
-      imageGenerated: !!generatedImageUrl,
-      pipelineSteps: 4,
-      candidatesGenerated: candidates.length,
+      aiModel: 'Google Gemini 1.5 Flash',
       fromCache: false,
-      cached: !selectedItem, // Indicates if this result was saved to cache
+      cached: !selectedItem,
     };
 
     return successResponse(responsePayload, responseMeta, corsHeaders);

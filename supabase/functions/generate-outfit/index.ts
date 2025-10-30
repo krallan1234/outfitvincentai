@@ -47,7 +47,7 @@ const generateCacheKey = async (prompt: string, userId: string, mood?: string): 
 
 // Google Gemini API configuration
 const geminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
-const geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
+const geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

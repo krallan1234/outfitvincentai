@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Loader2, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { useSignedUrl } from '@/hooks/useSignedUrl';
+import { useSignedUrls } from '@/hooks/useSignedUrl';
 import { OptimizedImage } from '@/components/ui/optimized-image';
 import useEmblaCarousel from 'embla-carousel-react';
 
@@ -25,6 +25,15 @@ export const ClothesGallery = ({
   multiSelect = false 
 }: ClothesGalleryProps) => {
   const { clothes, loading, deleteClothing } = useClothes();
+  
+  // Get all image paths for batch signed URL generation
+  const imagePaths = useMemo(() => 
+    clothes.map(item => item.image_url), 
+    [clothes]
+  );
+  
+  // Use batch signed URLs for better performance
+  const { signedUrls, loading: urlsLoading } = useSignedUrls('clothes', imagePaths);
   
   // Embla carousel for better mobile experience
   const [emblaRef, emblaApi] = useEmblaCarousel({ 
@@ -74,6 +83,12 @@ export const ClothesGallery = ({
     );
   }
 
+  console.log('Rendering ClothesGallery:', { 
+    clothesCount: clothes.length, 
+    signedUrlsCount: Object.keys(signedUrls).length,
+    urlsLoading 
+  });
+
   return (
     <div className="relative w-full" role="region" aria-label="Clothing gallery">
       {/* Desktop Grid View - 4 columns on large screens */}
@@ -82,6 +97,8 @@ export const ClothesGallery = ({
           <ClothingCard 
             key={item.id} 
             item={item} 
+            signedUrl={signedUrls[item.image_url]}
+            urlLoading={urlsLoading}
             onDelete={() => deleteClothing(item.id)}
             selectionMode={selectionMode}
             isSelected={multiSelect ? selectedItemIds.includes(item.id) : selectedItemId === item.id}
@@ -109,7 +126,9 @@ export const ClothesGallery = ({
               {clothes.map((item) => (
                 <div key={item.id} className="flex-[0_0_calc(50%-6px)] min-w-0">
                   <ClothingCard 
-                    item={item} 
+                    item={item}
+                    signedUrl={signedUrls[item.image_url]}
+                    urlLoading={urlsLoading}
                     onDelete={() => deleteClothing(item.id)}
                     selectionMode={selectionMode}
                     isSelected={multiSelect ? selectedItemIds.includes(item.id) : selectedItemId === item.id}
@@ -138,15 +157,15 @@ export const ClothesGallery = ({
 
 interface ClothingCardProps {
   item: ClothingItem;
+  signedUrl?: string;
+  urlLoading?: boolean;
   onDelete: () => void;
   selectionMode?: boolean;
   isSelected?: boolean;
   onSelect?: () => void;
 }
 
-const ClothingCard = ({ item, onDelete, selectionMode, isSelected, onSelect }: ClothingCardProps) => {
-  const { signedUrl, loading: urlLoading, error: urlError } = useSignedUrl('clothes', item.image_url);
-
+const ClothingCard = ({ item, signedUrl, urlLoading, onDelete, selectionMode, isSelected, onSelect }: ClothingCardProps) => {
   // Generate a simple blur placeholder (in production, generate during upload)
   const blurDataURL = useMemo(() => {
     // Simple 1x1 pixel blur placeholder
@@ -160,14 +179,20 @@ const ClothingCard = ({ item, onDelete, selectionMode, isSelected, onSelect }: C
       aria-label={`${item.category} clothing item${isSelected ? ', selected' : ''}`}
     >
       <div className="aspect-square relative bg-muted" onClick={selectionMode ? onSelect : undefined}>
-        {urlError ? (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-muted text-muted-foreground p-4">
-            <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span className="text-xs text-center">Image unavailable</span>
-          </div>
-        ) : signedUrl ? (
+        {!signedUrl ? (
+          urlLoading ? (
+            <div className="absolute inset-0 bg-muted animate-pulse flex items-center justify-center" aria-hidden="true">
+              <span className="text-muted-foreground text-sm">Loading...</span>
+            </div>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-muted text-muted-foreground p-4">
+              <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-xs text-center">Image unavailable</span>
+            </div>
+          )
+        ) : (
           <OptimizedImage
             src={signedUrl}
             alt={`${item.category}${item.color ? ` in ${item.color}` : ''}${item.description ? ` - ${item.description}` : ''}`}
@@ -175,11 +200,7 @@ const ClothingCard = ({ item, onDelete, selectionMode, isSelected, onSelect }: C
             blurDataURL={blurDataURL}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
-        ) : urlLoading ? (
-          <div className="absolute inset-0 bg-muted animate-pulse flex items-center justify-center" aria-hidden="true">
-            <span className="text-muted-foreground text-sm">Loading...</span>
-          </div>
-        ) : null}
+        )}
         {selectionMode && isSelected && (
           <div className="absolute inset-0 bg-primary/20 flex items-center justify-center backdrop-blur-[2px]">
             <Badge className="bg-primary text-primary-foreground shadow-lg">

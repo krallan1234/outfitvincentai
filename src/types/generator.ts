@@ -83,14 +83,45 @@ export const MOODS = [
 
 export type MoodValue = typeof MOODS[number]['value'];
 
-// Quick prompt templates
-export const QUICK_PROMPTS = [
-  'Formal office wear in blue tones',
-  'Casual weekend brunch outfit',
-  'Date night dinner look',
-  'Summer beach vacation style',
-  'Winter layered street style',
-  'Business meeting attire',
-] as const;
+// Quick prompt templates - categorized
+export const QUICK_PROMPTS_CATEGORIZED = {
+  Casual: [
+    'Casual weekend brunch',
+    'Coffee shop hangout',
+    'Relaxed Sunday vibes',
+    'Everyday comfort style',
+  ],
+  Business: [
+    'Business meeting outfit',
+    'Professional presentation',
+    'Office power look',
+    'Corporate lunch attire',
+  ],
+  Evening: [
+    'Date night look',
+    'Romantic dinner outfit',
+    'Cocktail party style',
+    'Night out with friends',
+  ],
+  Active: [
+    'Gym workout attire',
+    'Morning yoga session',
+    'Running outfit',
+    'Athletic streetwear',
+  ],
+  Weather: [
+    'Rainy day outfit',
+    'Summer beach vibes',
+    'Cozy winter layers',
+    'Spring transitional look',
+  ],
+  Special: [
+    'Wedding guest outfit',
+    'Job interview attire',
+    'Birthday party look',
+    'Travel comfortable style',
+  ]
+} as const;
 
-export type QuickPrompt = typeof QUICK_PROMPTS[number];
+// Flat list for backward compatibility
+export const QUICK_PROMPTS = Object.values(QUICK_PROMPTS_CATEGORIZED).flat() as readonly string[];

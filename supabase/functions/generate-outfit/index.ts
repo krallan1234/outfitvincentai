@@ -49,6 +49,10 @@ const generateCacheKey = async (prompt: string, userId: string, mood?: string): 
 const geminiApiKey = Deno.env.get('GOOGLE_GEMINI_API_KEY');
 const geminiApiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
+// Lovable AI Gateway fallback (serves Google Gemini via gateway)
+const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+const lovableAiUrl = 'https://ai.gateway.lovable.dev/v1/chat/completions';
+
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -626,11 +630,67 @@ serve(async (req) => {
           return res;
         },
         { maxRetries: 3, initialDelayMs: 1000, maxDelayMs: 10000, logger }
-      );
+      ).catch(async (err) => {
+        // Fallback to Lovable AI Gateway if direct Gemini fails
+        if (!lovableApiKey) throw err;
+        logger.warn('Falling back to Lovable AI Gateway (google/gemini-2.5-flash) due to Gemini error');
+        const fallback = await fetch(lovableAiUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${lovableApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash',
+            messages: [
+              { role: 'system', content: 'Return ONLY valid JSON for the function call. No prose.' },
+              { role: 'user', content: prompt }
+            ],
+            tools: [
+              {
+                type: 'function',
+                function: {
+                  name: 'build_outfit',
+                  description: 'Return a structured outfit JSON',
+                  parameters: schema,
+                }
+              }
+            ],
+            tool_choice: { type: 'function', function: { name: 'build_outfit' } }
+          })
+        });
+        if (!fallback.ok) {
+          const t = await fallback.text();
+          logger.error('Lovable AI fallback failed', undefined, { status: fallback.status, error: t });
+          if (fallback.status === 429) throw new Error('AI_RATE_LIMIT');
+          throw new Error('AI_FALLBACK_FAILED');
+        }
+        
+        return new Response(await fallback.text(), { headers: { 'content-type': 'application/json', 'x-used-fallback': 'true' } });
+      });
 
-      const data = await response.json();
-      const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-      return JSON.parse(jsonText);
+      // Parse response
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (jsonText) return JSON.parse(jsonText);
+        const toolCall = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+        if (toolCall) return JSON.parse(toolCall);
+        const contentStr = data.choices?.[0]?.message?.content;
+        if (contentStr) return JSON.parse(contentStr);
+        return {};
+      } else {
+        const raw = await response.text();
+        try {
+          const data = JSON.parse(raw);
+          const toolCall = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+          if (toolCall) return JSON.parse(toolCall);
+          const contentStr = data.choices?.[0]?.message?.content;
+          if (contentStr) return JSON.parse(contentStr);
+        } catch (_) {}
+        return {};
+      }
     };
 
     // Main outfit generation with Gemini

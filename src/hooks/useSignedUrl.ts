@@ -66,10 +66,55 @@ export const useSignedUrl = (bucket: string, path: string | null, expiresIn: num
 };
 
 /**
- * Batch version for multiple URLs
+ * Cache key helper for localStorage
+ */
+const getCacheKey = (bucket: string, path: string) => `signed_url_${bucket}_${path}`;
+
+/**
+ * Get cached signed URL from localStorage
+ */
+const getCachedUrl = (bucket: string, path: string): string | null => {
+  try {
+    const cached = localStorage.getItem(getCacheKey(bucket, path));
+    if (!cached) return null;
+    
+    const { url, expiresAt } = JSON.parse(cached);
+    // Return if still valid (with 5 min buffer)
+    if (Date.now() < expiresAt - 300000) return url;
+    
+    // Remove expired cache
+    localStorage.removeItem(getCacheKey(bucket, path));
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Cache signed URL in localStorage
+ */
+const setCachedUrl = (bucket: string, path: string, url: string, expiresIn: number) => {
+  try {
+    const expiresAt = Date.now() + (expiresIn * 1000);
+    localStorage.setItem(getCacheKey(bucket, path), JSON.stringify({ url, expiresAt }));
+  } catch (err) {
+    console.warn('Failed to cache signed URL:', err);
+  }
+};
+
+/**
+ * Batch version for multiple URLs with localStorage caching
  */
 export const useSignedUrls = (bucket: string, paths: string[], expiresIn: number = 86400) => {
-  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>(() => {
+    // Initialize with cached URLs
+    const cached: Record<string, string> = {};
+    paths.forEach(path => {
+      const cachedUrl = getCachedUrl(bucket, path);
+      if (cachedUrl) cached[path] = cachedUrl;
+    });
+    return cached;
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -84,24 +129,52 @@ export const useSignedUrls = (bucket: string, paths: string[], expiresIn: number
         setLoading(true);
         setError(null);
         
-        // Use edge function to get signed URLs (requires service role key)
+        // Check cache first
+        const cached: Record<string, string> = {};
+        const pathsToFetch: string[] = [];
+        
+        paths.forEach(path => {
+          const cachedUrl = getCachedUrl(bucket, path);
+          if (cachedUrl) {
+            cached[path] = cachedUrl;
+          } else {
+            pathsToFetch.push(path);
+          }
+        });
+        
+        // If all URLs are cached, use cache
+        if (pathsToFetch.length === 0) {
+          setSignedUrls(cached);
+          setLoading(false);
+          return;
+        }
+        
+        // Set cached URLs immediately for faster perceived performance
+        if (Object.keys(cached).length > 0) {
+          setSignedUrls(prev => ({ ...prev, ...cached }));
+        }
+        
+        // Fetch missing URLs
         const { data, error: signError } = await supabase.functions.invoke('get-signed-urls', {
           body: { 
-            urls: paths,
+            urls: pathsToFetch,
             expiresIn 
           }
         });
 
         if (signError) throw signError;
         if (data?.signedUrls) {
-          setSignedUrls(data.signedUrls);
-        } else {
-          throw new Error('No signed URLs returned');
+          // Cache the new URLs
+          Object.entries(data.signedUrls).forEach(([path, url]) => {
+            setCachedUrl(bucket, path, url as string, expiresIn);
+          });
+          
+          // Merge with cached URLs
+          setSignedUrls(prev => ({ ...prev, ...data.signedUrls }));
         }
       } catch (err) {
         console.error('Failed to get signed URLs:', err);
         setError(err instanceof Error ? err : new Error('Failed to get signed URLs'));
-        setSignedUrls({});
       } finally {
         setLoading(false);
       }
@@ -116,6 +189,28 @@ export const useSignedUrls = (bucket: string, paths: string[], expiresIn: number
   }, [bucket, paths.join(','), expiresIn]);
 
   return { signedUrls, loading, error };
+};
+
+/**
+ * Prefetch signed URLs in the background (call on login)
+ */
+export const prefetchSignedUrls = async (bucket: string, paths: string[], expiresIn: number = 86400) => {
+  try {
+    const pathsToFetch = paths.filter(path => !getCachedUrl(bucket, path));
+    if (pathsToFetch.length === 0) return;
+    
+    const { data } = await supabase.functions.invoke('get-signed-urls', {
+      body: { urls: pathsToFetch, expiresIn }
+    });
+    
+    if (data?.signedUrls) {
+      Object.entries(data.signedUrls).forEach(([path, url]) => {
+        setCachedUrl(bucket, path, url as string, expiresIn);
+      });
+    }
+  } catch (err) {
+    console.warn('Failed to prefetch signed URLs:', err);
+  }
 };
 
 /**

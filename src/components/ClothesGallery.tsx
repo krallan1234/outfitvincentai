@@ -199,6 +199,7 @@ const ClothingCard = ({ item, signedUrl, urlLoading, onDelete, selectionMode, is
             className="w-full h-full"
             blurDataURL={blurDataURL}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            priority={false}
           />
         )}
         {selectionMode && isSelected && (

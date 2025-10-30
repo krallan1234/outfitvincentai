@@ -36,13 +36,13 @@ export const OptimizedImage = ({
   const generateSrcSet = (baseSrc: string) => {
     // If it's a Supabase URL, we can use transformation params
     if (baseSrc.includes('supabase.co/storage')) {
-      const sizes = [320, 640, 768, 1024, 1280, 1536];
+      const sizes = [320, 640, 768, 1024]; // Reduced sizes for faster loading
       return sizes
         .map(size => {
           // Add width transformation parameter
           const url = new URL(baseSrc);
           url.searchParams.set('width', size.toString());
-          url.searchParams.set('quality', '80');
+          url.searchParams.set('quality', '85'); // Higher quality
           return `${url.toString()} ${size}w`;
         })
         .join(', ');

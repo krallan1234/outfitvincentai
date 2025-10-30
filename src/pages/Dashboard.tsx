@@ -7,8 +7,12 @@ import { Sparkles } from 'lucide-react';
 import { InspirationOfTheDay } from '@/components/InspirationOfTheDay';
 import { WavyDivider } from '@/components/WavyDivider';
 import { FashionQuote } from '@/components/FashionQuote';
+import { usePrefetchImages } from '@/hooks/usePrefetchImages';
 
 const Dashboard = () => {
+  // Prefetch images on mount for instant display
+  usePrefetchImages();
+  
   return (
     <div className="min-h-screen relative">
       {/* Subtle background image */}

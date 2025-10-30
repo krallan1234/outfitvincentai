@@ -3,6 +3,7 @@ import { outfitsApi, profilesApi } from '@/api/supabase';
 import { supabase } from '@/integrations/supabase/client';
 import { OutfitGenerationParamsSchema } from '@/lib/validations';
 import { logger } from '@/lib/logger';
+import { sanitizeUserInput, checkGenerationRateLimit } from '@/lib/security';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -21,13 +22,29 @@ export const useGenerateOutfit = () => {
 
   return useMutation({
     mutationFn: async (params: GenerateOutfitInput) => {
-      // Validate input
-      const validated = OutfitGenerationParamsSchema.parse(params);
-      logger.info('Starting outfit generation', { prompt: validated.prompt });
-
       // Get user
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+
+      // Security: Check rate limit (client-side)
+      if (!checkGenerationRateLimit(user.id)) {
+        throw new Error('Rate limit exceeded. Please wait a minute before generating again.');
+      }
+
+      // Security: Sanitize user input
+      const sanitizedPrompt = sanitizeUserInput(params.prompt, 500);
+
+      // Validate input
+      const validated = OutfitGenerationParamsSchema.parse({
+        ...params,
+        prompt: sanitizedPrompt,
+      });
+
+      logger.info('Starting outfit generation', {
+        prompt: validated.prompt.substring(0, 50),
+      });
 
       // Fetch preferences
       let preferences;

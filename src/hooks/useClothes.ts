@@ -24,12 +24,25 @@ export const useClothes = () => {
   const fetchClothes = async () => {
     try {
       setLoading(true);
+      
+      // Get authenticated user first
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      if (!user) {
+        console.warn('No authenticated user found');
+        setClothes([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('clothes')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      console.log('Fetched clothes:', data?.length || 0, 'items');
       setClothes(data || []);
     } catch (error) {
       console.error('Error fetching clothes:', error);

@@ -5,8 +5,10 @@ import { registerServiceWorker } from './lib/pwa';
 import { logger } from './lib/logger';
 import { analytics } from './lib/analytics';
 
-// Initialize analytics
-analytics.init();
+// Initialize analytics after DOM is ready
+if (typeof window !== 'undefined') {
+  setTimeout(() => analytics.init(), 100);
+}
 
 // Register PWA Service Worker in production
 if (import.meta.env.PROD) {

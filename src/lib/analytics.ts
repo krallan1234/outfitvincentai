@@ -84,10 +84,3 @@ class Analytics {
 }
 
 export const analytics = new Analytics();
-
-// Auto-initialize on load
-if (typeof window !== 'undefined') {
-  window.addEventListener('load', () => {
-    analytics.init();
-  });
-}

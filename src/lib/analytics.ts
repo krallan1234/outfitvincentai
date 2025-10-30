@@ -43,8 +43,21 @@ class Analytics {
     if (!this.isInitialized) return;
 
     if (typeof window !== 'undefined' && (window as any).posthog) {
-      (window as any).posthog.identify(userId, traits);
-      console.log('[Analytics] User identified:', userId);
+      const ph: any = (window as any).posthog;
+      try {
+        if (typeof ph.identify === 'function') {
+          ph.identify(userId, traits);
+          console.log('[Analytics] User identified:', userId);
+        } else if (typeof ph.capture === 'function') {
+          // Fallback: capture an identify event without breaking the app
+          ph.capture('user_identified', { userId, ...(traits || {}) });
+          console.warn('[Analytics] posthog.identify not available, used capture fallback');
+        } else {
+          console.warn('[Analytics] PostHog methods unavailable');
+        }
+      } catch (e) {
+        console.warn('[Analytics] Identify failed but was suppressed', e);
+      }
     }
   }
 

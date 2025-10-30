@@ -1,10 +1,14 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OutfitGenerator } from '@/components/OutfitGenerator';
 import { OutfitGallery } from '@/components/OutfitGallery';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, Images } from 'lucide-react';
-import { FashionQuote } from '@/components/FashionQuote';
-import { WavyDivider } from '@/components/WavyDivider';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Images } from 'lucide-react';
 
 const OutfitPage = () => {
   return (
@@ -14,23 +18,31 @@ const OutfitPage = () => {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent mb-2">
             Outfit Generator
           </h1>
-          <p className="text-muted-foreground text-lg">Create perfect outfits from your wardrobe</p>
+          <p className="text-muted-foreground text-lg">
+            Create perfect outfits from your wardrobe
+          </p>
         </div>
-        
+
         <Tabs defaultValue="generate" className="w-full">
           <TabsList className="grid w-full grid-cols-2 max-w-md mb-8 p-1 bg-muted/50 rounded-xl">
-            <TabsTrigger value="generate" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger
+              value="generate"
+              className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
               Generate Outfit
             </TabsTrigger>
-            <TabsTrigger value="gallery" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <TabsTrigger
+              value="gallery"
+              className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
               My Outfits
             </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="generate" className="mt-6">
             <OutfitGenerator />
           </TabsContent>
-          
+
           <TabsContent value="gallery" className="mt-6">
             <Card className="card-elegant border-0 shadow-xl">
               <CardHeader className="pb-4">

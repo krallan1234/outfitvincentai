@@ -137,7 +137,7 @@ export const OutfitGenerator = () => {
       )}
 
       {/* Outfit History Insights */}
-      <OutfitHistory />
+      <OutfitHistory outfits={[]} />
 
       {/* Profile Preferences Section */}
       <Collapsible open={showPreferences} onOpenChange={setShowPreferences}>

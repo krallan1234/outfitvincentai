@@ -1,96 +1,49 @@
-import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { History, TrendingUp } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Outfit } from '@/types/outfit';
+import { useMemo } from 'react';
 
-interface OutfitInsights {
-  totalOutfits: number;
-  favoriteColors: string[];
-  favoriteStyles: string[];
-  lastOutfit?: {
-    title: string;
-    mood?: string;
-    created_at: string;
-  };
+interface OutfitHistoryProps {
+  outfits: Outfit[];
 }
 
-export const OutfitHistory = () => {
-  const [insights, setInsights] = useState<OutfitInsights | null>(null);
-  const [loading, setLoading] = useState(true);
+export const OutfitHistory = ({ outfits }: OutfitHistoryProps) => {
+  const insights = useMemo(() => {
+    if (outfits.length === 0) return null;
 
-  useEffect(() => {
-    loadInsights();
-  }, []);
+    const colorMap = new Map<string, number>();
+    const styleMap = new Map<string, number>();
 
-  const loadInsights = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Get recent outfits
-      const { data: outfits } = await supabase
-        .from('outfits')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (!outfits || outfits.length === 0) {
-        setLoading(false);
-        return;
+    outfits.forEach((outfit) => {
+      if (outfit.mood) {
+        styleMap.set(outfit.mood, (styleMap.get(outfit.mood) || 0) + 1);
       }
+    });
 
-      // Analyze patterns
-      const colorMap = new Map<string, number>();
-      const styleMap = new Map<string, number>();
+    const topColors = Array.from(colorMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([color]) => color);
 
-      outfits.forEach(outfit => {
-        // Extract colors from recommended_clothes
-        if (outfit.recommended_clothes && Array.isArray(outfit.recommended_clothes)) {
-          outfit.recommended_clothes.forEach((itemId: string) => {
-            // In a real scenario, we'd fetch the actual item details
-            // For now, we'll use the AI analysis if available
-          });
-        }
+    const topStyles = Array.from(styleMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([style]) => style);
 
-        // Track moods/styles
-        if (outfit.mood) {
-          styleMap.set(outfit.mood, (styleMap.get(outfit.mood) || 0) + 1);
-        }
-      });
-
-      // Get top 3 colors and styles
-      const topColors = Array.from(colorMap.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([color]) => color);
-
-      const topStyles = Array.from(styleMap.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([style]) => style);
-
-      setInsights({
-        totalOutfits: outfits.length,
-        favoriteColors: topColors,
-        favoriteStyles: topStyles,
-        lastOutfit: outfits[0] ? {
-          title: outfits[0].title,
-          mood: outfits[0].mood,
-          created_at: outfits[0].created_at
-        } : undefined
-      });
-    } catch (error) {
-      console.error('Error loading outfit insights:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return null;
-  }
+    return {
+      totalOutfits: outfits.length,
+      favoriteColors: topColors,
+      favoriteStyles: topStyles,
+      lastOutfit: outfits[0]
+        ? {
+            title: outfits[0].title,
+            mood: outfits[0].mood,
+            created_at: outfits[0].created_at,
+          }
+        : undefined,
+    };
+  }, [outfits]);
 
   if (!insights || insights.totalOutfits === 0) {
     return (

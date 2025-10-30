@@ -1,16 +1,30 @@
 import { useState, useRef, useMemo } from 'react';
-import { useOutfits, Outfit } from '@/hooks/useOutfits';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Loader2, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { OutfitModal } from '@/components/OutfitModal';
 import { OutfitRemixButton } from '@/components/OutfitRemixButton';
 import { OptimizedImage } from '@/components/ui/optimized-image';
+import { Outfit } from '@/types/outfit';
+import { useDeleteOutfit, useOutfitsQuery } from '@/hooks/useOutfitsQuery';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export const OutfitGallery = () => {
-  const { outfits, loading, deleteOutfit } = useOutfits();
+  const { user } = useAuthStore();
+  const { data: outfits = [], isLoading } = useOutfitsQuery(user?.id);
+  const { mutate: deleteOutfit } = useDeleteOutfit();
   const [selectedOutfit, setSelectedOutfit] = useState<Outfit | null>(null);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
@@ -48,10 +62,10 @@ export const OutfitGallery = () => {
     scrollContainerRef.current?.scrollBy({ left: 300, behavior: 'smooth' });
   };
 
-  if (loading && outfits.length === 0) {
+  if (isLoading && outfits.length === 0) {
     return (
       <div className="flex items-center justify-center p-8" role="status" aria-live="polite">
-        <Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" />
+        <Loader2 className="h-8 h-8 animate-spin" aria-hidden="true" />
         <span className="sr-only">Loading outfits...</span>
       </div>
     );
@@ -60,7 +74,9 @@ export const OutfitGallery = () => {
   if (outfits.length === 0) {
     return (
       <div className="text-center p-8" role="status">
-        <p className="text-muted-foreground">No outfits generated yet. Create your first outfit!</p>
+        <p className="text-muted-foreground">
+          No outfits generated yet. Create your first outfit!
+        </p>
       </div>
     );
   }
@@ -144,11 +160,10 @@ const OutfitCard = ({ outfit, onDelete, onClick }: OutfitCardProps) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     });
   };
 
-  // Simple blur placeholder
   const blurDataURL = useMemo(() => {
     return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNjY2MiLz48L3N2Zz4=';
   }, []);
@@ -261,7 +276,16 @@ const OutfitCard = ({ outfit, onDelete, onClick }: OutfitCardProps) => {
 
         {/* Action Buttons */}
         <div className="flex gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
-          <OutfitRemixButton outfit={outfit} variant="outline" />
+          <OutfitRemixButton
+            outfit={{
+              id: outfit.id || '',
+              title: outfit.title || '',
+              prompt: outfit.prompt || '',
+              mood: outfit.mood,
+              recommended_clothes: outfit.recommended_clothes,
+            }}
+            variant="outline"
+          />
         </div>
       </CardContent>
     </Card>

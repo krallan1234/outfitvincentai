@@ -2,11 +2,12 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AppLayout } from '@/components/AppLayout';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
+import { analytics } from '@/lib/analytics';
 import Index from './pages/Index';
 import AuthPage from './pages/AuthPage';
 import PolicyPage from './pages/PolicyPage';
@@ -47,6 +48,13 @@ const LoadingFallback = () => (
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, loading } = useAuth();
+
+  useEffect(() => {
+    // Track authentication status
+    if (isAuthenticated) {
+      analytics.identify(String(Date.now())); // Use actual user ID from auth
+    }
+  }, [isAuthenticated]);
 
   if (loading) {
     return (

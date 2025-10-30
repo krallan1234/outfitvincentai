@@ -3,6 +3,10 @@ import App from './App.tsx';
 import './index.css';
 import { registerServiceWorker } from './lib/pwa';
 import { logger } from './lib/logger';
+import { analytics } from './lib/analytics';
+
+// Initialize analytics
+analytics.init();
 
 // Register PWA Service Worker in production
 if (import.meta.env.PROD) {

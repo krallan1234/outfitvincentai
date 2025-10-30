@@ -5,6 +5,7 @@ import { OutfitGenerationParamsSchema } from '@/lib/validations';
 import { logger } from '@/lib/logger';
 import { sanitizeUserInput, checkGenerationRateLimit } from '@/lib/security';
 import { toast } from 'sonner';
+import { analytics } from '@/lib/analytics';
 import { z } from 'zod';
 
 interface GenerateOutfitInput {
@@ -22,6 +23,13 @@ export const useGenerateOutfit = () => {
 
   return useMutation({
     mutationFn: async (params: GenerateOutfitInput) => {
+      // Track generation start
+      analytics.track('outfit_generation_started', { 
+        has_occasion: !!params.occasion,
+        has_weather: !!params.weather,
+        has_selected_items: !!params.selectedItems?.length
+      });
+
       // Get user
       const {
         data: { user },
@@ -91,6 +99,13 @@ export const useGenerateOutfit = () => {
       queryClient.invalidateQueries({ queryKey: ['outfits'] });
       toast.success(data.fromCache ? 'Loaded from cache!' : 'Outfit generated successfully!');
       logger.info('Outfit generation succeeded', { outfitId: data.outfit.id });
+      
+      // Track successful generation
+      analytics.trackOutfitGenerated({
+        outfit_id: data.outfit.id,
+        from_cache: data.fromCache,
+        item_count: data.recommendedClothes?.length || 0
+      });
     },
     onError: (error) => {
       const errorMessage =

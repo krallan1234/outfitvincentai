@@ -1,0 +1,59 @@
+{
+  "name": "OutfitVincentAI",
+  "short_name": "OutfitAI",
+  "description": "AI-powered outfit generator for your wardrobe",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#8B7355",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/dashboard-background.jpg",
+      "sizes": "1280x720",
+      "type": "image/jpeg",
+      "form_factor": "wide"
+    }
+  ],
+  "categories": ["lifestyle", "fashion"],
+  "shortcuts": [
+    {
+      "name": "Generate Outfit",
+      "short_name": "Generate",
+      "description": "Create a new outfit",
+      "url": "/generator",
+      "icons": [
+        {
+          "src": "/favicon.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "My Outfits",
+      "short_name": "Outfits",
+      "description": "View your outfit history",
+      "url": "/history",
+      "icons": [
+        {
+          "src": "/favicon.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

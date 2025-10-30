@@ -1,13 +1,22 @@
-import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
-import "./index.css";
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
+import './index.css';
+import { registerServiceWorker } from './lib/pwa';
+import { logger } from './lib/logger';
 
-// Global safety: ensure no stale service worker caches cause mixed React versions
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
-}
-if ('caches' in window) {
-  caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+// Register PWA Service Worker in production
+if (import.meta.env.PROD) {
+  registerServiceWorker().catch((err) => {
+    logger.error('Failed to register service worker', err);
+  });
+} else {
+  // Clean up service workers in development to avoid conflicts
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
+  }
+  if ('caches' in window) {
+    caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+  }
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById('root')!).render(<App />);

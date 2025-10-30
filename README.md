@@ -136,6 +136,73 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+- React Query (@tanstack/react-query)
+- Zustand (state management)
+- Zod (validation)
+
+## Performance Optimizations
+
+### Bundle Analysis
+Run bundle analysis to inspect chunk sizes:
+```bash
+npm run build -- --mode analyze
+```
+This generates `bundle-analysis.html` with detailed bundle breakdown.
+
+### PWA Support
+- **Service Worker**: Automatic caching for offline functionality
+- **Image Caching**: Workbox strategies for optimal image loading
+- **API Caching**: NetworkFirst strategy for Supabase calls
+- **Installable**: Add to home screen on mobile devices
+- **Manifest**: Full PWA manifest with shortcuts
+
+### Code Splitting Strategy
+Optimized bundle chunks:
+- `react-vendor`: React, React DOM, React Router
+- `query-vendor`: TanStack React Query
+- `ui-vendor`: Radix UI components
+- `supabase-vendor`: Supabase client
+- `utils-vendor`: Lodash, Zod, date-fns
+- `chart-vendor`: Recharts
+
+### Image Optimization
+- **OptimizedImage Component**: Lazy loading with blur placeholders
+- **Responsive Sizes**: Automatic srcset generation
+- **WebP/AVIF**: Modern format support
+- **Loading Strategy**: Native lazy loading + intersection observer fallback
+
+### React Query Caching
+- **5-minute stale time** for user data
+- **Automatic refetching** on window focus
+- **Optimistic updates** for instant UI feedback
+- **Query invalidation** for data consistency
+- **Retry logic**: 2-3 retries with exponential backoff
+
+### Infinite Scroll
+History page uses infinite scroll via `useInfiniteQuery` for efficient large dataset handling.
+
+### Performance Utilities
+`src/lib/performance.ts` provides:
+- `measurePerformance()` - Measure operation timing
+- `reportWebVitals()` - Track Core Web Vitals
+- `prefetchRoute()` - Prefetch routes for faster navigation
+- `debounce()` / `throttle()` - Rate limiting helpers
+
+### Lighthouse Performance Goals
+**Target: 100/100 Performance Score**
+
+Metrics:
+- First Contentful Paint: < 1.8s
+- Largest Contentful Paint: < 2.5s
+- Total Blocking Time: < 200ms
+- Cumulative Layout Shift: < 0.1
+- Speed Index: < 3.4s
+
+**Production Optimizations:**
+- Terser minification with console removal
+- CSS code splitting
+- Gzip/Brotli compression
+- 1000kb chunk size limit
 
 ## Security & Configuration
 

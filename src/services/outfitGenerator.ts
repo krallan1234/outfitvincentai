@@ -1,6 +1,7 @@
 import { outfitsApi, profilesApi } from '@/api/supabase';
 import { supabase } from '@/integrations/supabase/client';
 import { UserPreferences } from '@/types/generator';
+import { validateColorHarmony } from '@/utils/colorTheory';
 
 export interface ClothingItem {
   id: string;
@@ -26,19 +27,39 @@ export interface PinterestPin {
 
 /**
  * Validates that selected items don't conflict (e.g., no dress + top/bottom)
+ * Also validates color harmony
  */
-export function validateSelectedItems(items: ClothingItem[]): boolean {
-  const categories = items.map(item => item.analysis?.main_category || 'other');
+export function validateSelectedItems(items: any[]): { 
+  isValid: boolean; 
+  reason?: string 
+} {
+  if (!items || items.length === 0) return { isValid: true };
+
+  const categories = items.map(item => 
+    item.analysis?.main_category || item.category?.toLowerCase() || 'other'
+  );
   
-  const hasDress = categories.includes('dress');
-  const hasTop = categories.includes('top');
-  const hasBottom = categories.includes('bottom');
+  const hasDress = categories.some(cat => cat.includes('dress'));
+  const hasTop = categories.some(cat => cat.includes('top'));
+  const hasBottom = categories.some(cat => cat.includes('bottom'));
 
   if (hasDress && (hasTop || hasBottom)) {
-    return false;
+    return { isValid: false, reason: 'Cannot combine dress with top/bottom' };
   }
 
-  return true;
+  // Validate color harmony if there are multiple colored items
+  const colors = items
+    .map(item => item.analysis?.color || item.color)
+    .filter((color): color is string => !!color && color !== 'unknown');
+
+  if (colors.length >= 2) {
+    const colorValidation = validateColorHarmony(colors);
+    if (!colorValidation.isValid) {
+      return { isValid: false, reason: colorValidation.explanation };
+    }
+  }
+
+  return { isValid: true };
 }
 
 /**

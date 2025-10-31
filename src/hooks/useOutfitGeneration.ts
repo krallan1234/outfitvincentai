@@ -9,6 +9,7 @@ import {
   PinterestPin,
 } from '@/types/generator';
 import { ClothingItem } from '@/types/outfit';
+import { validateSelectedItems } from '@/services/outfitGenerator';
 
 const GENERATION_TIPS = [
   'Analyzing your wardrobe selections...',
@@ -28,77 +29,6 @@ export const useOutfitGeneration = () => {
 
   const { generateOutfit: generateOutfitAPI } = useOutfits();
   const { toast } = useToast();
-
-  const validateSelectedItems = (items: ClothingItem[]): boolean => {
-    if (items.length === 0) return true;
-
-    const categories = items.map((item) => item.category.toLowerCase());
-
-    const topCategories = categories.filter((cat) =>
-      cat.includes('top') ||
-      cat.includes('shirt') ||
-      cat.includes('blouse') ||
-      cat.includes('sweater') ||
-      cat.includes('t-shirt') ||
-      cat.includes('tank')
-    );
-
-    const bottomCategories = categories.filter((cat) =>
-      cat.includes('bottom') ||
-      cat.includes('pants') ||
-      cat.includes('jeans') ||
-      cat.includes('skirt') ||
-      cat.includes('shorts') ||
-      cat.includes('trousers')
-    );
-
-    const dressCategories = categories.filter((cat) =>
-      cat.includes('dress') || cat.includes('jumpsuit')
-    );
-
-    if (topCategories.length > 1) {
-      toast({
-        title: 'Selection Conflict',
-        description: 'You can only select one top item. Please remove duplicate tops.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-
-    if (bottomCategories.length > 1) {
-      toast({
-        title: 'Selection Conflict',
-        description:
-          'You can only select one bottom item. Please remove duplicate bottoms.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-
-    if (dressCategories.length > 1) {
-      toast({
-        title: 'Selection Conflict',
-        description: 'You can only select one dress. Please remove duplicates.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-
-    if (
-      dressCategories.length > 0 &&
-      (topCategories.length > 0 || bottomCategories.length > 0)
-    ) {
-      toast({
-        title: 'Selection Conflict',
-        description:
-          'Cannot select a dress with tops or bottoms. Choose either a dress OR top+bottom combination.',
-        variant: 'destructive',
-      });
-      return false;
-    }
-
-    return true;
-  };
 
   const enhancePromptWithContext = (
     prompt: string,
@@ -203,7 +133,13 @@ export const useOutfitGeneration = () => {
     }
 
     // Validate selected items
-    if (!validateSelectedItems(selectedItems)) {
+    const validation = validateSelectedItems(selectedItems);
+    if (!validation.isValid) {
+      toast({
+        title: 'Invalid Selection',
+        description: validation.reason || 'Selected items conflict',
+        variant: 'destructive',
+      });
       return null;
     }
 

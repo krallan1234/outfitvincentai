@@ -71,6 +71,26 @@ export const useSignedUrl = (bucket: string, path: string | null, expiresIn: num
 const getCacheKey = (bucket: string, path: string) => `signed_url_${bucket}_${path}`;
 
 /**
+ * Clear all cached signed URLs for a bucket
+ * Used when new items are added to invalidate cache
+ */
+export const clearSignedUrlCache = (bucket: string) => {
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(`signed_url_${bucket}_`)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    console.log(`[useSignedUrl] Cleared ${keysToRemove.length} cached URLs for bucket: ${bucket}`);
+  } catch (err) {
+    console.warn('[useSignedUrl] Failed to clear cache:', err);
+  }
+};
+
+/**
  * Get cached signed URL from localStorage
  */
 const getCachedUrl = (bucket: string, path: string): string | null => {

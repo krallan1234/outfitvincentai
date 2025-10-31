@@ -695,10 +695,44 @@ serve(async (req) => {
 
     // Main outfit generation with Gemini
     const generateOutfitWithGemini = async () => {
+      // Build Pinterest inspiration context
+      let pinterestInspiration = '';
+      if (pinterestContext) {
+        pinterestInspiration = `\nPINTEREST TRENDS:\n${pinterestContext}\n`;
+        if (pinterestPins && pinterestPins.length > 0) {
+          const topPins = pinterestPins.slice(0, 5);
+          pinterestInspiration += `\nTOP TRENDING STYLES:\n`;
+          topPins.forEach((pin: any, i: number) => {
+            pinterestInspiration += `${i + 1}. "${pin.title}" - ${pin.description || 'Trending fashion'}\n`;
+            if (pin.dominant_color) pinterestInspiration += `   Color: ${pin.dominant_color}\n`;
+          });
+        }
+      }
+      if (boardInspiration) {
+        pinterestInspiration += `\nUSER'S PINTEREST BOARD INSPIRATION:\n${boardInspiration}\n`;
+      }
+
+      // Build seasonal recommendations based on weather
+      let seasonalAdvice = '';
+      if (finalWeatherData) {
+        const temp = finalWeatherData.temperature;
+        if (temp < 10) {
+          seasonalAdvice = '\nSEASONAL GUIDANCE: Cold weather - prioritize layering, warm outerwear, closed-toe shoes. Avoid shorts, sandals, sleeveless tops.';
+        } else if (temp < 20) {
+          seasonalAdvice = '\nSEASONAL GUIDANCE: Cool weather - light layers recommended. Balance warmth and style.';
+        } else if (temp < 28) {
+          seasonalAdvice = '\nSEASONAL GUIDANCE: Warm weather - breathable fabrics, lighter colors recommended.';
+        } else {
+          seasonalAdvice = '\nSEASONAL GUIDANCE: Hot weather - prioritize breathable, light fabrics. Avoid heavy layering and dark colors.';
+        }
+      }
+
       const fullPrompt = `Generate detailed outfit JSON based on this request: ${prompt}
 
 MOOD: ${mood || 'stylish'}
 ${finalWeatherData ? `WEATHER: ${finalWeatherData.temperature}°C, ${finalWeatherData.condition}` : ''}
+${seasonalAdvice}
+${pinterestInspiration}
 
 USER PROFILE:
 ${completeUserPreferences.gender ? `Gender: ${completeUserPreferences.gender}` : ''}
@@ -718,7 +752,9 @@ ${selectedItem ? `MUST INCLUDE: ${JSON.stringify(selectedItem)}` : ''}
 RULES:
 - ONLY use items from AVAILABLE WARDROBE (use exact IDs)
 - Create complete outfit: top+bottom+shoes OR dress+shoes
-- Match style to prompt and weather
+- Match style to prompt, weather, and Pinterest trends
+- Follow seasonal guidance strictly
+- Ensure color harmony (complementary or analogous colors)
 - Include accessories if available
 - Generate imagePrompt for Unsplash`;
 

@@ -51,7 +51,7 @@ serve(async (req) => {
   }
 
   try {
-    const { urls, expiresIn = 300 } = await req.json() as SignUrlRequest;
+    const { urls, expiresIn = 86400 } = await req.json() as SignUrlRequest; // 24 hours default
     
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
       throw new Error('urls array is required');

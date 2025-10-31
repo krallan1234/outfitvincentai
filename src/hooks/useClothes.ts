@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { clearSignedUrlCache } from '@/hooks/useSignedUrl';
 
 export interface ClothingItem {
   id: string;
@@ -146,6 +147,9 @@ export const useClothes = () => {
         .single();
 
       if (dbError) throw dbError;
+
+      // Clear signed URL cache to ensure new items load fresh URLs
+      clearSignedUrlCache('clothes');
 
       setClothes(prev => [clothingData, ...prev]);
       toast({

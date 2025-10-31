@@ -47,16 +47,30 @@ serve(async (req) => {
 
     // Fetch top posts from fashion subreddits
     const response = await fetch(
-      `https://www.reddit.com/r/streetwear+malefashionadvice+femalefashionadvice/top.json?t=week&limit=${limit}`,
+      `https://www.reddit.com/r/streetwear+malefashionadvice+femalefashionadvice/top.json?t=week&limit=${limit}&raw_json=1`,
       {
         headers: {
-          'User-Agent': 'LovableApp/1.0',
+          'User-Agent': 'stylo.se-ai-stylist/1.0 (+https://www.stylo.se)',
+          'Accept': 'application/json',
+          'Referer': 'https://www.stylo.se'
         },
       }
     );
 
     if (!response.ok) {
-      throw new Error(`Reddit API error: ${response.status}`);
+      console.warn('Reddit API error:', response.status);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          query,
+          total_posts: 0,
+          trending_styles: [],
+          trending_keywords: [],
+          top_posts: [],
+          ai_context: 'Reddit-data otillgänglig. Fortsätter med Pinterest och Instagram om tillgängligt.'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const data = await response.json();
@@ -147,12 +161,15 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
-        ai_context: '',
+        error: error instanceof Error ? error.message : String(error),
+        ai_context: 'Kunde inte hämta Reddit-trender. Fortsätter med övriga källor.',
         top_posts: [],
+        trending_styles: [],
+        trending_keywords: [],
+        query: ''
       }),
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

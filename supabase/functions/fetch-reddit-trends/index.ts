@@ -29,7 +29,19 @@ serve(async (req) => {
   }
 
   try {
-    const { query = '', limit = 15 } = await req.json();
+    // Support both GET and POST methods
+    let query = '';
+    let limit = 15;
+
+    if (req.method === 'POST') {
+      const body = await req.json();
+      query = body.query || '';
+      limit = body.limit || 15;
+    } else if (req.method === 'GET') {
+      const url = new URL(req.url);
+      query = url.searchParams.get('query') || '';
+      limit = parseInt(url.searchParams.get('limit') || '15');
+    }
 
     console.log('Fetching Reddit fashion trends:', { query, limit });
 

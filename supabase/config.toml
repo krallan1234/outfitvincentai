@@ -3,6 +3,15 @@ project_id = "bichfpvapfibrpplrtcr"
 [functions.pinterest-auth]
 verify_jwt = false
 
+[functions.fetch-reddit-trends]
+verify_jwt = false
+
+[functions.fetch-instagram-trends]
+verify_jwt = false
+
+[functions.ai-stylist]
+verify_jwt = true
+
 [functions.fetch-pinterest-board]
 verify_jwt = true
 

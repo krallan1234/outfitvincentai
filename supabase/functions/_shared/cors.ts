@@ -2,8 +2,7 @@
 const ALLOWED_ORIGINS = [
   'https://2c95fd08-586c-4e21-9ff9-bea6ea888afc.lovableproject.com',
   'https://2c95fd08-586c-4e21-9ff9-bea6ea888afc-dev.lovableproject.com',
-  // Add your production domain here when deployed
-  // 'https://yourdomain.com',
+  'https://www.stylo.se',
 ];
 
 export const getCorsHeaders = (origin?: string): Record<string, string> => {
@@ -25,4 +24,12 @@ export const handleCorsPreFlight = (origin?: string): Response => {
     status: 204,
     headers: getCorsHeaders(origin),
   });
+};
+
+// Default CORS headers for simple usage
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-forwarded-for',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
+  'Access-Control-Max-Age': '86400',
 };

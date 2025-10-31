@@ -389,44 +389,8 @@ export const OutfitModal = ({ outfit, isOpen, onClose, onLike, showLikeButton = 
           {/* AI Stylist Explanation */}
           <AIStylistExplanation outfit={outfit} />
 
-          {/* AI Stylist Explanation */}
-          <AIStylistExplanation outfit={outfit} />
-
-          {/* Outfit Visual */}
+          {/* Outfit Items */}
           <div className="space-y-3 sm:space-y-4">
-            <h3 className="text-base sm:text-lg font-semibold font-serif flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-accent" />
-              Outfit Visualization
-            </h3>
-            
-            {/* Generated Image */}
-            {outfit.generated_image_url && (
-              <div className="w-full bg-muted rounded-xl overflow-hidden shadow-elegant border border-primary/10 aspect-[3/4] sm:aspect-video flex items-center justify-center">
-                <img
-                  src={outfit.generated_image_url}
-                  alt={outfit.title}
-                  className="w-full h-full object-contain pointer-events-none select-none transition-none"
-                  loading="eager"
-                  style={{ 
-                    minHeight: '200px',
-                    maxHeight: '50vh',
-                  }}
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    target.style.display = 'none';
-                    const parent = target.parentElement;
-                    if (parent) {
-                      parent.innerHTML = `
-                        <div class="w-full h-full flex items-center justify-center text-muted-foreground">
-                          <span>Image preview unavailable</span>
-                        </div>
-                      `;
-                    }
-                  }}
-                />
-              </div>
-            )}
-
             {/* Clothes Grid */}
             {loading ? (
               <div className="flex items-center justify-center p-8">

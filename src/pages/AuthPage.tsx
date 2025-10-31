@@ -32,7 +32,7 @@ const AuthPage = () => {
       // Security: Validate inputs before submission
       const validation = authSchema.omit({ displayName: true }).safeParse({ email, password });
       if (!validation.success) {
-        const firstError = validation.error.errors[0];
+        const firstError = validation.error.issues[0];
         toast({
           variant: "destructive",
           title: "Validation Error",
@@ -79,7 +79,7 @@ const AuthPage = () => {
       // Security: Validate inputs before submission
       const validation = authSchema.safeParse({ email, password, displayName });
       if (!validation.success) {
-        const firstError = validation.error.errors[0];
+        const firstError = validation.error.issues[0];
         toast({
           variant: 'destructive',
           title: 'Validation Error',

@@ -11,6 +11,23 @@ import {
 import { ClothingItem } from '@/types/outfit';
 import { validateSelectedItems } from '@/services/outfitGenerator';
 
+export interface StylistAnalysis {
+  user_style_summary?: string;
+  reddit_trend_summary?: string;
+  combined_trend_summary?: string;
+  outfits?: Array<{
+    id: number;
+    style_name: string;
+    items: Array<{
+      type: string;
+      description: string;
+      item_id?: string;
+    }>;
+    trend_reason: string;
+    trend_sources: string[];
+  }>;
+}
+
 const GENERATION_TIPS = [
   'Analyzing your wardrobe selections...',
   'Finding perfect color combinations...',
@@ -26,6 +43,7 @@ export const useOutfitGeneration = () => {
     tip: '',
     error: null,
   });
+  const [stylistAnalysis, setStylistAnalysis] = useState<StylistAnalysis | null>(null);
 
   const { generateOutfit: generateOutfitAPI } = useOutfits();
   const { toast } = useToast();
@@ -121,6 +139,58 @@ export const useOutfitGeneration = () => {
     return '';
   };
 
+  const fetchInstagramTrends = async (
+    prompt: string
+  ): Promise<string> => {
+    try {
+      console.log('Fetching Instagram fashion trends for:', prompt);
+
+      const instagramResponse = await supabase.functions.invoke('fetch-instagram-trends', {
+        body: { query: prompt },
+      });
+
+      if (instagramResponse.data && !instagramResponse.error) {
+        return instagramResponse.data.ai_context || '';
+      }
+    } catch (err) {
+      console.warn('Failed to fetch Instagram trends, continuing without:', err);
+    }
+
+    return '';
+  };
+
+  const getAIStylistAnalysis = async (
+    prompt: string,
+    redditTrends: string,
+    pinterestContext: string,
+    instagramTrends: string,
+    userClothes: ClothingItem[],
+    selectedItems: ClothingItem[]
+  ) => {
+    try {
+      console.log('Getting AI Stylist analysis...');
+
+      const stylistResponse = await supabase.functions.invoke('ai-stylist', {
+        body: {
+          reddit_trends: redditTrends,
+          pinterest_data: pinterestContext,
+          instagram_trends: instagramTrends,
+          user_clothes: userClothes,
+          selected_items: selectedItems,
+          prompt: prompt,
+        },
+      });
+
+      if (stylistResponse.data && !stylistResponse.error) {
+        return stylistResponse.data.styling_analysis || null;
+      }
+    } catch (err) {
+      console.warn('Failed to get AI Stylist analysis:', err);
+    }
+
+    return null;
+  };
+
   const startGenerationProgress = (hasWeather: boolean): NodeJS.Timeout => {
     let tipIndex = 0;
     const tips = hasWeather
@@ -198,15 +268,50 @@ export const useOutfitGeneration = () => {
         params.forceVariety
       );
 
-      // Fetch Pinterest trends
+      // Fetch all trend sources
       const { context: pinterestContext, pins: pinterestPins } =
         await fetchPinterestTrends(enhancedPrompt);
-
-      // Fetch Reddit trends
       const redditContext = await fetchRedditTrends(enhancedPrompt);
+      const instagramContext = await fetchInstagramTrends(enhancedPrompt);
 
-      // Combine contexts
-      const combinedContext = [pinterestContext, redditContext]
+      // Get comprehensive AI Stylist analysis
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      let allUserClothes: ClothingItem[] = [];
+      
+      if (currentUser) {
+        const { data: clothesData } = await supabase
+          .from('clothes')
+          .select('*')
+          .eq('user_id', currentUser.id);
+        
+        if (clothesData) {
+          allUserClothes = clothesData as ClothingItem[];
+        }
+      }
+
+      const aiStylistAnalysis = await getAIStylistAnalysis(
+        enhancedPrompt,
+        redditContext,
+        pinterestContext,
+        instagramContext,
+        allUserClothes,
+        selectedItems
+      );
+
+      console.log('AI Stylist Analysis:', aiStylistAnalysis);
+      
+      // Store stylist analysis in state for UI display
+      if (aiStylistAnalysis) {
+        setStylistAnalysis(aiStylistAnalysis);
+      }
+
+      // Combine all contexts for backend
+      const combinedContext = [
+        pinterestContext,
+        redditContext,
+        instagramContext,
+        aiStylistAnalysis ? `\nAI STYLIST ANALYSIS:\n${JSON.stringify(aiStylistAnalysis, null, 2)}` : ''
+      ]
         .filter(ctx => ctx)
         .join('\n\n');
 
@@ -275,5 +380,6 @@ export const useOutfitGeneration = () => {
   return {
     ...state,
     generate,
+    stylistAnalysis,
   };
 };

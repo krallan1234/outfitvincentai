@@ -101,6 +101,26 @@ export const useOutfitGeneration = () => {
     return { context: '', pins: [] };
   };
 
+  const fetchRedditTrends = async (
+    prompt: string
+  ): Promise<string> => {
+    try {
+      console.log('Fetching Reddit fashion trends for:', prompt);
+
+      const redditResponse = await supabase.functions.invoke('fetch-reddit-trends', {
+        body: { query: prompt, limit: 15 },
+      });
+
+      if (redditResponse.data && !redditResponse.error) {
+        return redditResponse.data.ai_context || '';
+      }
+    } catch (err) {
+      console.warn('Failed to fetch Reddit trends, continuing without:', err);
+    }
+
+    return '';
+  };
+
   const startGenerationProgress = (hasWeather: boolean): NodeJS.Timeout => {
     let tipIndex = 0;
     const tips = hasWeather
@@ -182,6 +202,14 @@ export const useOutfitGeneration = () => {
       const { context: pinterestContext, pins: pinterestPins } =
         await fetchPinterestTrends(enhancedPrompt);
 
+      // Fetch Reddit trends
+      const redditContext = await fetchRedditTrends(enhancedPrompt);
+
+      // Combine contexts
+      const combinedContext = [pinterestContext, redditContext]
+        .filter(ctx => ctx)
+        .join('\n\n');
+
       // Generate outfit
       const result = await generateOutfitAPI(
         enhancedPrompt,
@@ -192,7 +220,7 @@ export const useOutfitGeneration = () => {
         params.purchaseLinks,
         params.weather,
         userPreferences,
-        pinterestContext,
+        combinedContext,
         pinterestPins,
         params.shouldGenerateImage
       );

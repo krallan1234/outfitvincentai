@@ -2,6 +2,7 @@ import { OutfitModal } from '@/components/OutfitModal';
 import { Outfit } from '@/hooks/useOutfits';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface ResultPreviewProps {
   outfit: Outfit | null;
@@ -30,12 +31,35 @@ export const ResultPreview = ({ outfit, isOpen, onClose }: ResultPreviewProps) =
 
   if (!outfit) return null;
 
+  // Extract AI analysis data
+  const aiAnalysis = outfit.ai_analysis as any;
+  const reasoningFeedback = aiAnalysis?.reasoningFeedback || aiAnalysis?.reasoning;
+  const styleProfile = aiAnalysis?.styleProfile;
+
   return (
-    <OutfitModal
-      outfit={outfit}
-      isOpen={isOpen}
-      onClose={onClose}
-      showLikeButton={false}
-    />
+    <>
+      <OutfitModal
+        outfit={outfit}
+        isOpen={isOpen}
+        onClose={onClose}
+        showLikeButton={false}
+      />
+      
+      {/* AI Reasoning Display - shown in modal */}
+      {isOpen && reasoningFeedback && (
+        <div className="fixed inset-x-4 bottom-20 sm:right-4 sm:left-auto sm:w-96 z-50 animate-in slide-in-from-bottom">
+          <div className="p-4 bg-muted/95 backdrop-blur-sm rounded-lg border border-muted-foreground/20 shadow-lg">
+            <p className="text-sm text-muted-foreground italic">
+              💭 <strong className="text-foreground">AI's analys:</strong> "{reasoningFeedback}"
+            </p>
+            {styleProfile && (
+              <Badge variant="secondary" className="mt-2">
+                Stil: {styleProfile}
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 };

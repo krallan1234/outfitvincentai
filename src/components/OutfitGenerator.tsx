@@ -25,6 +25,7 @@ import { ExamplePrompts } from './outfit-generator/ExamplePrompts';
 import { ContextSelectors } from './outfit-generator/ContextSelectors';
 import { ResultPreview } from './outfit-generator/ResultPreview';
 import { ResultControls } from './outfit-generator/ResultControls';
+import { InspirationExamples } from './outfit-generator/InspirationExamples';
 import { OutfitGenerationResult } from '@/types/generator';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -43,11 +44,33 @@ export const OutfitGenerator = () => {
   const [shouldGenerateImage, setShouldGenerateImage] = useState<boolean>(false);
   const [pinterestBoardId, setPinterestBoardId] = useState<string | undefined>(undefined);
   const [forceVariety, setForceVariety] = useState<boolean>(false);
+  const [recentOutfits, setRecentOutfits] = useState<OutfitGenerationResult[]>([]);
 
   const { toast } = useToast();
   const { preferences, location } = useUserPreferences();
   const { weather } = useWeather(location);
   const { loading, step, tip, generate } = useOutfitGeneration();
+
+  // Load recent outfits from localStorage on mount
+  useEffect(() => {
+    const cached = localStorage.getItem('recent-outfits');
+    if (cached) {
+      try {
+        setRecentOutfits(JSON.parse(cached).slice(0, 3));
+      } catch (e) {
+        console.error('Failed to load cached outfits:', e);
+      }
+    }
+  }, []);
+
+  // Save to localStorage when generatedOutfit changes
+  useEffect(() => {
+    if (generatedOutfit) {
+      const updated = [generatedOutfit, ...recentOutfits].slice(0, 3);
+      setRecentOutfits(updated);
+      localStorage.setItem('recent-outfits', JSON.stringify(updated));
+    }
+  }, [generatedOutfit]);
 
   const handleGenerate = async (regenerate: boolean = false): Promise<void> => {
     const result = await generate(
@@ -91,6 +114,27 @@ export const OutfitGenerator = () => {
     } else {
       setSelectedItems([...selectedItems, item]);
     }
+  };
+
+  const handleRandomize = async () => {
+    const randomPrompts = [
+      'Överraska mig med en trendig outfit',
+      'Blanda klassiskt och modernt',
+      'Skapa en outfit med oväntat färgval',
+      'Bold statement-look',
+      'Minimalistisk elegans',
+      'Avslappnad men stylish',
+      'Kreativ vardagsstil',
+      'Sofistikerad enkelhet'
+    ];
+    const randomIndex = Math.floor(Math.random() * randomPrompts.length);
+    setPrompt(randomPrompts[randomIndex]);
+    setForceVariety(true);
+    
+    // Small delay to let user see the prompt change
+    setTimeout(() => {
+      handleGenerate(false);
+    }, 300);
   };
 
   return (
@@ -192,8 +236,30 @@ export const OutfitGenerator = () => {
           {/* Quick Prompts */}
           <QuickPrompts onSelect={setPrompt} disabled={loading} />
 
+          {/* Inspiration Examples */}
+          <InspirationExamples
+            onSelect={(text, mood) => {
+              setPrompt(text);
+              if (mood) setMood(mood);
+            }}
+            disabled={loading}
+          />
+
           {/* Custom Prompt */}
           <PromptEditor value={prompt} onChange={setPrompt} disabled={loading} />
+
+          {/* Tips Box */}
+          <div className="flex items-start gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+            <span className="text-xl">💬</span>
+            <div className="flex-1 text-sm">
+              <p className="font-semibold text-blue-900 dark:text-blue-100">
+                Tips för bästa resultat
+              </p>
+              <p className="text-blue-700 dark:text-blue-300 mt-1">
+                Exempel: "Skapa en streetwear-look för hösten" eller "En elegant outfit för middag med vänner"
+              </p>
+            </div>
+          </div>
 
           {/* Context Selectors */}
           <ContextSelectors
@@ -286,6 +352,24 @@ export const OutfitGenerator = () => {
             </TooltipProvider>
           </div>
 
+          {/* Recent Outfits Button */}
+          {recentOutfits.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                toast({
+                  title: '📁 Senaste outfits',
+                  description: `Du har ${recentOutfits.length} sparade outfit${recentOutfits.length > 1 ? 's' : ''} i cache`,
+                  duration: 3000,
+                });
+              }}
+              className="text-muted-foreground"
+            >
+              📁 Visa senaste ({recentOutfits.length})
+            </Button>
+          )}
+
           {/* Result Controls */}
           <ResultControls
             loading={loading}
@@ -294,6 +378,7 @@ export const OutfitGenerator = () => {
             shouldGenerateImage={shouldGenerateImage}
             onGenerate={() => handleGenerate(false)}
             onRegenerate={() => handleGenerate(true)}
+            onRandomize={handleRandomize}
             onImageGenerationToggle={setShouldGenerateImage}
           />
         </CardContent>

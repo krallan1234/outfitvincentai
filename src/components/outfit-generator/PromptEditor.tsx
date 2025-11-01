@@ -61,9 +61,9 @@ export const PromptEditor = ({ value, onChange, disabled = false }: PromptEditor
 
   return (
     <div className="space-y-2">
-      <Label htmlFor="prompt">Describe Your Outfit</Label>
+      <Label htmlFor="prompt-editor">Describe Your Outfit</Label>
       <Textarea
-        id="prompt"
+        id="prompt-editor"
         value={localValue}
         onChange={(e) => handleChange(e.target.value)}
         placeholder="e.g., 'Formal office wear in blue tones' or 'Casual summer outfit for a picnic'"

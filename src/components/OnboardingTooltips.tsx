@@ -20,6 +20,13 @@ const ONBOARDING_STEPS: TooltipStep[] = [
     position: 'bottom'
   },
   {
+    id: 'prompt-tips',
+    target: 'prompt-editor',
+    title: '✨ Beskriv hur du vill känna dig',
+    description: 'Skriv hur du vill känna dig idag – AI:n skapar din outfit! Exempel: "Proffsig men bekväm för möte" eller "Trendig streetwear för hösten"',
+    position: 'bottom'
+  },
+  {
     id: 'preferences',
     target: 'preferences-section',
     title: 'Personalize Your Experience',

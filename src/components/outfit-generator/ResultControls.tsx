@@ -10,6 +10,7 @@ interface ResultControlsProps {
   shouldGenerateImage: boolean;
   onGenerate: () => void;
   onRegenerate: () => void;
+  onRandomize: () => void;
   onImageGenerationToggle: (checked: boolean) => void;
 }
 
@@ -20,6 +21,7 @@ export const ResultControls = ({
   shouldGenerateImage,
   onGenerate,
   onRegenerate,
+  onRandomize,
   onImageGenerationToggle,
 }: ResultControlsProps) => {
   return (
@@ -44,6 +46,18 @@ export const ResultControls = ({
 
       {/* Action Buttons */}
       <div className="flex gap-2">
+        {/* Randomize Button */}
+        <Button
+          onClick={onRandomize}
+          disabled={loading}
+          variant="outline"
+          size="icon"
+          className="px-4"
+          title="Överraska mig med en slumpmässig outfit"
+        >
+          🎲
+        </Button>
+
         <Button
           onClick={onGenerate}
           className="flex-1"

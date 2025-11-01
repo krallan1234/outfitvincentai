@@ -209,6 +209,47 @@ export const useOutfitGeneration = () => {
     }, 3000);
   };
 
+  // Retry wrapper with exponential backoff
+  const generateWithRetry = async (params: any, maxRetries = 2): Promise<any> => {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await generateOutfitAPI(
+          params.prompt,
+          params.mood,
+          params.isPublic,
+          params.pinterestBoardId,
+          params.selectedItems,
+          params.purchaseLinks,
+          params.weather,
+          params.userPreferences,
+          params.combinedContext,
+          params.pinterestPins,
+          params.shouldGenerateImage
+        );
+        return result;
+      } catch (error) {
+        lastError = error as Error;
+        console.warn(`Generation attempt ${attempt + 1} failed:`, error);
+        
+        if (attempt < maxRetries) {
+          // Exponential backoff: 1s, 2s
+          const delay = 1000 * Math.pow(2, attempt);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          toast({
+            title: 'Försöker igen...',
+            description: `Försök ${attempt + 2}/${maxRetries + 1}`,
+            duration: 2000,
+          });
+        }
+      }
+    }
+    
+    throw lastError || new Error('Generation failed after retries');
+  };
+
   const generate = async (
     params: OutfitGenerationParams,
     selectedItems: ClothingItem[] = []
@@ -315,20 +356,20 @@ export const useOutfitGeneration = () => {
         .filter(ctx => ctx)
         .join('\n\n');
 
-      // Generate outfit
-      const result = await generateOutfitAPI(
-        enhancedPrompt,
-        params.mood,
-        params.isPublic !== false,
-        params.pinterestBoardId,
-        selectedItems.length > 0 ? selectedItems : undefined,
-        params.purchaseLinks,
-        params.weather,
+      // Generate outfit with retry logic
+      const result = await generateWithRetry({
+        prompt: enhancedPrompt,
+        mood: params.mood,
+        isPublic: params.isPublic !== false,
+        pinterestBoardId: params.pinterestBoardId,
+        selectedItems: selectedItems.length > 0 ? selectedItems : undefined,
+        purchaseLinks: params.purchaseLinks,
+        weather: params.weather,
         userPreferences,
         combinedContext,
         pinterestPins,
-        params.shouldGenerateImage
-      );
+        shouldGenerateImage: params.shouldGenerateImage
+      });
 
       console.log('✅ Outfit generation API result:', {
         hasOutfit: !!result?.outfit,

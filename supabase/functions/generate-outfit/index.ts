@@ -621,9 +621,10 @@ serve(async (req) => {
     console.log(`Avoiding ${recentItemIds.length} recently used items for variety${forceVariety ? ' (Force Variety Mode)' : ''}`);
 
     // Helper function to call Gemini with structured JSON output
-    // Default temperature increased from 0.4 to 0.7 for more variety
-    // Use 0.95 when forceVariety is enabled for maximum creativity
-    const defaultTemperature = forceVariety ? 0.95 : 0.7;
+    // Temperature fine-tuned for balance between quality and variety
+    // 0.65 default: maintains quality while enabling variation
+    // 0.85 forceVariety: increased creativity without chaos
+    const defaultTemperature = forceVariety ? 0.85 : 0.65;
     const callGeminiStructured = async (prompt: string, schema: any, temperature = defaultTemperature) => {
       const response = await withRetry(
         async () => {
@@ -758,15 +759,41 @@ ${completeUserPreferences.gender ? `Gender: ${completeUserPreferences.gender}` :
 ${completeUserPreferences.style_preferences ? `Style: ${JSON.stringify(completeUserPreferences.style_preferences)}` : ''}
 ${completeUserPreferences.favorite_colors ? `Favorite Colors: ${JSON.stringify(completeUserPreferences.favorite_colors)}` : ''}
 
-${forceVariety && recentItemIds.length > 0 ? `🎨 VARIETY REQUIREMENT:
-Try to AVOID using these recently used items (unless absolutely necessary):
-${JSON.stringify(recentItemIds)}
+💎 QUALITY + VARIETY BALANCE:
+- CREATE a complete, wearable outfit that looks GOOD together
+- ENSURE color harmony and style coherence
+- BUT avoid falling into repetitive patterns:
+  * Don't always pick the safest neutral colors
+  * Rotate between different outfit silhouettes
+  * Mix textures and styles creatively
+  * Try unexpected (but harmonious) color combinations
 
-GOAL: Create a fresh, different outfit that showcases OTHER items from the wardrobe.
-Prioritize items that haven't been featured in recent outfits.
-${itemUsageStats && itemUsageStats.length > 0 ? `\nITEM FRESHNESS INFO:
-Items rarely used (PRIORITIZE THESE): ${validClothes.filter(c => !usageMap.has(c.id) || usageMap.get(c.id)!.usage_count <= 2).map(c => c.id).slice(0, 10).join(', ')}
-Items frequently used (AVOID): ${itemUsageStats.slice(0, 5).map(s => s.item_id).join(', ')}` : ''}
+${forceVariety ? `🎨 CREATIVE VARIATION MODE (ACTIVE):
+- PRIORITIZE items marked as ✨ FRESH or 🆕 RARELY USED
+- EXPERIMENT with bolder color pairings (while maintaining harmony)
+- TRY different outfit structures than usual
+- THINK: "What would surprise the user positively?"
+` : `🎯 SUBTLE VARIATION MODE:
+- Consider items that haven't been used recently
+- Add subtle variations in style/color from previous outfits
+- Balance familiarity with freshness
+`}
+
+${forceVariety && recentItemIds.length > 0 ? `📊 RECENT OUTFIT PATTERNS (to avoid repetition):
+Recently used ${recentItemIds.length} items: ${JSON.stringify(recentItemIds.slice(0, 8))}
+
+GOAL: Create something that feels DIFFERENT from recent patterns while maintaining quality.
+` : ''}
+
+${itemUsageStats && itemUsageStats.length > 0 ? `📈 ITEM FRESHNESS INFO:
+${validClothes.filter(c => !usageMap.has(c.id) || usageMap.get(c.id)!.usage_count === 0).slice(0, 5).map(c => `🆕 NEVER USED: ${c.id} (${c.category}, ${c.analysis.color})`).join('\n')}
+${validClothes.filter(c => usageMap.has(c.id) && usageMap.get(c.id)!.usage_count <= 2).slice(0, 5).map(c => `✨ RARELY USED: ${c.id} (${c.category}, ${c.analysis.color})`).join('\n')}
+${itemUsageStats.slice(0, 3).map(s => {
+  const item = validClothes.find(c => c.id === s.item_id);
+  const daysSinceUse = (Date.now() - new Date(s.last_used_at).getTime()) / (1000 * 60 * 60 * 24);
+  if (daysSinceUse > 14) return `🌟 NOT USED IN 2+ WEEKS: ${s.item_id} (${item?.category})`;
+  return `🔄 USED ${s.usage_count}x recently: ${s.item_id} (${item?.category})`;
+}).join('\n')}
 ` : ''}
 
 AVAILABLE WARDROBE:
@@ -817,7 +844,7 @@ ${selectedItem ? '- YOU MUST include ALL selected items listed above in your out
         required: ['description', 'imagePrompt', 'stylingTips', 'colorHarmony']
       };
 
-      return await callGeminiStructured(fullPrompt, outfitSchema, 0.5);
+      return await callGeminiStructured(fullPrompt, outfitSchema);
     };
 
     // Process outfit generation result

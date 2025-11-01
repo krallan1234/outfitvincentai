@@ -747,10 +747,14 @@ OUTERWEAR: ${JSON.stringify(clothesByCategory.outerwear.map(i => ({ id: i.id, ca
 FOOTWEAR: ${JSON.stringify(clothesByCategory.footwear.map(i => ({ id: i.id, category: i.category, color: i.analysis.color })))}
 ACCESSORIES: ${JSON.stringify(clothesByCategory.accessories.map(i => ({ id: i.id, category: i.category, color: i.analysis.color })))}
 
-${selectedItem ? `MUST INCLUDE: ${JSON.stringify(selectedItem)}` : ''}
+${selectedItem ? `🚨 CRITICAL REQUIREMENT - YOU MUST INCLUDE THESE SELECTED ITEMS IN THE OUTFIT:
+${JSON.stringify(selectedItem, null, 2)}
+
+These items are MANDATORY and must be used in the outfit response. Build the rest of the outfit around these selected pieces. Match their exact IDs in your response.` : ''}
 
 RULES:
 - ONLY use items from AVAILABLE WARDROBE (use exact IDs)
+${selectedItem ? '- YOU MUST include ALL selected items listed above in your outfit response' : ''}
 - Create complete outfit: top+bottom+shoes OR dress+shoes
 - Match style to prompt, weather, and Pinterest trends
 - Follow seasonal guidance strictly
@@ -879,22 +883,39 @@ RULES:
         throw new Error('Outfit has invalid structure');
       }
 
-      // Validate selected items are included if any
+      // Validate and auto-include selected items if any
       if (selectedItem) {
         const selectedIds = Array.isArray(selectedItem) 
           ? selectedItem.map((i: any) => i.id) 
           : [selectedItem.id];
-        const outfitIds = bestOutfit.outfit.items.map((i: any) => i.item_id);
-        const allIncluded = selectedIds.every((id: string) => outfitIds.includes(id));
+        const outfitItemIds = bestOutfit.outfit.items.map((i: any) => i.item_id);
         
-        if (!allIncluded) {
-          return errorResponse(
-            400,
-            'Could not create outfit with selected items',
-            'SELECTED_ITEMS_NOT_INCLUDED',
-            undefined,
-            corsHeaders
-          );
+        // Check which selected items are missing
+        const missingIds = selectedIds.filter((id: string) => !outfitItemIds.includes(id));
+        
+        if (missingIds.length > 0) {
+          logger.warn('Selected items not in AI response, auto-adding them', { missingIds });
+          
+          // Auto-add missing selected items to the outfit
+          for (const missingId of missingIds) {
+            const selectedItemData = Array.isArray(selectedItem) 
+              ? selectedItem.find((i: any) => i.id === missingId)
+              : (selectedItem.id === missingId ? selectedItem : null);
+            
+            if (selectedItemData) {
+              const clothesItem = validClothes.find(c => c.id === missingId);
+              if (clothesItem) {
+                bestOutfit.outfit.items.push({
+                  item_id: missingId,
+                  category: clothesItem.category,
+                  item_name: clothesItem.category,
+                  color: clothesItem.analysis.color,
+                  style: clothesItem.analysis.style
+                });
+                logger.info('Auto-added selected item to outfit', { itemId: missingId, category: clothesItem.category });
+              }
+            }
+          }
         }
       }
 

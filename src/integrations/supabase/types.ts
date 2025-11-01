@@ -495,7 +495,9 @@ export type Database = {
           gender: string | null
           id: string
           location: string | null
+          occasion_preferences: Json | null
           privacy_settings: Json | null
+          size_information: Json | null
           skin_tone: string | null
           style_preferences: Json | null
           updated_at: string
@@ -512,7 +514,9 @@ export type Database = {
           gender?: string | null
           id?: string
           location?: string | null
+          occasion_preferences?: Json | null
           privacy_settings?: Json | null
+          size_information?: Json | null
           skin_tone?: string | null
           style_preferences?: Json | null
           updated_at?: string
@@ -529,7 +533,9 @@ export type Database = {
           gender?: string | null
           id?: string
           location?: string | null
+          occasion_preferences?: Json | null
           privacy_settings?: Json | null
+          size_information?: Json | null
           skin_tone?: string | null
           style_preferences?: Json | null
           updated_at?: string

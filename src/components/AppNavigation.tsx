@@ -12,6 +12,7 @@ const navigationItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutGrid, public: false },
   { name: 'Outfits', href: '/outfits', icon: Sparkles, public: false },
   { name: 'Advanced', href: '/advanced-generator', icon: Sparkles, public: false },
+  { name: 'Style Profile', href: '/style-profile', icon: User, public: false },
   { name: 'Calendar', href: '/calendar', icon: CalendarDays, public: false },
   { name: 'Messages', href: '/messages', icon: MessageCircle, public: false },
   { name: 'Community', href: '/community', icon: Users, public: false },

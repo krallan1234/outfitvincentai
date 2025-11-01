@@ -27,6 +27,9 @@ const GeneratorPage = lazy(() =>
 const AdvancedGeneratorPage = lazy(() =>
   import('./pages/AdvancedGeneratorPage').then((m) => ({ default: m.AdvancedGeneratorPage }))
 );
+const StyleProfilePage = lazy(() =>
+  import('./pages/StyleProfilePage').then((m) => ({ default: m.StyleProfilePage }))
+);
 const HistoryPage = lazy(() =>
   import('./pages/HistoryPage').then((m) => ({ default: m.HistoryPage }))
 );
@@ -103,6 +106,14 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <AdvancedGeneratorPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/style-profile"
+                  element={
+                    <ProtectedRoute>
+                      <StyleProfilePage />
                     </ProtectedRoute>
                   }
                 />

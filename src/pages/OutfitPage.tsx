@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OutfitGenerator } from '@/components/OutfitGenerator';
 import { OutfitGallery } from '@/components/OutfitGallery';
+import { OutfitGalleryMasonry } from '@/components/OutfitGalleryMasonry';
 import {
   Card,
   CardContent,
@@ -8,9 +9,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Images } from 'lucide-react';
+import { Images, LayoutGrid } from 'lucide-react';
+import { useOutfitsQuery } from '@/hooks/useOutfitsQuery';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const OutfitPage = () => {
+  const { user } = useAuthStore();
+  const { data: outfits = [] } = useOutfitsQuery(user?.id);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-muted/20 to-background">
       <div className="container mx-auto px-4 py-8 animate-fade-in">
@@ -24,7 +30,7 @@ const OutfitPage = () => {
         </div>
 
         <Tabs defaultValue="generate" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md mb-8 p-1 bg-muted/50 rounded-xl">
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl mb-8 p-1 bg-muted/50 rounded-xl">
             <TabsTrigger
               value="generate"
               className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
@@ -36,6 +42,12 @@ const OutfitPage = () => {
               className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
             >
               My Outfits
+            </TabsTrigger>
+            <TabsTrigger
+              value="masonry"
+              className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              Gallery View
             </TabsTrigger>
           </TabsList>
 
@@ -56,6 +68,23 @@ const OutfitPage = () => {
               </CardHeader>
               <CardContent>
                 <OutfitGallery />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="masonry" className="mt-6">
+            <Card className="card-elegant border-0 shadow-xl">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-2xl flex items-center gap-2">
+                  <LayoutGrid className="h-6 w-6 text-primary" />
+                  Outfit Gallery
+                </CardTitle>
+                <CardDescription className="text-base">
+                  Advanced gallery with filters, sorting, and comparison
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <OutfitGalleryMasonry outfits={outfits} />
               </CardContent>
             </Card>
           </TabsContent>

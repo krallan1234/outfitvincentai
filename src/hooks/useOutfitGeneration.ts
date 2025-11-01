@@ -8,7 +8,7 @@ import {
   GenerationState,
   PinterestPin,
 } from '@/types/generator';
-import { ClothingItem } from '@/types/outfit';
+import { ClothingItem } from '@/hooks/useClothes';
 import { validateSelectedItems } from '@/services/outfitGenerator';
 
 export interface StylistAnalysis {

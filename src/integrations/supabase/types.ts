@@ -233,6 +233,44 @@ export type Database = {
           },
         ]
       }
+      outfit_feedback: {
+        Row: {
+          confidence_score: number | null
+          created_at: string | null
+          feedback_type: string
+          id: string
+          outfit_id: string
+          style_context: Json | null
+          user_id: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string | null
+          feedback_type: string
+          id?: string
+          outfit_id: string
+          style_context?: Json | null
+          user_id: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string | null
+          feedback_type?: string
+          id?: string
+          outfit_id?: string
+          style_context?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outfit_feedback_outfit_id_fkey"
+            columns: ["outfit_id"]
+            isOneToOne: false
+            referencedRelation: "outfits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outfit_generation_cache: {
         Row: {
           cache_key: string
@@ -301,6 +339,7 @@ export type Database = {
       outfits: {
         Row: {
           ai_analysis: Json | null
+          confidence_score: number | null
           created_at: string
           description: string | null
           generated_image_url: string | null
@@ -311,12 +350,16 @@ export type Database = {
           prompt: string
           purchase_links: Json | null
           recommended_clothes: Json | null
+          styling_tips: Json | null
           title: string
+          trend_relevance: number | null
           updated_at: string
           user_id: string
+          weather_score: number | null
         }
         Insert: {
           ai_analysis?: Json | null
+          confidence_score?: number | null
           created_at?: string
           description?: string | null
           generated_image_url?: string | null
@@ -327,12 +370,16 @@ export type Database = {
           prompt: string
           purchase_links?: Json | null
           recommended_clothes?: Json | null
+          styling_tips?: Json | null
           title: string
+          trend_relevance?: number | null
           updated_at?: string
           user_id: string
+          weather_score?: number | null
         }
         Update: {
           ai_analysis?: Json | null
+          confidence_score?: number | null
           created_at?: string
           description?: string | null
           generated_image_url?: string | null
@@ -343,9 +390,12 @@ export type Database = {
           prompt?: string
           purchase_links?: Json | null
           recommended_clothes?: Json | null
+          styling_tips?: Json | null
           title?: string
+          trend_relevance?: number | null
           updated_at?: string
           user_id?: string
+          weather_score?: number | null
         }
         Relationships: []
       }

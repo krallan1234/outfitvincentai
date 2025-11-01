@@ -110,7 +110,7 @@ export const useGenerateOutfit = () => {
     onError: (error) => {
       const errorMessage =
         error instanceof z.ZodError
-          ? error.errors[0].message
+          ? error.issues[0].message
           : error instanceof Error
             ? error.message
             : 'Failed to generate outfit';

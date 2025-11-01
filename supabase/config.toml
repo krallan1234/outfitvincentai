@@ -50,3 +50,6 @@ verify_jwt = true
 
 [functions.outfit-recommendations]
 verify_jwt = true
+
+[functions.save-outfit-feedback]
+verify_jwt = true

@@ -16,7 +16,7 @@ import { OutfitHistory } from './OutfitHistory';
 import { OutfitGenerationProgress } from './OutfitGenerationProgress';
 import { OnboardingTooltips } from './OnboardingTooltips';
 import { ErrorModal, useErrorModal } from './ErrorModal';
-import { ClothingItem } from '@/types/outfit';
+import { ClothingItem } from '@/hooks/useClothes';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PinterestTrendsPreview } from './PinterestTrendsPreview';
 import { PromptEditor } from './outfit-generator/PromptEditor';

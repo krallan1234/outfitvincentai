@@ -24,6 +24,9 @@ const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const GeneratorPage = lazy(() =>
   import('./pages/GeneratorPage').then((m) => ({ default: m.GeneratorPage }))
 );
+const AdvancedGeneratorPage = lazy(() =>
+  import('./pages/AdvancedGeneratorPage').then((m) => ({ default: m.AdvancedGeneratorPage }))
+);
 const HistoryPage = lazy(() =>
   import('./pages/HistoryPage').then((m) => ({ default: m.HistoryPage }))
 );
@@ -92,6 +95,14 @@ const App = () => {
                   element={
                     <ProtectedRoute>
                       <GeneratorPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/advanced-generator"
+                  element={
+                    <ProtectedRoute>
+                      <AdvancedGeneratorPage />
                     </ProtectedRoute>
                   }
                 />

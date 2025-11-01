@@ -135,6 +135,7 @@ serve(async (req) => {
       pinterestContext, 
       pinterestPins, 
       generateImage,
+      forceVariety,
     } = validationResult.data;
 
     // Verify user authorization (authenticated user must match requested userId)
@@ -156,12 +157,13 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Generate cache key
-    const cacheKey = await generateCacheKey(prompt, userId, mood);
-    logger.info('Cache key generated', { cacheKey: cacheKey.substring(0, 16) + '...' });
+    // Generate cache key (include timestamp when forceVariety is true to bust cache)
+    const cacheKeySuffix = forceVariety ? Date.now().toString() : '';
+    const cacheKey = await generateCacheKey(prompt + cacheKeySuffix, userId, mood);
+    logger.info('Cache key generated', { cacheKey: cacheKey.substring(0, 16) + '...', forceVariety });
 
-    // Check cache first (only if no specific items are selected)
-    if (!selectedItem) {
+    // Check cache first (only if no specific items are selected and not forcing variety)
+    if (!selectedItem && !forceVariety) {
       logger.info('Checking cache for existing outfit...');
       const { data: cachedOutfit, error: cacheError } = await supabase
         .from('outfit_generation_cache')
@@ -200,8 +202,10 @@ serve(async (req) => {
       }
 
       logger.info('Cache miss, proceeding with AI generation');
-    } else {
+    } else if (selectedItem) {
       logger.info('Cache skipped due to selected items');
+    } else if (forceVariety) {
+      logger.info('Cache skipped due to forceVariety mode');
     }
 
     // Check API key configuration
@@ -590,22 +594,37 @@ serve(async (req) => {
       console.log(`Using ${pinterestTrends.length} Pinterest trend pins from frontend`);
     }
 
-    // Get recent outfits to avoid repeats
+    // Get recent outfits to avoid repeats (fetch more when forceVariety is enabled)
     const { data: recentOutfits } = await supabase
       .from('outfits')
       .select('recommended_clothes, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(forceVariety ? 10 : 5);
     
     const recentItemIds = recentOutfits
       ?.flatMap(o => o.recommended_clothes || [])
       .filter((id, index, self) => self.indexOf(id) === index) || [];
     
-    console.log(`Avoiding ${recentItemIds.length} recently used items for variety`);
+    // Fetch item usage stats for weighting
+    const { data: itemUsageStats } = await supabase
+      .from('outfit_item_usage')
+      .select('item_id, usage_count, last_used_at')
+      .eq('user_id', userId)
+      .order('usage_count', { ascending: false });
+    
+    // Create usage map for quick lookup
+    const usageMap = new Map(
+      itemUsageStats?.map(stat => [stat.item_id, stat]) || []
+    );
+    
+    console.log(`Avoiding ${recentItemIds.length} recently used items for variety${forceVariety ? ' (Force Variety Mode)' : ''}`);
 
     // Helper function to call Gemini with structured JSON output
-    const callGeminiStructured = async (prompt: string, schema: any, temperature = 0.4) => {
+    // Default temperature increased from 0.4 to 0.7 for more variety
+    // Use 0.95 when forceVariety is enabled for maximum creativity
+    const defaultTemperature = forceVariety ? 0.95 : 0.7;
+    const callGeminiStructured = async (prompt: string, schema: any, temperature = defaultTemperature) => {
       const response = await withRetry(
         async () => {
           const res = await fetch(`${geminiApiUrl}?key=${geminiApiKey}`, {
@@ -738,6 +757,17 @@ USER PROFILE:
 ${completeUserPreferences.gender ? `Gender: ${completeUserPreferences.gender}` : ''}
 ${completeUserPreferences.style_preferences ? `Style: ${JSON.stringify(completeUserPreferences.style_preferences)}` : ''}
 ${completeUserPreferences.favorite_colors ? `Favorite Colors: ${JSON.stringify(completeUserPreferences.favorite_colors)}` : ''}
+
+${forceVariety && recentItemIds.length > 0 ? `🎨 VARIETY REQUIREMENT:
+Try to AVOID using these recently used items (unless absolutely necessary):
+${JSON.stringify(recentItemIds)}
+
+GOAL: Create a fresh, different outfit that showcases OTHER items from the wardrobe.
+Prioritize items that haven't been featured in recent outfits.
+${itemUsageStats && itemUsageStats.length > 0 ? `\nITEM FRESHNESS INFO:
+Items rarely used (PRIORITIZE THESE): ${validClothes.filter(c => !usageMap.has(c.id) || usageMap.get(c.id)!.usage_count <= 2).map(c => c.id).slice(0, 10).join(', ')}
+Items frequently used (AVOID): ${itemUsageStats.slice(0, 5).map(s => s.item_id).join(', ')}` : ''}
+` : ''}
 
 AVAILABLE WARDROBE:
 TOPS: ${JSON.stringify(clothesByCategory.top.map(i => ({ id: i.id, category: i.category, color: i.analysis.color })))}
@@ -1145,8 +1175,50 @@ ${selectedItem ? '- YOU MUST include ALL selected items listed above in your out
 
     console.log('Outfit generated and saved successfully');
 
-    // Save to cache (only if no specific items were selected)
-    if (!selectedItem) {
+    // Track item usage for variety system
+    if (legacyRecommendedItems && legacyRecommendedItems.length > 0) {
+      logger.info('Tracking item usage for variety system', { itemCount: legacyRecommendedItems.length });
+      
+      for (const itemId of legacyRecommendedItems) {
+        // Upsert item usage: increment count if exists, create if not
+        try {
+          const { data: existingUsage } = await supabase
+            .from('outfit_item_usage')
+            .select('usage_count')
+            .eq('user_id', userId)
+            .eq('item_id', itemId)
+            .single();
+          
+          if (existingUsage) {
+            // Update existing usage
+            await supabase
+              .from('outfit_item_usage')
+              .update({
+                last_used_at: new Date().toISOString(),
+                usage_count: existingUsage.usage_count + 1,
+              })
+              .eq('user_id', userId)
+              .eq('item_id', itemId);
+          } else {
+            // Insert new usage record
+            await supabase
+              .from('outfit_item_usage')
+              .insert({
+                user_id: userId,
+                item_id: itemId,
+                last_used_at: new Date().toISOString(),
+                usage_count: 1,
+              });
+          }
+        } catch (usageError) {
+          // Log but don't fail the request
+          logger.warn('Failed to track item usage', { itemId, error: usageError });
+        }
+      }
+    }
+
+    // Save to cache (only if no specific items were selected and not forcing variety)
+    if (!selectedItem && !forceVariety) {
       logger.info('Saving outfit to cache...');
       try {
         const cacheExpiry = new Date();
@@ -1181,6 +1253,10 @@ ${selectedItem ? '- YOU MUST include ALL selected items listed above in your out
       } catch (cacheError) {
         logger.error('Exception while saving to cache', cacheError);
       }
+    } else if (selectedItem) {
+      logger.info('Cache skipped due to selected items');
+    } else if (forceVariety) {
+      logger.info('Cache skipped due to forceVariety mode');
     }
 
     // Trigger automatic texture generation for all clothes items (async, don't wait)

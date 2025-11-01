@@ -27,6 +27,7 @@ export interface GenerationParams {
   mood?: string;
   weather?: any;
   userPreferences?: any;
+  forceVariety?: boolean;
 }
 
 const calculateOverallScore = (factors: ConfidenceBreakdown): number => {

@@ -336,6 +336,36 @@ export type Database = {
         }
         Relationships: []
       }
+      outfit_item_usage: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          last_used_at: string
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          last_used_at?: string
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          last_used_at?: string
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       outfit_likes: {
         Row: {
           created_at: string

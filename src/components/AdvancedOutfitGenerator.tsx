@@ -4,13 +4,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CloudRain, Sparkles, Loader2 } from 'lucide-react';
+import { CloudRain, Sparkles, Loader2, InfoIcon } from 'lucide-react';
 import { OutfitCard } from './OutfitCard';
 import { OutfitGenerationProgress } from './OutfitGenerationProgress';
 import { useAdvancedOutfitGenerator, GenerationParams } from '@/hooks/useAdvancedOutfitGenerator';
 import { useWeather } from '@/hooks/useWeather';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
 import { MOODS } from '@/types/generator';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const OCCASIONS = [
   { value: 'casual', label: 'Casual' },
@@ -25,6 +27,7 @@ export const AdvancedOutfitGenerator = () => {
   const [prompt, setPrompt] = useState('');
   const [occasion, setOccasion] = useState('');
   const [mood, setMood] = useState('');
+  const [forceVariety, setForceVariety] = useState(false);
   
   const { outfits, loading, generateMultiple, saveFeedback } = useAdvancedOutfitGenerator();
   const { preferences, location } = useUserPreferences();
@@ -41,6 +44,7 @@ export const AdvancedOutfitGenerator = () => {
       mood: mood || undefined,
       weather: weather || undefined,
       userPreferences: preferences || undefined,
+      forceVariety,
     };
 
     await generateMultiple(params);
@@ -135,6 +139,35 @@ export const AdvancedOutfitGenerator = () => {
               </span>
             </div>
           )}
+
+          {/* Force Variety Toggle */}
+          <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/50">
+            <Switch
+              checked={forceVariety}
+              onCheckedChange={setForceVariety}
+              disabled={loading}
+              id="force-variety-advanced"
+            />
+            <div className="flex-1">
+              <Label htmlFor="force-variety-advanced" className="flex items-center gap-2 cursor-pointer">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Force Different Items
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                AI will avoid recently used items for maximum variety
+              </p>
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InfoIcon className="w-4 h-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Enable for 5 unique outfits with items you haven't used recently. Higher AI creativity.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
 
           {/* Generate Button */}
           <Button 

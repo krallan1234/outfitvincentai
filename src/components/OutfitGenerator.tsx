@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CloudRain, Settings } from 'lucide-react';
+import { CloudRain, Settings, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useWeather } from '@/hooks/useWeather';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
@@ -26,6 +26,9 @@ import { ContextSelectors } from './outfit-generator/ContextSelectors';
 import { ResultPreview } from './outfit-generator/ResultPreview';
 import { ResultControls } from './outfit-generator/ResultControls';
 import { OutfitGenerationResult } from '@/types/generator';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { InfoIcon } from 'lucide-react';
 
 export const OutfitGenerator = () => {
   const [prompt, setPrompt] = useState<string>('');
@@ -39,13 +42,14 @@ export const OutfitGenerator = () => {
   const [pinterestTrendsPins, setPinterestTrendsPins] = useState<any[]>([]);
   const [shouldGenerateImage, setShouldGenerateImage] = useState<boolean>(false);
   const [pinterestBoardId, setPinterestBoardId] = useState<string | undefined>(undefined);
+  const [forceVariety, setForceVariety] = useState<boolean>(false);
 
   const { toast } = useToast();
   const { preferences, location } = useUserPreferences();
   const { weather } = useWeather(location);
   const { loading, step, tip, generate } = useOutfitGeneration();
 
-  const handleGenerate = async (forceVariety: boolean = false): Promise<void> => {
+  const handleGenerate = async (regenerate: boolean = false): Promise<void> => {
     const result = await generate(
       {
         prompt,
@@ -56,7 +60,7 @@ export const OutfitGenerator = () => {
         weather: weather || undefined,
         userPreferences: preferences || undefined,
         shouldGenerateImage,
-        forceVariety,
+        forceVariety: regenerate ? true : forceVariety, // Always force variety on regenerate
       },
       selectedItems
     );
@@ -252,6 +256,35 @@ export const OutfitGenerator = () => {
           </div>
 
           {loading && tip && <OutfitGenerationProgress step={step} tip={tip} />}
+
+          {/* Force Variety Toggle */}
+          <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/50">
+            <Switch
+              checked={forceVariety}
+              onCheckedChange={setForceVariety}
+              disabled={loading}
+              id="force-variety"
+            />
+            <div className="flex-1">
+              <Label htmlFor="force-variety" className="flex items-center gap-2 cursor-pointer">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Force Different Items
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                AI will avoid recently used items and create more diverse outfits
+              </p>
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InfoIcon className="w-4 h-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Enable this to get outfits with items you haven't used recently. Higher AI creativity for unique combinations.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
 
           {/* Result Controls */}
           <ResultControls

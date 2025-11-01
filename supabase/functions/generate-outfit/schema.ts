@@ -61,6 +61,7 @@ export const GenerateOutfitRequestSchema = z.object({
   pinterestContext: z.string().optional(),
   pinterestPins: z.array(PinterestPinSchema).optional(),
   generateImage: z.boolean().default(false),
+  forceVariety: z.boolean().default(false),
 });
 
 export type GenerateOutfitRequest = z.infer<typeof GenerateOutfitRequestSchema>;
